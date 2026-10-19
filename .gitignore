@@ -1,0 +1,8 @@
+.superpowers/
+.DS_Store
+node_modules/
+/web/build/
+/web/.svelte-kit/
+/bin/
+*.local
+.env
