@@ -1,0 +1,13 @@
+dn: ou=people,dc=example,dc=org
+objectClass: organizationalUnit
+ou: people
+
+dn: uid=thijs,ou=people,dc=example,dc=org
+objectClass: inetOrgPerson
+uid: thijs
+cn: Thijs Willems
+sn: Willems
+givenName: Thijs
+displayName: Thijs Willems
+mail: thijs@example.org
+userPassword: correct-horse-battery
