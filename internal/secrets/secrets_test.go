@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-
 func TestEnsureCreatesAllFiles(t *testing.T) {
 	dir := t.TempDir()
 	if err := Ensure(dir); err != nil {
