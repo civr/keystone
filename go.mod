@@ -3,6 +3,7 @@ module github.com/civr/keystone
 go 1.27
 
 require (
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-ldap/ldap/v3 v3.4.15
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/redis/go-redis/v9 v9.23.0
