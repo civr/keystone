@@ -3,12 +3,10 @@ package secrets
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 )
 
-var urlSafe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 func TestEnsureCreatesAllFiles(t *testing.T) {
 	dir := t.TempDir()
