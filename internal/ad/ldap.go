@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -29,10 +30,21 @@ func buildFilter(tmpl, username string) string {
 	return strings.ReplaceAll(tmpl, "%s", ldap.EscapeFilter(username))
 }
 
+func isLDAPS(u string) bool { return strings.HasPrefix(strings.ToLower(u), "ldaps://") }
+
 func tlsConfig(cfg Config) (*tls.Config, error) {
-	tc := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: cfg.InsecureSkipVerify} //nolint:gosec // admin-controlled setting
-	if cfg.MinTLS == "1.3" {
+	tc := &tls.Config{InsecureSkipVerify: cfg.InsecureSkipVerify} //nolint:gosec // admin-controlled setting
+	switch cfg.MinTLS {
+	case "", "1.2":
+		tc.MinVersion = tls.VersionTLS12
+	case "1.3":
 		tc.MinVersion = tls.VersionTLS13
+	default:
+		return nil, fmt.Errorf("ad: unsupported min TLS version %q (use 1.2 or 1.3)", cfg.MinTLS)
+	}
+	// go-ldap's StartTLS never sets ServerName, so derive it from the URL.
+	if u, err := url.Parse(cfg.URL); err == nil {
+		tc.ServerName = u.Hostname()
 	}
 	if cfg.CAPEM != "" {
 		pool := x509.NewCertPool()
@@ -47,13 +59,16 @@ func tlsConfig(cfg Config) (*tls.Config, error) {
 // connect dials, applies timeouts and closes the connection when ctx ends.
 // The returned func must be called to release resources.
 func connect(ctx context.Context, cfg Config) (*ldap.Conn, func(), error) {
+	if !isLDAPS(cfg.URL) && !cfg.StartTLS && !cfg.AllowPlaintext {
+		return nil, nil, errors.New("ad: plaintext ldap:// without StartTLS is not allowed (use ldaps://, enable StartTLS, or allow plaintext explicitly)")
+	}
 	tc, err := tlsConfig(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 	timeout := time.Duration(cfg.TimeoutSeconds) * time.Second
 	opts := []ldap.DialOpt{ldap.DialWithDialer(&net.Dialer{Timeout: timeout})}
-	if strings.HasPrefix(strings.ToLower(cfg.URL), "ldaps://") {
+	if isLDAPS(cfg.URL) {
 		opts = append(opts, ldap.DialWithTLSConfig(tc))
 	}
 	conn, err := ldap.DialURL(cfg.URL, opts...)
@@ -70,7 +85,7 @@ func connect(ctx context.Context, cfg Config) (*ldap.Conn, func(), error) {
 		}
 	}()
 	closeFn := func() { close(done); _ = conn.Close() }
-	if cfg.StartTLS && !strings.HasPrefix(strings.ToLower(cfg.URL), "ldaps://") {
+	if cfg.StartTLS && !isLDAPS(cfg.URL) {
 		if err := conn.StartTLS(tc); err != nil {
 			closeFn()
 			return nil, nil, fmt.Errorf("%w: starttls: %v", ErrUnavailable, err)

@@ -18,6 +18,7 @@ type Config struct {
 	UserFilter         string
 	MinTLS             string
 	TimeoutSeconds     int
+	AllowPlaintext     bool `json:"allow_plaintext"` // permit ldap:// without StartTLS
 }
 
 const (
