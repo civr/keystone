@@ -38,7 +38,7 @@ func Postgres(t *testing.T) string {
 
 // Valkey starts a valkey/valkey:8-alpine container and returns a redis:// URL.
 // It skips the test under -short.
-func Valkey(t *testing.T) string {
+func Valkey(t testing.TB) string {
 	t.Helper()
 	if testing.Short() {
 		t.Skip("skipping container test in -short mode")
