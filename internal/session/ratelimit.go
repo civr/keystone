@@ -35,6 +35,9 @@ func (l *Limiter) Allow(ctx context.Context, scope, key string, perMinute int) (
 // Fail records a failed login for account. Reaching LockoutThreshold locks the
 // account for LockoutMinutes and returns locked=true.
 func (l *Limiter) Fail(ctx context.Context, account string, cfg settings.Settings) (bool, error) {
+	if locked, _, err := l.Locked(ctx, account); err != nil || locked {
+		return locked, err // failures during a lock neither count nor extend it
+	}
 	window := time.Duration(cfg.BruteForce.LockoutMinutes) * time.Minute
 	fk := "fail:" + account
 	pipe := l.rdb.Pipeline()
@@ -47,7 +50,7 @@ func (l *Limiter) Fail(ctx context.Context, account string, cfg settings.Setting
 		return false, nil
 	}
 	pipe = l.rdb.Pipeline()
-	pipe.Set(ctx, "lock:"+account, 1, window)
+	pipe.SetNX(ctx, "lock:"+account, 1, window)
 	pipe.Del(ctx, fk) // fresh count once the lock lapses
 	if _, err := pipe.Exec(ctx); err != nil {
 		return false, err

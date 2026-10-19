@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,7 +24,8 @@ func newClient(t *testing.T) *redis.Client {
 	return rdb
 }
 
-var t0 = time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
+// Anchored to the real clock because Create computes Valkey TTLs from time.Now.
+var t0 = time.Now().Truncate(time.Second)
 
 func create(t *testing.T, s *Store, cfg settings.Settings) Session {
 	t.Helper()
@@ -162,5 +164,47 @@ func BenchmarkGet(b *testing.B) {
 		if _, err := s.Get(ctx, sess.ID, cfg, now); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestConcurrentUpdateNotRevertedBySlide(t *testing.T) {
+	ctx := context.Background()
+	s := NewStore(newClient(t))
+	cfg := settings.Defaults()
+	sess, err := s.Create(ctx, Session{CreatedAt: t0, LastSeenAt: t0, MustRegisterPasskey: true}, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			if _, err := s.Get(ctx, sess.ID, cfg, t0.Add(time.Duration(i+1)*time.Second)); err != nil {
+				t.Error(err)
+			}
+		}(i)
+	}
+	upd := sess
+	upd.MustRegisterPasskey = false
+	upd.LastPasskeyAt = t0
+	upd.LastSeenAt = t0 // stale value must not rewind last-seen
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := s.Update(ctx, upd); err != nil {
+			t.Error(err)
+		}
+	}()
+	wg.Wait()
+	got, err := s.Get(ctx, sess.ID, cfg, t0.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.MustRegisterPasskey || !got.LastPasskeyAt.Equal(t0) {
+		t.Fatalf("update reverted: %+v", got)
+	}
+	if got.LastSeenAt.Before(t0.Add(time.Minute)) {
+		t.Fatalf("last seen rewound: %v", got.LastSeenAt)
 	}
 }

@@ -70,3 +70,31 @@ func TestResetFailures(t *testing.T) {
 		t.Fatal("counter not reset")
 	}
 }
+
+func TestFailDuringLockDoesNotExtend(t *testing.T) {
+	ctx := context.Background()
+	rdb := newClient(t)
+	l := NewLimiter(rdb)
+	cfg := settings.Defaults()
+	cfg.BruteForce.LockoutThreshold = 2
+	_, _ = l.Fail(ctx, "x", cfg)
+	if locked, _ := l.Fail(ctx, "x", cfg); !locked {
+		t.Fatal("expected lock")
+	}
+	// age the lock, then fail again while locked
+	if err := rdb.Expire(ctx, "lock:x", time.Minute).Err(); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		if locked, _ := l.Fail(ctx, "x", cfg); !locked {
+			t.Fatal("still locked expected")
+		}
+	}
+	_, ttl, _ := l.Locked(ctx, "x")
+	if ttl > time.Minute {
+		t.Fatalf("lock extended to %v", ttl)
+	}
+	if n, _ := rdb.Exists(ctx, "fail:x").Result(); n != 0 {
+		t.Fatal("failures counted during lock")
+	}
+}
