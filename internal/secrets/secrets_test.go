@@ -48,14 +48,20 @@ func TestEnsureIsIdempotent(t *testing.T) {
 	}
 	before := map[string][]byte{}
 	for _, name := range Files {
-		b, _ := os.ReadFile(filepath.Join(dir, name))
+		b, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
 		before[name] = b
 	}
 	if err := Ensure(dir); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range Files {
-		b, _ := os.ReadFile(filepath.Join(dir, name))
+		b, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
 		if string(b) != string(before[name]) {
 			t.Errorf("%s changed on second Ensure", name)
 		}
@@ -93,5 +99,49 @@ func TestLoadMissingFileErrors(t *testing.T) {
 	_, err := Load(dir)
 	if err == nil || !strings.Contains(err.Error(), "session_key") {
 		t.Fatalf("err = %v, want mention of session_key", err)
+	}
+}
+
+func TestEnsureRejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(t.TempDir(), "elsewhere")
+	if err := os.WriteFile(target, make([]byte, 32), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(dir, "data_key")); err != nil {
+		t.Fatal(err)
+	}
+	err := Ensure(dir)
+	if err == nil || !strings.Contains(err.Error(), "data_key") {
+		t.Fatalf("err = %v, want error naming data_key", err)
+	}
+}
+
+func TestEnsureRejectsEmptyExistingKey(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "session_key"), nil, 0o400); err != nil {
+		t.Fatal(err)
+	}
+	err := Ensure(dir)
+	if err == nil || !strings.Contains(err.Error(), "session_key") {
+		t.Fatalf("err = %v, want error naming session_key", err)
+	}
+}
+
+func TestLoadRejectsShortPassword(t *testing.T) {
+	dir := t.TempDir()
+	if err := Ensure(dir); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, "valkey_password")
+	if err := os.Remove(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("short"), 0o400); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(dir)
+	if err == nil || !strings.Contains(err.Error(), "valkey_password") {
+		t.Fatalf("err = %v, want error naming valkey_password", err)
 	}
 }

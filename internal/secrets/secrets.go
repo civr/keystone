@@ -7,9 +7,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
+	"syscall"
 )
 
 // Files lists the secret file names Ensure manages.
@@ -45,9 +48,10 @@ func Ensure(dir string) error {
 }
 
 func writeNew(path string, content []byte) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o400)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o400)
 	if errors.Is(err, fs.ErrExist) {
-		return nil
+		_, err := readSecret(filepath.Dir(path), filepath.Base(path))
+		return err
 	}
 	if err != nil {
 		return err
@@ -64,35 +68,55 @@ func writeNew(path string, content []byte) error {
 	return nil
 }
 
-// Load reads all secret files from dir.
+var urlSafe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// readSecret reads and validates one secret file: it must be a regular file
+// (not a symlink), keys must be exactly 32 bytes, passwords >=32 URL-safe chars.
+func readSecret(dir, name string) ([]byte, error) {
+	path := filepath.Join(dir, name)
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return nil, fmt.Errorf("secrets: read %s: %w", name, err)
+	}
+	if !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("secrets: %s is not a regular file", name)
+	}
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, fmt.Errorf("secrets: read %s: %w", name, err)
+	}
+	defer f.Close()
+	b, err := io.ReadAll(io.LimitReader(f, 4096))
+	if err != nil {
+		return nil, fmt.Errorf("secrets: read %s: %w", name, err)
+	}
+	if isPassword(name) {
+		if len(b) < 32 || !urlSafe.Match(b) {
+			return nil, fmt.Errorf("secrets: %s must be at least 32 URL-safe characters", name)
+		}
+	} else if len(b) != 32 {
+		return nil, fmt.Errorf("secrets: %s has %d bytes, want 32", name, len(b))
+	}
+	return b, nil
+}
+
+// Load reads and validates all secret files from dir.
 func Load(dir string) (Secrets, error) {
 	var s Secrets
-	read := func(name string) ([]byte, error) {
-		b, err := os.ReadFile(filepath.Join(dir, name))
-		if err != nil {
-			return nil, fmt.Errorf("secrets: read %s: %w", name, err)
-		}
-		return b, nil
-	}
-	b, err := read("db_password")
+	b, err := readSecret(dir, "db_password")
 	if err != nil {
 		return s, err
 	}
 	s.DBPassword = string(b)
-	if b, err = read("valkey_password"); err != nil {
+	if b, err = readSecret(dir, "valkey_password"); err != nil {
 		return s, err
 	}
 	s.ValkeyPassword = string(b)
-	if s.SessionKey, err = read("session_key"); err != nil {
+	if s.SessionKey, err = readSecret(dir, "session_key"); err != nil {
 		return s, err
 	}
-	if s.DataKey, err = read("data_key"); err != nil {
+	if s.DataKey, err = readSecret(dir, "data_key"); err != nil {
 		return s, err
-	}
-	for name, k := range map[string][]byte{"session_key": s.SessionKey, "data_key": s.DataKey} {
-		if len(k) != 32 {
-			return s, fmt.Errorf("secrets: %s has %d bytes, want 32", name, len(k))
-		}
 	}
 	return s, nil
 }
