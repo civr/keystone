@@ -84,42 +84,34 @@ func VerifySecret(hash, s string) bool {
 	if len(parts) != 6 || parts[1] != "argon2id" {
 		return false
 	}
-	var version int
-	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version {
-		return false
-	}
-	var m, t uint32
-	var p uint8
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &m, &t, &p); err != nil {
-		return false
-	}
-	// Bound parameters so a corrupt row cannot trigger a huge allocation.
-	if m == 0 || m > 1<<20 || t == 0 || t > 20 || p == 0 {
+	// Exact match: rejects other parameters and trailing garbage.
+	if parts[2] != fmt.Sprintf("v=%d", argon2.Version) ||
+		parts[3] != fmt.Sprintf("m=%d,t=%d,p=%d", argonMemory, argonTime, argonThreads) {
 		return false
 	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
-	if err != nil {
+	if err != nil || len(salt) < argonSaltLen {
 		return false
 	}
 	want, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil || len(want) == 0 {
 		return false
 	}
-	got := argon2.IDKey([]byte(s), salt, t, m, p, uint32(len(want)))
+	got := argon2.IDKey([]byte(s), salt, argonTime, argonMemory, argonThreads, uint32(len(want)))
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
 const crockford = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-// RecoveryCode returns a random code formatted XXXX-XXXX (Crockford base32).
+// RecoveryCode returns a random code formatted XXXX-XXXX-XXXX-XXXX, 80 bits (Crockford base32).
 func RecoveryCode() string {
-	b := make([]byte, 8)
+	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
-	out := make([]byte, 0, 9)
+	out := make([]byte, 0, 19)
 	for i, v := range b {
-		if i == 4 {
+		if i > 0 && i%4 == 0 {
 			out = append(out, '-')
 		}
 		out = append(out, crockford[v&31])

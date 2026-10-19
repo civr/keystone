@@ -2,7 +2,9 @@ package crypto
 
 import (
 	"bytes"
+	"encoding/base64"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -62,17 +64,43 @@ func TestVerifySecret(t *testing.T) {
 	}
 }
 
+func TestVerifySecretStrictPHC(t *testing.T) {
+	h, _ := HashSecret("pw")
+	if !VerifySecret(h, "pw") {
+		t.Fatal("baseline failed")
+	}
+	parts := strings.Split(h, "$")
+	with := func(i int, v string) string {
+		c := append([]string(nil), parts...)
+		c[i] = v
+		return strings.Join(c, "$")
+	}
+	cases := map[string]string{
+		"other memory":     with(3, "m=1048576,t=3,p=2"),
+		"other time":       with(3, "m=65536,t=1,p=2"),
+		"other threads":    with(3, "m=65536,t=3,p=1"),
+		"trailing garbage": with(3, "m=65536,t=3,p=2,x=1"),
+		"other version":    with(2, "v=16"),
+		"short salt":       with(4, base64.RawStdEncoding.EncodeToString([]byte("short"))),
+	}
+	for name, hash := range cases {
+		if VerifySecret(hash, "pw") {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
 func TestRecoveryCodeFormat(t *testing.T) {
-	re := regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$`)
+	re := regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$`)
 	seen := map[string]bool{}
-	for i := 0; i < 200; i++ {
+	for i := 0; i < 1000; i++ {
 		c := RecoveryCode()
 		if !re.MatchString(c) {
 			t.Fatalf("bad code %q", c)
 		}
 		seen[c] = true
 	}
-	if len(seen) < 190 {
+	if len(seen) != 1000 {
 		t.Fatal("codes not random")
 	}
 }
