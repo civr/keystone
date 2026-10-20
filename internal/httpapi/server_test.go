@@ -50,6 +50,7 @@ func newEnv(t *testing.T, withValkey bool) *env {
 		}
 		rdb := redis.NewClient(opt)
 		t.Cleanup(func() { _ = rdb.Close() })
+		d.Valkey = rdb
 		d.Sessions = session.NewStore(rdb)
 		d.Limiter = session.NewLimiter(rdb)
 	}

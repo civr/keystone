@@ -6,6 +6,21 @@ import (
 	"net/http"
 )
 
+// maxJSONBody bounds request bodies decoded by readJSON.
+const maxJSONBody = 64 << 10
+
+// readJSON decodes the request body into v, rejecting unknown fields and
+// oversized bodies. On failure it writes a 400 and returns false.
+func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBody))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "Het verzoek is ongeldig.")
+		return false
+	}
+	return true
+}
+
 // writeJSON writes v as a JSON response with the given status.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

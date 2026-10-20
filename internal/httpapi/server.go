@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/audit"
@@ -21,12 +22,20 @@ import (
 type Deps struct {
 	Pool     *pgxpool.Pool
 	Settings *settings.Store
+	Valkey   *redis.Client // pending-login and WebAuthn ceremony state
 	Sessions *session.Store
 	Limiter  *session.Limiter
 	Dir      func() ad.Directory // current AD directory; nil while unconfigured
 	Audit    *audit.Writer
 	Secrets  secrets.Secrets
 	Shell    []byte // SPA shell; EmbeddedShell when empty
+
+	// SetupCodeHash is the argon2 hash of the setup code printed at startup;
+	// empty once setup is complete.
+	SetupCodeHash string
+	// TestAD checks an AD configuration (connect, service bind, count users).
+	// Nil means ad.Test with Secrets.DataKey; tests substitute a fake.
+	TestAD func(ctx context.Context, cfg ad.Config) (int, error)
 }
 
 type server struct {

@@ -25,6 +25,7 @@ import (
 
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/audit"
+	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/db"
 	"github.com/civr/keystone/internal/httpapi"
 	"github.com/civr/keystone/internal/secrets"
@@ -113,15 +114,22 @@ func serve(ctx context.Context) error {
 	defer aw.Close()
 	go aw.RunPurge(ctx, st)
 
+	setupHash, err := setupCode(ctx, pool)
+	if err != nil {
+		return err
+	}
+
 	handler := httpapi.New(httpapi.Deps{
-		Pool:     pool,
-		Settings: st,
-		Sessions: session.NewStore(rdb),
-		Limiter:  session.NewLimiter(rdb),
-		Dir:      directory(pool, sec.DataKey),
-		Audit:    aw,
-		Secrets:  sec,
-		Shell:    httpapi.EmbeddedShell,
+		Pool:          pool,
+		Settings:      st,
+		Valkey:        rdb,
+		Sessions:      session.NewStore(rdb),
+		Limiter:       session.NewLimiter(rdb),
+		Dir:           directory(pool, sec.DataKey),
+		Audit:         aw,
+		Secrets:       sec,
+		Shell:         httpapi.EmbeddedShell,
+		SetupCodeHash: setupHash,
 	})
 	srv := &http.Server{
 		Addr:              listenAddr,
@@ -150,6 +158,27 @@ func serve(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// setupCode generates a fresh setup code while setup is incomplete, logs it
+// and returns its argon2 hash (only the hash stays in memory). It returns ""
+// once setup is complete.
+func setupCode(ctx context.Context, pool *pgxpool.Pool) (string, error) {
+	var done bool
+	err := pool.QueryRow(ctx, `select completed_at is not null from setup_state where id = 1`).Scan(&done)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("setup state: %w", err)
+	}
+	if done {
+		return "", nil
+	}
+	code := crypto.RecoveryCode()
+	hash, err := crypto.HashSecret(code)
+	if err != nil {
+		return "", err
+	}
+	slog.Info("Keystone setup code: " + code)
+	return hash, nil
 }
 
 // directory returns the AD client for the stored configuration, or nil when

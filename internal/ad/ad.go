@@ -8,17 +8,17 @@ import (
 
 // Config describes the AD connection. Zero values get defaults via withDefaults.
 type Config struct {
-	URL                string
-	StartTLS           bool
-	InsecureSkipVerify bool
-	CAPEM              string
-	BindDN             string
-	BindPasswordSealed string
-	BaseDN             string
-	UserFilter         string
-	MinTLS             string
-	TimeoutSeconds     int
-	AllowPlaintext     bool `json:"allow_plaintext"` // permit ldap:// without StartTLS
+	URL                string `json:"url"`
+	StartTLS           bool   `json:"start_tls"`
+	InsecureSkipVerify bool   `json:"insecure_skip_verify"`
+	CAPEM              string `json:"ca_pem"`
+	BindDN             string `json:"bind_dn"`
+	BindPasswordSealed string `json:"bind_password_sealed"` // AES-GCM sealed with data_key
+	BaseDN             string `json:"base_dn"`
+	UserFilter         string `json:"user_filter"`
+	MinTLS             string `json:"min_tls"`
+	TimeoutSeconds     int    `json:"timeout_seconds"`
+	AllowPlaintext     bool   `json:"allow_plaintext"` // permit ldap:// without StartTLS
 }
 
 const (
