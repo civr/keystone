@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/passkey/passkeytest"
 	"github.com/civr/keystone/internal/session"
 	"github.com/civr/keystone/internal/settings"
@@ -580,5 +583,116 @@ func TestStepUpRequired(t *testing.T) {
 	after := l.session(t, c)
 	if !after.LastFullAuthAt.Equal(sess.LastFullAuthAt) {
 		t.Fatal("step-up changed LastFullAuthAt")
+	}
+}
+
+func sessionCookie(w interface{ Result() *http.Response }) *http.Cookie {
+	for _, c := range w.Result().Cookies() {
+		if c.Name == SessionCookie {
+			return c
+		}
+	}
+	return nil
+}
+
+func TestSlidingSessionRefreshesCookie(t *testing.T) {
+	t.Parallel()
+	l := newLoginEnv(t)
+	c := newClient(t, l.env, "192.168.1.40")
+	l.fullLogin(c)
+	sid := c.cookies[SessionCookie]
+	ctx := context.Background()
+	backdate := func() {
+		if err := l.deps.Valkey.HSet(ctx, "sess:"+sid, "seen", time.Now().Add(-2*time.Hour).UnixNano()).Err(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	backdate()
+	ck := sessionCookie(c.must("GET", "/api/me", nil, 200))
+	if ck == nil || ck.Value != sid || ck.MaxAge != 720*3600 || !ck.HttpOnly {
+		t.Fatalf("refreshed cookie = %+v", ck)
+	}
+	hour := time.Now().Truncate(time.Hour)
+	w := c.must("GET", "/api/me", nil, 200)
+	if ck := sessionCookie(w); ck != nil && time.Now().Truncate(time.Hour).Equal(hour) {
+		t.Fatalf("cookie re-issued again within the same hour: %+v", ck)
+	}
+
+	l.settings(t, func(s *settings.Settings) { s.Session.Sliding = false })
+	backdate()
+	if ck := sessionCookie(c.must("GET", "/api/me", nil, 200)); ck != nil {
+		t.Fatalf("non-sliding session re-issued cookie: %+v", ck)
+	}
+}
+
+func TestLoginBlockedBeforeSetupDone(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	c := newClient(t, s.env, "192.168.1.41")
+	s.unlock(c)
+	s.domain(c)
+	s.ad(c)
+	s.owner(c) // owner exists, no passkey, setup not finished
+
+	att := newClient(t, s.env, "192.168.1.42")
+	for _, p := range []string{"/api/auth/password", "/api/auth/passkey/begin", "/api/auth/passkey/finish",
+		"/api/auth/recovery", "/api/auth/emergency", "/api/auth/stepup/begin", "/api/auth/stepup/finish", "/api/auth/logout"} {
+		w := att.do("POST", p, map[string]string{"username": "thijs", "password": "correct horse"})
+		if w.Code != http.StatusConflict || errCode(t, w) != "setup_needed" {
+			t.Fatalf("%s before setup = %d %s", p, w.Code, w.Body.String())
+		}
+	}
+	if len(att.cookies) != 0 {
+		t.Fatalf("cookies set before setup: %v", att.cookies)
+	}
+	s.passkey(c)
+	c.must("POST", "/api/setup/finish", nil, 200)
+	if r := password(att, "thijs", "correct horse"); r.Code != 200 {
+		t.Fatalf("password after setup = %d %v", r.Code, r.Body)
+	}
+}
+
+// errDir is a Directory that always fails with err.
+type errDir struct{ err error }
+
+func (d errDir) Authenticate(context.Context, string, string) (ad.User, error) {
+	return ad.User{}, d.err
+}
+func (d errDir) Lookup(context.Context, string) (ad.User, error) { return ad.User{}, d.err }
+
+func TestADErrorClassification(t *testing.T) {
+	t.Parallel()
+	l := newLoginEnv(t)
+	with := func(err error) *client {
+		l.deps.Dir = func() ad.Directory { return errDir{err} }
+		l.h = New(l.deps)
+		return newClient(t, l.env, "192.168.1.43")
+	}
+
+	// Anything but ErrUnavailable is an internal error, not "AD down".
+	c := with(errors.New("ldap: unexpected result code 53"))
+	if r := password(c, "thijs", "correct horse"); r.Code != http.StatusInternalServerError || r.err() != "internal" {
+		t.Fatalf("password, other AD error = %d %v", r.Code, r.Body)
+	}
+	if w := c.do("POST", "/api/auth/emergency", map[string]string{"password": emergencyPassword}); w.Code != http.StatusInternalServerError || errCode(t, w) != "internal" {
+		t.Fatalf("emergency, other AD error = %d %s", w.Code, w.Body.String())
+	}
+
+	// A wrapped ErrUnavailable is AD down for both endpoints.
+	c = with(fmt.Errorf("dial: %w", ad.ErrUnavailable))
+	if r := password(c, "thijs", "correct horse"); r.Code != http.StatusServiceUnavailable || r.err() != "ad_unavailable" || r.Body["emergency"] != true {
+		t.Fatalf("password, AD unavailable = %d %v", r.Code, r.Body)
+	}
+	if r := decode(t, c.do("POST", "/api/auth/emergency", map[string]string{"password": emergencyPassword})); r.Code != 200 || r.Body["next"] != "passkey" {
+		t.Fatalf("emergency, AD unavailable = %d %v", r.Code, r.Body)
+	}
+
+	// Enabled without a password hash is not an emergency option.
+	if _, err := l.deps.Pool.Exec(context.Background(), `update emergency set enabled = true, password_hash = null`); err != nil {
+		t.Fatal(err)
+	}
+	if r := password(c, "thijs", "correct horse"); r.Code != http.StatusServiceUnavailable || r.Body["emergency"] != false {
+		t.Fatalf("emergency without hash = %d %v", r.Code, r.Body)
 	}
 }

@@ -128,6 +128,29 @@ func decode(h map[string]string) (Session, error) {
 // in force) LastSeenAt is advanced to now and the TTL extended; only that
 // field is written, so concurrent Updates are never reverted.
 func (s *Store) Get(ctx context.Context, id string, cfg settings.Settings, now time.Time) (Session, error) {
+	sess, _, err := s.GetSliding(ctx, id, cfg, now)
+	return sess, err
+}
+
+// GetSliding is Get that also returns LastSeenAt as it was before this call
+// advanced it, so callers can tell how long the session was idle.
+func (s *Store) GetSliding(ctx context.Context, id string, cfg settings.Settings, now time.Time) (Session, time.Time, error) {
+	sess, err := s.get(ctx, id, cfg, now)
+	if err != nil {
+		return Session{}, time.Time{}, err
+	}
+	prev := sess.LastSeenAt
+	if cfg.Session.Sliding || cfg.Session.IdleTimeoutMinutes > 0 {
+		sess.LastSeenAt = now
+		if err := slideScript.Run(ctx, s.rdb, []string{key(id)}, now.UnixNano(), ttlFor(sess, cfg, now).Milliseconds()).Err(); err != nil && !errors.Is(err, redis.Nil) {
+			return Session{}, time.Time{}, fmt.Errorf("slide session: %w", err)
+		}
+	}
+	return sess, prev, nil
+}
+
+// get loads id and checks expiry under cfg, revoking an expired session.
+func (s *Store) get(ctx context.Context, id string, cfg settings.Settings, now time.Time) (Session, error) {
 	h, err := s.rdb.HGetAll(ctx, key(id)).Result()
 	if err != nil {
 		return Session{}, fmt.Errorf("get session: %w", err)
@@ -146,12 +169,6 @@ func (s *Store) Get(ctx context.Context, id string, cfg settings.Settings, now t
 	if expired {
 		_ = s.Revoke(ctx, id)
 		return Session{}, ErrNotFound
-	}
-	if cfg.Session.Sliding || cfg.Session.IdleTimeoutMinutes > 0 {
-		sess.LastSeenAt = now
-		if err := slideScript.Run(ctx, s.rdb, []string{key(id)}, now.UnixNano(), ttlFor(sess, cfg, now).Milliseconds()).Err(); err != nil && !errors.Is(err, redis.Nil) {
-			return Session{}, fmt.Errorf("slide session: %w", err)
-		}
 	}
 	return sess, nil
 }

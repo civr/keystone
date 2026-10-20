@@ -208,3 +208,17 @@ func TestConcurrentUpdateNotRevertedBySlide(t *testing.T) {
 		t.Fatalf("last seen rewound: %v", got.LastSeenAt)
 	}
 }
+
+func TestGetSlidingReportsPreviousLastSeen(t *testing.T) {
+	s := NewStore(newClient(t))
+	cfg := settings.Defaults()
+	sess := create(t, s, cfg)
+	got, prev, err := s.GetSliding(context.Background(), sess.ID, cfg, t0.Add(time.Hour))
+	if err != nil || !prev.Equal(t0) || !got.LastSeenAt.Equal(t0.Add(time.Hour)) {
+		t.Fatalf("got %+v prev %v err %v", got, prev, err)
+	}
+	_, prev, err = s.GetSliding(context.Background(), sess.ID, cfg, t0.Add(2*time.Hour))
+	if err != nil || !prev.Equal(t0.Add(time.Hour)) {
+		t.Fatalf("second prev %v err %v", prev, err)
+	}
+}

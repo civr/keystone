@@ -192,7 +192,9 @@ func normHost(scheme, host string) string {
 
 // loadSession attaches the session named by the ks_session cookie, checked
 // against the current settings. A missing or expired session is not an error
-// here; routes that need one use requireSession.
+// here; routes that need one use requireSession. For sliding sessions the
+// cookie is re-issued with a fresh Max-Age on the first request of each clock
+// hour, so the browser keeps it as long as the server-side session lives.
 func (s *server) loadSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(SessionCookie)
@@ -200,7 +202,8 @@ func (s *server) loadSession(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		sess, err := s.d.Sessions.Get(r.Context(), c.Value, settingsFrom(r.Context()), time.Now())
+		cfg, now := settingsFrom(r.Context()), time.Now()
+		sess, prevSeen, err := s.d.Sessions.GetSliding(r.Context(), c.Value, cfg, now)
 		switch {
 		case errors.Is(err, session.ErrNotFound):
 			next.ServeHTTP(w, r)
@@ -208,6 +211,9 @@ func (s *server) loadSession(next http.Handler) http.Handler {
 			slog.Error("http: load session", "err", err)
 			errUnavailable(w)
 		default:
+			if cfg.Session.Sliding && !now.Truncate(time.Hour).Equal(prevSeen.Truncate(time.Hour)) {
+				setCookie(w, cfg, SessionCookie, sess.ID, time.Duration(cfg.Session.DurationHours)*time.Hour)
+			}
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keySession, &sess)))
 		}
 	})

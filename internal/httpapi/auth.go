@@ -45,6 +45,7 @@ const (
 )
 
 func (s *server) authRoutes(r chi.Router) {
+	r.Use(s.requireSetupDone)
 	r.Post("/password", s.authPassword)
 	r.Post("/passkey/begin", s.authPasskeyBegin)
 	r.Post("/passkey/finish", s.authPasskeyFinish)
@@ -53,6 +54,27 @@ func (s *server) authRoutes(r chi.Router) {
 	r.With(requireSession).Post("/stepup/begin", s.stepUpBegin)
 	r.With(requireSession).Post("/stepup/finish", s.stepUpFinish)
 	r.With(requireSession).Post("/logout", s.logout)
+}
+
+// requireSetupDone answers 409 setup_needed until setup has finished, so an
+// owner stored mid-setup cannot sign in (and register a passkey) without the
+// setup code.
+func (s *server) requireSetupDone(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var done bool
+		err := s.d.Pool.QueryRow(r.Context(),
+			`select coalesce((select completed_at is not null from setup_state where id = 1), false)`).Scan(&done)
+		if err != nil {
+			slog.Error("auth: setup state", "err", err)
+			errUnavailable(w)
+			return
+		}
+		if !done {
+			writeError(w, http.StatusConflict, "setup_needed", "Keystone is nog niet ingericht. Rond eerst de installatie af.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // requireStepUp rejects requests whose session has not used a passkey within
@@ -102,7 +124,8 @@ func (s *server) loadOwner(ctx context.Context) (ownerInfo, error) {
 	return o, err
 }
 
-// emergencyAccount returns whether the emergency account is enabled and its hash.
+// emergencyAccount returns whether the emergency account is usable (enabled
+// with a password hash) and its hash.
 func (s *server) emergencyAccount(ctx context.Context) (bool, string, error) {
 	var enabled bool
 	var hash string
@@ -110,7 +133,7 @@ func (s *server) emergencyAccount(ctx context.Context) (bool, string, error) {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, "", nil
 	}
-	return enabled, hash, err
+	return enabled && hash != "", hash, err
 }
 
 // adContext bounds an AD call by ad.timeout_seconds, independent of the
@@ -343,10 +366,14 @@ func (s *server) authPassword(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, ad.ErrInvalidCredentials), errors.Is(err, ad.ErrNotFound):
 		s.loginFailed(w, ctx, cfg, account, "password", ip)
 		return
-	case err != nil:
+	case errors.Is(err, ad.ErrUnavailable):
 		slog.Warn("auth: AD authenticate", "err", err)
 		s.d.Audit.Log(ctx, audit.ActorAnonymous, "login.failure", ip, map[string]any{"username": account, "reason": "ad_unavailable"})
 		s.adUnavailable(w, ctx)
+		return
+	case err != nil:
+		s.d.Audit.Log(ctx, audit.ActorAnonymous, "login.failure", ip, map[string]any{"username": account, "reason": "ad_error"})
+		errInternal(w, "AD authenticate", err)
 		return
 	}
 	owner, err := s.loadOwner(ctx)
@@ -621,7 +648,9 @@ func (s *server) authRecovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var left int
-	_ = s.d.Pool.QueryRow(ctx, `select count(*) from recovery_codes where used_at is null`).Scan(&left)
+	if err := s.d.Pool.QueryRow(ctx, `select count(*) from recovery_codes where used_at is null`).Scan(&left); err != nil {
+		slog.Error("auth: count recovery codes", "err", err)
+	}
 	s.d.Audit.Log(ctx, audit.ActorOwner, "recovery.used", ip, map[string]any{"remaining": left})
 	writeJSON(w, http.StatusOK, map[string]string{"next": "register_passkey"})
 }
@@ -669,7 +698,7 @@ func (s *server) authEmergency(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "emergency lookup", err)
 		return
 	}
-	if !enabled || hash == "" {
+	if !enabled {
 		writeError(w, http.StatusForbidden, "emergency_disabled", "Het nood-account is niet ingeschakeld.")
 		return
 	}
@@ -687,8 +716,13 @@ func (s *server) authEmergency(w http.ResponseWriter, r *http.Request) {
 		actx, cancel := s.adContext(ctx)
 		_, err := dir.Lookup(actx, owner.Username)
 		cancel()
-		if !errors.Is(err, ad.ErrUnavailable) {
+		switch {
+		case errors.Is(err, ad.ErrUnavailable):
+		case err == nil, errors.Is(err, ad.ErrNotFound):
 			writeError(w, http.StatusForbidden, "ad_available", "AD is bereikbaar. Log in met je gewone wachtwoord.")
+			return
+		default:
+			errInternal(w, "AD lookup", err)
 			return
 		}
 	}
