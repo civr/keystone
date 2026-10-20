@@ -143,9 +143,7 @@ func (s *server) getAD(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	set := cfg.BindPasswordSealed != ""
-	cfg.BindPasswordSealed = ""
-	m, _ := toTree(cfg).(map[string]any)
-	delete(m, "bind_password_sealed")
+	m := redactedAD(cfg)
 	m["bind_password_set"] = set
 	writeJSON(w, http.StatusOK, m)
 }
@@ -181,8 +179,21 @@ func (s *server) readAdminAD(w http.ResponseWriter, r *http.Request) (ad.Config,
 		writeError(w, http.StatusBadRequest, "invalid_ad_config", "bind_password is verplicht")
 		return ad.Config{}, false
 	}
+	// The stored password is never sent to a different server.
+	if stored.URL != cfg.URL {
+		writeError(w, http.StatusBadRequest, "bind_password_required", "Voer het bind-wachtwoord opnieuw in als je de AD-server wijzigt.")
+		return ad.Config{}, false
+	}
 	cfg.BindPasswordSealed = stored.BindPasswordSealed
 	return cfg, true
+}
+
+// redactedAD is cfg as a JSON tree without the sealed password.
+func redactedAD(cfg ad.Config) map[string]any {
+	cfg.BindPasswordSealed = ""
+	m, _ := toTree(cfg).(map[string]any)
+	delete(m, "bind_password_sealed")
+	return m
 }
 
 func (s *server) putAD(w http.ResponseWriter, r *http.Request) {
@@ -206,12 +217,14 @@ func (s *server) putAD(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "save ad config", err)
 		return
 	}
-	detail := map[string]any{"url": cfg.URL, "bind_dn": cfg.BindDN, "base_dn": cfg.BaseDN,
-		"password_changed": !hadPrev || prev.BindPasswordSealed != cfg.BindPasswordSealed}
+	oldTree := map[string]any{}
 	if hadPrev {
-		detail["old"] = map[string]any{"url": prev.URL, "bind_dn": prev.BindDN, "base_dn": prev.BaseDN}
+		oldTree = redactedAD(prev)
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "ad.changed", clientIP(ctx), detail)
+	s.d.Audit.Log(ctx, audit.ActorOwner, "ad.changed", clientIP(ctx), map[string]any{
+		"changes":          diffJSON(oldTree, redactedAD(cfg)),
+		"password_changed": !hadPrev || prev.BindPasswordSealed != cfg.BindPasswordSealed,
+	})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -225,9 +238,21 @@ func (s *server) testAD(w http.ResponseWriter, r *http.Request) {
 		test = func(ctx context.Context, c ad.Config) (int, error) { return ad.Test(ctx, c, s.d.Secrets.DataKey) }
 	}
 	n, err := test(r.Context(), cfg)
-	res := map[string]any{"ok": err == nil, "error": "", "users_found": n}
 	if err != nil {
-		res["error"] = err.Error()
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "users_found": 0, "error": "ad_test_failed", "message": adTestMessage(err)})
+		return
 	}
-	writeJSON(w, http.StatusOK, res)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "users_found": n})
+}
+
+func adTestMessage(err error) string {
+	switch {
+	case errors.Is(err, ad.ErrInvalidCredentials):
+		return "De bind-gebruiker of het wachtwoord is onjuist."
+	case errors.Is(err, ad.ErrUnavailable):
+		return "AD is niet bereikbaar."
+	case errors.Is(err, ad.ErrNotFound):
+		return "Geen gebruikers gevonden met deze base DN en dit filter."
+	}
+	return "De verbinding met AD is mislukt: " + err.Error()
 }

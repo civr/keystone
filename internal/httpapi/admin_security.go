@@ -2,8 +2,11 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strconv"
@@ -28,25 +31,48 @@ func (s *server) listSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].CreatedAt.After(list[j].CreatedAt) })
-	own := SessionFrom(ctx).ID
+	own := sessionHandle(SessionFrom(ctx).ID)
 	out := make([]map[string]any, 0, len(list))
 	for _, x := range list {
 		out = append(out, map[string]any{
-			"id": x.ID, "created_at": x.CreatedAt, "last_seen_at": x.LastSeenAt, "ip": x.IP,
-			"user_agent": x.UserAgent, "emergency": x.Emergency, "current": x.ID == own,
+			"id": sessionHandle(x.ID), "created_at": x.CreatedAt, "last_seen_at": x.LastSeenAt, "ip": x.IP,
+			"user_agent": x.UserAgent, "emergency": x.Emergency, "current": sessionHandle(x.ID) == own,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"sessions": out})
 }
 
+// sessionHandle is the opaque public name of a session. The session ID itself
+// is the ks_session cookie value and must never leave the server.
+func sessionHandle(id string) string {
+	sum := sha256.Sum256([]byte(id))
+	return base64.RawURLEncoding.EncodeToString(sum[:])[:22]
+}
+
 func (s *server) deleteSession(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id := chi.URLParam(r, "id")
-	if err := s.d.Sessions.Revoke(ctx, id); err != nil {
+	handle := chi.URLParam(r, "id")
+	list, err := s.d.Sessions.List(ctx)
+	if err != nil {
 		errUnavailable(w)
 		return
 	}
-	own := id == SessionFrom(ctx).ID
+	var target string
+	for _, x := range list {
+		if subtle.ConstantTimeCompare([]byte(sessionHandle(x.ID)), []byte(handle)) == 1 {
+			target = x.ID
+			break
+		}
+	}
+	if target == "" {
+		errNotFound(w, r)
+		return
+	}
+	if err := s.d.Sessions.Revoke(ctx, target); err != nil {
+		errUnavailable(w)
+		return
+	}
+	own := target == SessionFrom(ctx).ID
 	if own {
 		setCookie(w, settingsFrom(ctx), SessionCookie, "", 0)
 	}
@@ -247,15 +273,31 @@ func (s *server) regenerateRecovery(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"recovery_codes": codes})
 }
 
+func (s *server) getEmergency(w http.ResponseWriter, r *http.Request) {
+	var enabled, set bool
+	err := s.d.Pool.QueryRow(r.Context(), `select coalesce((select enabled from emergency where id = 1), false),
+		coalesce((select password_hash is not null and password_hash <> '' from emergency where id = 1), false)`).Scan(&enabled, &set)
+	if err != nil {
+		errInternal(w, "load emergency", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"enabled": enabled, "password_set": set})
+}
+
 func (s *server) putEmergency(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req struct {
-		Enabled  bool   `json:"enabled"`
+		Enabled  *bool  `json:"enabled"`
 		Password string `json:"password"`
 	}
 	if !readJSON(w, r, &req) {
 		return
 	}
+	if req.Enabled == nil {
+		writeInvalid(w, "enabled", "enabled is verplicht.")
+		return
+	}
+	enabled := *req.Enabled
 	var hash *string
 	if req.Password != "" {
 		if utf8.RuneCountInString(req.Password) < emergencyMinLen {
@@ -269,26 +311,46 @@ func (s *server) putEmergency(w http.ResponseWriter, r *http.Request) {
 		}
 		hash = &h
 	}
-	if req.Enabled && hash == nil {
-		has, err := s.emergencyHasHash(ctx)
-		if err != nil {
-			errInternal(w, "load emergency", err)
-			return
-		}
-		if !has {
-			writeError(w, http.StatusBadRequest, "password_required", "Stel eerst een noodwachtwoord in.")
-			return
-		}
+	has, err := s.emergencyHasHash(ctx)
+	if err != nil {
+		errInternal(w, "load emergency", err)
+		return
 	}
+	if enabled && hash == nil && !has {
+		writeError(w, http.StatusBadRequest, "password_required", "Stel eerst een noodwachtwoord in.")
+		return
+	}
+	var wasEnabled bool
+	_ = s.d.Pool.QueryRow(ctx, `select coalesce((select enabled from emergency where id = 1), false)`).Scan(&wasEnabled)
 	if _, err := s.d.Pool.Exec(ctx, `insert into emergency (id, enabled, password_hash) values (1, $1, $2)
 		on conflict (id) do update set enabled = excluded.enabled,
-		password_hash = coalesce(excluded.password_hash, emergency.password_hash)`, req.Enabled, hash); err != nil {
+		password_hash = coalesce(excluded.password_hash, emergency.password_hash)`, enabled, hash); err != nil {
 		errInternal(w, "save emergency", err)
 		return
 	}
+	if !enabled || hash != nil {
+		s.revokeEmergencySessions(ctx)
+	}
 	s.d.Audit.Log(ctx, audit.ActorOwner, "emergency.changed", clientIP(ctx),
-		map[string]any{"enabled": req.Enabled, "password_changed": hash != nil})
+		map[string]any{"old_enabled": wasEnabled, "new_enabled": enabled, "password_changed": hash != nil})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// revokeEmergencySessions ends every session that was opened through the
+// emergency account.
+func (s *server) revokeEmergencySessions(ctx context.Context) {
+	list, err := s.d.Sessions.List(ctx)
+	if err != nil {
+		slog.Error("admin: list sessions", "err", err)
+		return
+	}
+	for _, x := range list {
+		if x.Emergency {
+			if err := s.d.Sessions.Revoke(ctx, x.ID); err != nil {
+				slog.Error("admin: revoke emergency session", "err", err)
+			}
+		}
+	}
 }
 
 func (s *server) emergencyHasHash(ctx context.Context) (bool, error) {
@@ -376,7 +438,12 @@ func (s *server) exportAudit(w http.ResponseWriter, r *http.Request) {
 	n := 0
 	for rows.Next() {
 		a, err := scanAudit(rows)
-		if err != nil || enc.Encode(a) != nil {
+		if err != nil {
+			slog.Error("admin: export audit scan", "err", err)
+			return
+		}
+		if err := enc.Encode(a); err != nil {
+			slog.Warn("admin: export audit write", "err", err)
 			return
 		}
 		if n++; n%500 == 0 {

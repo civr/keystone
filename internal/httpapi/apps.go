@@ -29,7 +29,7 @@ const (
 var (
 	colorRe    = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 	iconRe     = regexp.MustCompile(`^data:image/(png|svg\+xml|webp);base64,([A-Za-z0-9+/]+={0,2})$`)
-	svgEventRe = regexp.MustCompile(`(?i)[\s"'/]on[a-z]+\s*=`)
+	svgEventRe = regexp.MustCompile(`(?i)on[a-z]+\s*=`)
 )
 
 // appInput is the editable part of an app tile.
@@ -74,10 +74,23 @@ func (a *appInput) validate() (field, msg string) {
 	return "", ""
 }
 
-// unsafeSVG rejects <script, on*= event attributes and javascript: URLs.
+// unsafeSVG is a defence-in-depth blacklist. The real protection is that icons
+// are only ever rendered through <img src="data:...">, where browsers never run
+// scripts in an SVG (Task 10 must honor this: never inline an icon in the DOM).
 func unsafeSVG(svg string) bool {
+	if !utf8.ValidString(svg) || strings.HasPrefix(svg, "\ufeff") || strings.ContainsRune(svg, 0) {
+		return true
+	}
 	l := strings.ToLower(svg)
-	return strings.Contains(l, "<script") || strings.Contains(l, "javascript:") || svgEventRe.MatchString(svg)
+	for _, bad := range []string{
+		"&#", "<!entity", "<!doctype", "<script", ":script", "foreignobject",
+		`attributename="on`, `attributename='on`, "javascript:", "data:", "<iframe", "<embed", "<object",
+	} {
+		if strings.Contains(l, bad) {
+			return true
+		}
+	}
+	return svgEventRe.MatchString(svg)
 }
 
 type appOut struct {

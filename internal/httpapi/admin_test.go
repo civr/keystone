@@ -3,14 +3,19 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/passkey/passkeytest"
+	"github.com/civr/keystone/internal/session"
 	"github.com/civr/keystone/internal/settings"
 )
 
@@ -159,20 +164,62 @@ func TestADGetHidesPassword(t *testing.T) {
 	}
 	before := sealed()
 	// Omitted password keeps the sealed one.
-	upd := map[string]any{"url": "ldaps://dc2.home.lan", "bind_dn": "cn=svc,dc=home,dc=lan", "base_dn": "dc=home,dc=lan"}
+	upd := map[string]any{"url": "ldaps://dc.home.lan", "bind_dn": "cn=svc,dc=home,dc=lan", "base_dn": "ou=x,dc=home,dc=lan"}
 	c.must("PUT", "/api/admin/ad", upd, 200)
 	if sealed() != before {
 		t.Fatal("bind password re-sealed without a new one")
 	}
 	body(t, c.must("GET", "/api/admin/ad", nil, 200).Body, &res)
-	if res["url"] != "ldaps://dc2.home.lan" {
-		t.Fatalf("url = %v", res["url"])
+	if res["base_dn"] != "ou=x,dc=home,dc=lan" {
+		t.Fatalf("base_dn = %v", res["base_dn"])
+	}
+	// A changed url needs a new password: the stored one never goes to a new host.
+	for _, path := range []string{"/api/admin/ad", "/api/admin/ad/test"} {
+		m := map[string]any{"url": "ldaps://evil.example", "bind_dn": "cn=svc,dc=home,dc=lan", "base_dn": "dc=home,dc=lan"}
+		method := "PUT"
+		if strings.HasSuffix(path, "test") {
+			method = "POST"
+		}
+		if w := c.do(method, path, m); w.Code != 400 || errCode(t, w) != "bind_password_required" {
+			t.Fatalf("%s url change = %d %s", path, w.Code, w.Body.String())
+		}
 	}
 	// A new password replaces it.
+	upd["url"] = "ldaps://dc2.home.lan"
 	upd["bind_password"] = "new-secret"
 	c.must("PUT", "/api/admin/ad", upd, 200)
 	if sealed() == before {
 		t.Fatal("bind password not replaced")
+	}
+	var detail []byte
+	if err := l.deps.Pool.QueryRow(context.Background(),
+		`select detail::text from audit_log where action = 'ad.changed' order by id desc limit 1`).Scan(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(detail), `"password_changed": true`) {
+		t.Fatalf("ad audit = %s", detail)
+	}
+	upd2 := map[string]any{"url": "ldaps://dc2.home.lan", "bind_dn": "cn=svc,dc=home,dc=lan", "base_dn": "ou=x,dc=home,dc=lan", "start_tls": true, "min_tls": "1.3"}
+	c.must("PUT", "/api/admin/ad", upd2, 200)
+	if err := l.deps.Pool.QueryRow(context.Background(),
+		`select detail::text from audit_log where action = 'ad.changed' order by id desc limit 1`).Scan(&detail); err != nil {
+		t.Fatal(err)
+	}
+	var ad struct {
+		Changes []change `json:"changes"`
+	}
+	if err := json.Unmarshal(detail, &ad); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]change{}
+	for _, ch := range ad.Changes {
+		got[ch.Path] = ch
+	}
+	if got["start_tls"].New != true || got["start_tls"].Old != false || got["min_tls"].New != "1.3" || len(got) != 2 {
+		t.Fatalf("ad changes = %s", detail)
+	}
+	if strings.Contains(string(detail), "sealed") {
+		t.Fatal("audit leaks sealed password")
 	}
 	// Invalid config → 400.
 	if w := c.do("PUT", "/api/admin/ad", map[string]any{"url": "http://x", "bind_dn": "a", "base_dn": "b"}); w.Code != 400 {
@@ -275,8 +322,25 @@ func TestRevokeSessionEndsIt(t *testing.T) {
 			other = s.ID
 		}
 	}
-	if own != c1.cookies[SessionCookie] || other != c2.cookies[SessionCookie] {
+	if own != sessionHandle(c1.cookies[SessionCookie]) || other != sessionHandle(c2.cookies[SessionCookie]) {
 		t.Fatalf("sessions = %+v", res.Sessions)
+	}
+	// The raw session tokens (cookie values) never appear in a response.
+	for _, w := range []*httptest.ResponseRecorder{
+		c1.must("GET", "/api/admin/sessions", nil, 200), c1.must("GET", "/api/me", nil, 200),
+	} {
+		for _, ck := range []string{c1.cookies[SessionCookie], c2.cookies[SessionCookie]} {
+			if strings.Contains(w.Body.String(), ck) {
+				t.Fatal("response leaks a session token")
+			}
+		}
+	}
+	// A raw session ID is not a valid handle.
+	if w := c1.do("DELETE", "/api/admin/sessions/"+c2.cookies[SessionCookie], nil); w.Code != 404 {
+		t.Fatalf("delete by raw id = %d", w.Code)
+	}
+	if w := c2.do("GET", "/api/me", nil); w.Code != 200 {
+		t.Fatal("raw-id delete revoked a session")
 	}
 	c1.must("DELETE", "/api/admin/sessions/"+other, nil, 200)
 	if w := c2.do("GET", "/api/me", nil); w.Code != 401 {
@@ -336,10 +400,34 @@ func TestEmergencyPut(t *testing.T) {
 		return en, h
 	}
 	_, h0 := state()
+	if w := c.do("PUT", "/api/admin/emergency", map[string]any{"password": "een-heel-nieuw-wachtwoord"}); w.Code != 400 {
+		t.Fatalf("missing enabled = %d", w.Code)
+	}
+	var st map[string]bool
+	body(t, c.must("GET", "/api/admin/emergency", nil, 200).Body, &st)
+	if !st["enabled"] || !st["password_set"] {
+		t.Fatalf("GET emergency = %v", st)
+	}
+	// Disabling or changing the password ends emergency sessions.
+	em := func() string {
+		sess, err := l.deps.Sessions.Create(context.Background(), session.Session{Emergency: true}, l.cfg(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sess.ID
+	}
+	id := em()
+	c.must("PUT", "/api/admin/emergency", map[string]any{"enabled": true}, 200)
+	if _, err := l.deps.Sessions.Get(context.Background(), id, l.cfg(t), time.Now()); err != nil {
+		t.Fatalf("plain enable revoked emergency session: %v", err)
+	}
 	if w := c.do("PUT", "/api/admin/emergency", map[string]any{"enabled": true, "password": "kort"}); w.Code != 400 {
 		t.Fatalf("short password = %d", w.Code)
 	}
 	c.must("PUT", "/api/admin/emergency", map[string]any{"enabled": false}, 200)
+	if _, err := l.deps.Sessions.Get(context.Background(), id, l.cfg(t), time.Now()); err == nil {
+		t.Fatal("emergency session survived disabling")
+	}
 	if en, h := state(); en || h != h0 {
 		t.Fatalf("disable: %v, hash changed=%v", en, h != h0)
 	}
@@ -402,5 +490,14 @@ func TestAuditListAndExport(t *testing.T) {
 	var e entry
 	if err := json.Unmarshal([]byte(lines[0]), &e); err != nil || e.Action == "" {
 		t.Fatalf("line 0 = %q %v", lines[0], err)
+	}
+}
+
+func TestADTestMessagesAreDutch(t *testing.T) {
+	t.Parallel()
+	for _, err := range []error{ad.ErrInvalidCredentials, ad.ErrUnavailable, ad.ErrNotFound, errors.New("x")} {
+		if m := adTestMessage(fmt.Errorf("wrap: %w", err)); m == "" || strings.Contains(m, "ad:") {
+			t.Fatalf("message for %v = %q", err, m)
+		}
 	}
 }

@@ -57,6 +57,26 @@ func TestAppValidation(t *testing.T) {
 		"icon http":       with("icon", "http://x/i.png"),
 		"icon too big":    with("icon", dataURL("image/png", string(make([]byte, 64*1024)))),
 	}
+	for name, svg := range map[string]string{
+		"svg entity":       `<svg>&#106;avascript:x</svg>`,
+		"svg ENTITY":       `<!DOCTYPE svg [<!ENTITY x "y">]><svg>&x;</svg>`,
+		"svg doctype":      `<!doctype svg><svg/>`,
+		"svg prefixed":     `<svg xmlns:s="http://www.w3.org/2000/svg"><s:script>x</s:script></svg>`,
+		"svg upper":        `<svg><SCRIPT>x</SCRIPT></svg>`,
+		"svg foreign":      `<svg><foreignObject><div/></foreignObject></svg>`,
+		"svg animate on":   `<svg><animate attributeName="onload" to="x()"/></svg>`,
+		"svg animate on2":  `<svg><set attributeName='onclick' to='x()'/></svg>`,
+		"svg onerror ws":   "<svg><image href=\"x\" OnError\t= \"x()\"/></svg>",
+		"svg data uri":     `<svg><image href="data:text/html,x"/></svg>`,
+		"svg iframe":       `<svg><iframe/></svg>`,
+		"svg embed":        `<svg><embed/></svg>`,
+		"svg object":       `<svg><object/></svg>`,
+		"svg bom":          "\ufeff<svg/>",
+		"svg nul":          "<svg>\x00</svg>",
+		"svg invalid utf8": "<svg>\xff</svg>",
+	} {
+		bad[name] = with("icon", dataURL("image/svg+xml", svg))
+	}
 	for name, b := range bad {
 		if w := c.do("POST", "/api/apps", b); w.Code != 400 || errCode(t, w) != "invalid" {
 			t.Errorf("%s: POST = %d %s", name, w.Code, w.Body.String())

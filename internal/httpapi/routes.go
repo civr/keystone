@@ -26,6 +26,7 @@ func (s *server) adminRoutes(r chi.Router) {
 	w.Delete("/passkeys/{id}", s.deletePasskey)
 
 	w.Post("/recovery/regenerate", s.regenerateRecovery)
+	g.Get("/emergency", s.getEmergency)
 	w.Put("/emergency", s.putEmergency)
 
 	g.Get("/audit", s.listAudit)
