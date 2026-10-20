@@ -3,9 +3,7 @@ package httpapi
 import "github.com/go-chi/chi/v5"
 
 // Route groups under /api. They are mounted now and filled by later tasks
-// (setup wizard, login flow, admin settings, app tiles).
-
-func (s *server) authRoutes(r chi.Router) {}
+// (admin settings, app tiles).
 
 func (s *server) adminRoutes(r chi.Router) {}
 

@@ -3,8 +3,11 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"net/http"
 	"net/url"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/redis/go-redis/v9"
 
@@ -12,8 +15,11 @@ import (
 	"github.com/civr/keystone/internal/settings"
 )
 
-// waTTL bounds a WebAuthn ceremony (begin → finish).
-const waTTL = 5 * time.Minute
+const (
+	// waTTL bounds a WebAuthn ceremony (begin → finish).
+	waTTL               = 5 * time.Minute
+	maxPasskeyNameRunes = 64
+)
 
 var (
 	errNoCeremony  = errors.New("no pending webauthn ceremony")
@@ -53,4 +59,42 @@ func (s *server) takeCeremony(ctx context.Context, id string) ([]byte, error) {
 		return nil, errNoCeremony
 	}
 	return state, err
+}
+
+// passkeyName is the ?name= of a registration finish, trimmed and capped;
+// "Passkey" when empty.
+func passkeyName(r *http.Request) string {
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		return "Passkey"
+	}
+	if utf8.RuneCountInString(name) > maxPasskeyNameRunes {
+		name = string([]rune(name)[:maxPasskeyNameRunes])
+	}
+	return name
+}
+
+// bindCeremony stores ceremony state and records "<kind>:<id>" under
+// wabind:<bind>, so the ceremony belongs to one pending login or session; a
+// new begin replaces the previous binding.
+func (s *server) bindCeremony(ctx context.Context, bind, kind string, state []byte) error {
+	id, err := s.putCeremony(ctx, state)
+	if err != nil {
+		return err
+	}
+	return s.d.Valkey.Set(ctx, "wabind:"+bind, kind+":"+id, waTTL).Err()
+}
+
+// takeBoundCeremony returns (and deletes) the ceremony bound to bind and its kind.
+func (s *server) takeBoundCeremony(ctx context.Context, bind string) (string, []byte, error) {
+	v, err := s.d.Valkey.GetDel(ctx, "wabind:"+bind).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", nil, errNoCeremony
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	kind, id, _ := strings.Cut(v, ":")
+	state, err := s.takeCeremony(ctx, id)
+	return kind, state, err
 }

@@ -30,12 +30,11 @@ import (
 // finish; domain, ad and owner can be redone until the first passkey exists.
 
 const (
-	setupKind           = "setup" // ks_pending value prefix
-	setupTTL            = 30 * time.Minute
-	setupUnlockPerMin   = 5
-	emergencyMinLen     = 16
-	recoveryCodeCount   = 10
-	maxPasskeyNameRunes = 64
+	setupKind         = "setup" // ks_pending value prefix
+	setupTTL          = 30 * time.Minute
+	setupUnlockPerMin = 5
+	emergencyMinLen   = 16
+	recoveryCodeCount = 10
 )
 
 type setupProgress struct {
@@ -161,7 +160,7 @@ func errSetupDone(w http.ResponseWriter) {
 }
 
 func errInternal(w http.ResponseWriter, what string, err error) {
-	slog.Error("setup: "+what, "err", err)
+	slog.Error("http: "+what, "err", err)
 	writeError(w, http.StatusInternalServerError, "internal", "Er ging iets mis. Probeer het opnieuw.")
 }
 
@@ -499,13 +498,7 @@ func (s *server) setupPasskeyFinish(w http.ResponseWriter, r *http.Request, toke
 		errInternal(w, "passkey service", err)
 		return
 	}
-	name := strings.TrimSpace(r.URL.Query().Get("name"))
-	if name == "" {
-		name = "Passkey"
-	}
-	if utf8.RuneCountInString(name) > maxPasskeyNameRunes {
-		name = string([]rune(name)[:maxPasskeyNameRunes])
-	}
+	name := passkeyName(r)
 	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 	if err := svc.FinishRegistration(ctx, state, r, name); err != nil {
 		slog.Warn("setup: finish registration", "err", err)

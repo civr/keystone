@@ -29,29 +29,36 @@ func SignDevice(key []byte, deviceID string, lastFullAuth time.Time) string {
 // VerifyDevice checks the signature and that the last full authentication is
 // within TrustedDeviceDays of now.
 func VerifyDevice(key []byte, cookie string, cfg settings.Settings, now time.Time) (string, bool) {
+	id, _, ok := VerifyDeviceAt(key, cookie, cfg, now)
+	return id, ok
+}
+
+// VerifyDeviceAt is VerifyDevice that also returns the signed time of the last
+// full authentication (second precision).
+func VerifyDeviceAt(key []byte, cookie string, cfg settings.Settings, now time.Time) (string, time.Time, bool) {
 	p, sig, ok := strings.Cut(cookie, ".")
 	if !ok {
-		return "", false
+		return "", time.Time{}, false
 	}
 	payload, err := b64.DecodeString(p)
 	if err != nil {
-		return "", false
+		return "", time.Time{}, false
 	}
 	got, err := b64.DecodeString(sig)
 	if err != nil || !hmac.Equal(got, macOf(key, payload)) {
-		return "", false
+		return "", time.Time{}, false
 	}
 	i := strings.LastIndexByte(string(payload), '|')
 	if i < 0 {
-		return "", false
+		return "", time.Time{}, false
 	}
 	secs, err := strconv.ParseInt(string(payload[i+1:]), 10, 64)
 	if err != nil {
-		return "", false
+		return "", time.Time{}, false
 	}
-	age := now.Sub(time.Unix(secs, 0))
-	if age >= time.Duration(cfg.Session.TrustedDeviceDays)*24*time.Hour {
-		return "", false
+	at := time.Unix(secs, 0)
+	if now.Sub(at) >= time.Duration(cfg.Session.TrustedDeviceDays)*24*time.Hour {
+		return "", time.Time{}, false
 	}
-	return string(payload[:i]), true
+	return string(payload[:i]), at, true
 }

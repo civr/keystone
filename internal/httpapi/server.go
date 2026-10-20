@@ -64,6 +64,7 @@ func (s *server) router() chi.Router {
 		api.Get("/healthz", s.healthz)
 		api.Route("/setup", s.setupRoutes)
 		api.Route("/auth", s.authRoutes)
+		api.With(requireSession).Get("/me", s.me)
 		api.Route("/admin", s.adminRoutes)
 		api.Route("/apps", s.appRoutes)
 	})

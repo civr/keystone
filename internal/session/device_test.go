@@ -56,3 +56,15 @@ func TestDeviceExpiresAfterTrustedDays(t *testing.T) {
 		t.Fatal("shortened setting not applied")
 	}
 }
+
+func TestVerifyDeviceAtReturnsLastFullAuth(t *testing.T) {
+	cfg := settings.Defaults()
+	c := SignDevice(devKey, "dev-1", t0)
+	id, at, ok := VerifyDeviceAt(devKey, c, cfg, t0.Add(time.Hour))
+	if !ok || id != "dev-1" || !at.Equal(time.Unix(t0.Unix(), 0)) {
+		t.Fatalf("got %q %v %v", id, at, ok)
+	}
+	if _, _, ok := VerifyDeviceAt(devKey, c, cfg, t0.Add(91*24*time.Hour)); ok {
+		t.Fatal("expired cookie accepted")
+	}
+}

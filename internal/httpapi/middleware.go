@@ -48,10 +48,11 @@ func SessionFrom(ctx context.Context) *session.Session {
 }
 
 // middlewares returns the global chain in order: realip → security headers →
-// request log → CIDR allowlists → Origin check → session loader.
+// request log → CIDR allowlists → Origin check → session loader →
+// must-register-passkey gate.
 func (s *server) middlewares() []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
-		s.realIP, s.securityHeaders, requestLog, cidrCheck, originCheck, s.loadSession,
+		s.realIP, s.securityHeaders, requestLog, cidrCheck, originCheck, s.loadSession, mustRegisterGate,
 	}
 }
 
