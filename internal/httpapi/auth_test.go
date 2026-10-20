@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/civr/keystone/internal/passkey"
+	"github.com/civr/keystone/internal/passkey/passkeytest"
 	"github.com/civr/keystone/internal/session"
 	"github.com/civr/keystone/internal/settings"
 )
@@ -22,7 +22,7 @@ const emergencyPassword = "nood-wachtwoord-1234567"
 // (auth), recovery codes (codes) and an emergency password.
 type loginEnv struct {
 	*setupEnv
-	auth  *passkey.TestAuthenticator
+	auth  *passkeytest.TestAuthenticator
 	codes []string
 }
 
@@ -86,7 +86,7 @@ func decode(t *testing.T, w interface {
 func (r *jsonResp) err() string { s, _ := r.Body["error"].(string); return s }
 
 // passkeyLogin runs /auth/passkey/begin + finish with authenticator a.
-func passkeyLogin(c *client, a *passkey.TestAuthenticator) {
+func passkeyLogin(c *client, a *passkeytest.TestAuthenticator) {
 	c.t.Helper()
 	opts := c.must("POST", "/api/auth/passkey/begin", nil, 200).Body.Bytes()
 	assertion, err := a.Assert(opts)
@@ -456,7 +456,7 @@ func TestMustRegisterPasskeyGate(t *testing.T) {
 	if !bytes.Contains(opts, []byte(`"rp"`)) {
 		t.Fatalf("expected creation options, got %s", opts)
 	}
-	a := passkey.NewTestAuthenticator(setupOrigin)
+	a := passkeytest.NewTestAuthenticator(setupOrigin)
 	cred, err := a.Register(opts)
 	if err != nil {
 		t.Fatal(err)

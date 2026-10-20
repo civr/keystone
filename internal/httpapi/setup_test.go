@@ -13,7 +13,7 @@ import (
 
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/crypto"
-	"github.com/civr/keystone/internal/passkey"
+	"github.com/civr/keystone/internal/passkey/passkeytest"
 )
 
 const (
@@ -121,10 +121,10 @@ func (s *setupEnv) owner(c *client) {
 	c.must("POST", "/api/setup/owner", map[string]string{"username": `HOME\Thijs`, "password": "correct horse"}, 200)
 }
 
-func (s *setupEnv) passkey(c *client) *passkey.TestAuthenticator {
+func (s *setupEnv) passkey(c *client) *passkeytest.TestAuthenticator {
 	c.t.Helper()
 	opts := c.must("POST", "/api/setup/passkey/begin", nil, 200).Body.Bytes()
-	a := passkey.NewTestAuthenticator(setupOrigin)
+	a := passkeytest.NewTestAuthenticator(setupOrigin)
 	cred, err := a.Register(opts)
 	if err != nil {
 		c.t.Fatal(err)
@@ -180,6 +180,11 @@ func TestWrongSetupCodeRateLimited(t *testing.T) {
 	t.Parallel()
 	s := newSetupEnv(t)
 	c := newClient(t, s.env, "192.168.1.30")
+	// Successful unlocks do not count towards the limit.
+	for i := 0; i < 6; i++ {
+		c.must("POST", "/api/setup/unlock", map[string]string{"code": s.code}, 200)
+	}
+	delete(c.cookies, PendingCookie)
 	for i := 0; i < 5; i++ {
 		w := c.do("POST", "/api/setup/unlock", map[string]string{"code": "AAAA-BBBB-CCCC-DDDD"})
 		if w.Code != http.StatusUnauthorized || errCode(t, w) != "bad_code" {
@@ -346,6 +351,54 @@ func TestStepsEnforcedInOrder(t *testing.T) {
 	}
 }
 
+func TestADResaveResetsOwner(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	c := newClient(t, s.env, "192.168.1.65")
+	s.unlock(c)
+	s.domain(c)
+	s.ad(c)
+	s.owner(c)
+	if _, step := status(t, c); step != "passkey" {
+		t.Fatalf("step = %q, want passkey", step)
+	}
+	s.ad(c) // a different directory: the owner must be verified again
+	if _, step := status(t, c); step != "owner" {
+		t.Fatalf("step after AD resave = %q, want owner", step)
+	}
+	w := c.do("POST", "/api/setup/passkey/begin", nil)
+	if w.Code != http.StatusConflict || errCode(t, w) != "step_order" {
+		t.Fatalf("passkey/begin after AD resave = %d %s", w.Code, w.Body.String())
+	}
+	var n int
+	if err := s.deps.Pool.QueryRow(context.Background(), `select count(*) from owner`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("owner rows after AD resave = %d, %v", n, err)
+	}
+	s.owner(c)
+	s.passkey(c)
+}
+
+func TestSetupPasskeyFinishReplayRejected(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	c := newClient(t, s.env, "192.168.1.66")
+	s.unlock(c)
+	s.domain(c)
+	s.ad(c)
+	s.owner(c)
+	opts := c.must("POST", "/api/setup/passkey/begin", nil, 200).Body.Bytes()
+	a := passkeytest.NewTestAuthenticator(setupOrigin)
+	cred, err := a.Register(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.must("POST", "/api/setup/passkey/finish", cred, 200)
+	w := c.do("POST", "/api/setup/passkey/finish", cred)
+	if w.Code != http.StatusBadRequest || errCode(t, w) != "no_ceremony" {
+		t.Fatalf("replayed finish = %d %s", w.Code, w.Body.String())
+	}
+}
+
 func completeSetup(t *testing.T, s *setupEnv, c *client) *httptest.ResponseRecorder {
 	t.Helper()
 	s.unlock(c)
@@ -395,8 +448,16 @@ func TestFinishReturnsTenRecoveryCodesAndSession(t *testing.T) {
 	if len(hashes) != 10 {
 		t.Fatalf("stored %d recovery hashes", len(hashes))
 	}
-	if !crypto.VerifySecret(hashes[0], res.RecoveryCodes[0]) && !crypto.VerifySecret(hashes[9], res.RecoveryCodes[0]) {
-		t.Fatal("first recovery code matches neither first nor last stored hash")
+	for _, code := range res.RecoveryCodes {
+		matches := 0
+		for _, h := range hashes {
+			if crypto.VerifySecret(h, code) {
+				matches++
+			}
+		}
+		if matches != 1 {
+			t.Fatalf("recovery code %s matches %d stored hashes, want 1", code, matches)
+		}
 	}
 	for _, h := range hashes {
 		if strings.Contains(h, res.RecoveryCodes[0]) {

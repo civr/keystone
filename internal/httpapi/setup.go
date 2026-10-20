@@ -224,6 +224,8 @@ func (s *server) setupUnlock(w http.ResponseWriter, r *http.Request) {
 		errUnavailable(w)
 		return
 	}
+	// Reserve a hit before the (slow) verify so parallel guesses cannot all
+	// slip past the limit, and refund it on success: only wrong codes count.
 	ip := clientIP(ctx)
 	allowed, err := s.d.Limiter.Allow(ctx, "setup-unlock", ip.String(), setupUnlockPerMin)
 	if err != nil {
@@ -239,6 +241,9 @@ func (s *server) setupUnlock(w http.ResponseWriter, r *http.Request) {
 		s.d.Audit.Log(ctx, audit.ActorAnonymous, "setup.unlock_failed", ip, nil)
 		writeError(w, http.StatusUnauthorized, "bad_code", "De setupcode klopt niet.")
 		return
+	}
+	if err := s.d.Limiter.Refund(ctx, "setup-unlock", ip.String()); err != nil {
+		slog.Warn("setup: rate limit refund", "err", err)
 	}
 	tok, err := randomToken()
 	if err != nil {
@@ -382,7 +387,11 @@ func (s *server) setupAD(w http.ResponseWriter, r *http.Request, _ string) {
 		errInternal(w, "encode ad config", err)
 		return
 	}
-	if _, err := s.d.Pool.Exec(ctx, `insert into ad_config (id, data) values (1, $1)
+	// One statement: (re)saving AD also drops any owner verified against the
+	// previous directory, so progress returns to the owner step. condAD
+	// guarantees no passkey (bound to that owner) exists yet.
+	if _, err := s.d.Pool.Exec(ctx, `with reset as (delete from owner)
+		insert into ad_config (id, data) values (1, $1)
 		on conflict (id) do update set data = excluded.data`, raw); err != nil {
 		errInternal(w, "save ad config", err)
 		return

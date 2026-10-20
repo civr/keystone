@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/civr/keystone/internal/db"
+	"github.com/civr/keystone/internal/passkey/passkeytest"
 	"github.com/civr/keystone/internal/testutil"
 )
 
@@ -39,7 +42,7 @@ func newPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-func register(t *testing.T, svc *Service, a *TestAuthenticator, name string) {
+func register(t *testing.T, svc *Service, a *passkeytest.TestAuthenticator, name string) {
 	t.Helper()
 	ctx := context.Background()
 	opts, state, err := svc.BeginRegistration(ctx)
@@ -56,7 +59,7 @@ func register(t *testing.T, svc *Service, a *TestAuthenticator, name string) {
 	}
 }
 
-func login(svc *Service, a *TestAuthenticator, discoverable bool) error {
+func login(svc *Service, a *passkeytest.TestAuthenticator, discoverable bool) error {
 	ctx := context.Background()
 	opts, state, err := svc.BeginLogin(ctx, discoverable)
 	if err != nil {
@@ -80,7 +83,7 @@ func TestPasskeyRegisterAndLogin(t *testing.T) {
 	if n, err := svc.Count(ctx); err != nil || n != 0 {
 		t.Fatalf("Count = %d, %v", n, err)
 	}
-	a := NewTestAuthenticator(testOrigin)
+	a := passkeytest.NewTestAuthenticator(testOrigin)
 	register(t, svc, a, "MacBook")
 	if n, err := svc.Count(ctx); err != nil || n != 1 {
 		t.Fatalf("Count after register = %d, %v", n, err)
@@ -99,7 +102,23 @@ func TestPasskeyRegisterAndLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(opts, []byte(b64.EncodeToString(a.CredID))) {
+	var creation struct {
+		PublicKey struct {
+			AuthenticatorSelection struct {
+				RequireResidentKey *bool  `json:"requireResidentKey"`
+				ResidentKey        string `json:"residentKey"`
+				UserVerification   string `json:"userVerification"`
+			} `json:"authenticatorSelection"`
+		} `json:"publicKey"`
+	}
+	if err := json.Unmarshal(opts, &creation); err != nil {
+		t.Fatal(err)
+	}
+	if sel := creation.PublicKey.AuthenticatorSelection; sel.RequireResidentKey == nil || !*sel.RequireResidentKey ||
+		sel.ResidentKey != "required" || sel.UserVerification != "required" {
+		t.Fatalf("authenticatorSelection = %+v (requireResidentKey %v)", sel, sel.RequireResidentKey)
+	}
+	if !bytes.Contains(opts, []byte(base64.RawURLEncoding.EncodeToString(a.CredID))) {
 		t.Fatalf("existing credential not in excludeCredentials: %s", opts)
 	}
 
@@ -123,7 +142,7 @@ func TestPasskeyRegisterAndLogin(t *testing.T) {
 		t.Fatal("assertion with foreign origin accepted")
 	}
 	// An unknown authenticator is rejected.
-	other := NewTestAuthenticator(testOrigin)
+	other := passkeytest.NewTestAuthenticator(testOrigin)
 	other.UserHandle = a.UserHandle
 	if err := login(svc, other, true); err == nil {
 		t.Fatal("unknown credential accepted")
@@ -153,7 +172,7 @@ func TestSignCountRegressionRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := NewTestAuthenticator(testOrigin)
+	a := passkeytest.NewTestAuthenticator(testOrigin)
 	register(t, svc, a, "YubiKey")
 	if err := login(svc, a, false); err != nil { // counter 1
 		t.Fatal(err)

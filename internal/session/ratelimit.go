@@ -32,6 +32,20 @@ func (l *Limiter) Allow(ctx context.Context, scope, key string, perMinute int) (
 	return incr.Val() <= int64(perMinute), nil
 }
 
+// refundScript decrements a rate-limit counter but never below zero.
+var refundScript = redis.NewScript(`
+local v = tonumber(redis.call('GET', KEYS[1]))
+if v and v > 0 then return redis.call('DECR', KEYS[1]) end
+return 0`)
+
+// Refund takes back one hit counted by Allow in the current minute, so a
+// caller can reserve a hit atomically before a slow check and return it when
+// the attempt succeeds (only failures then count). It never goes below zero.
+func (l *Limiter) Refund(ctx context.Context, scope, key string) error {
+	k := fmt.Sprintf("rl:%s:%s:%d", scope, key, l.now().Unix()/60)
+	return refundScript.Run(ctx, l.rdb, []string{k}).Err()
+}
+
 // Fail records a failed login for account. Reaching LockoutThreshold locks the
 // account for LockoutMinutes and returns locked=true.
 func (l *Limiter) Fail(ctx context.Context, account string, cfg settings.Settings) (bool, error) {

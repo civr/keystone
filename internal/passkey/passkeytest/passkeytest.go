@@ -1,4 +1,5 @@
-package passkey
+// Package passkeytest provides a software WebAuthn authenticator for tests.
+package passkeytest
 
 import (
 	"crypto/ecdsa"

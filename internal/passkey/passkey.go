@@ -87,10 +87,10 @@ func (s *Service) BeginRegistration(ctx context.Context) (json.RawMessage, []byt
 		exclude = append(exclude, c.Descriptor())
 	}
 	creation, sd, err := s.wa.BeginRegistration(o,
-		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementRequired),
 		webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
-			ResidentKey:      protocol.ResidentKeyRequirementRequired,
-			UserVerification: s.uv,
+			RequireResidentKey: protocol.ResidentKeyRequired(),
+			ResidentKey:        protocol.ResidentKeyRequirementRequired,
+			UserVerification:   s.uv,
 		}),
 		webauthn.WithExclusions(exclude),
 	)

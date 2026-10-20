@@ -98,3 +98,39 @@ func TestFailDuringLockDoesNotExtend(t *testing.T) {
 		t.Fatal("failures counted during lock")
 	}
 }
+
+func TestLimiterRefund(t *testing.T) {
+	ctx := context.Background()
+	l := NewLimiter(newClient(t))
+	l.now = func() time.Time { return t0 }
+	// Refunded hits do not count: 10 refunded successes, then 3 failures fill a limit of 3.
+	for i := 0; i < 10; i++ {
+		if ok, err := l.Allow(ctx, "unlock", "1.2.3.4", 3); err != nil || !ok {
+			t.Fatalf("refunded hit %d: %v %v", i, ok, err)
+		}
+		if err := l.Refund(ctx, "unlock", "1.2.3.4"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		if ok, _ := l.Allow(ctx, "unlock", "1.2.3.4", 3); !ok {
+			t.Fatalf("failure %d blocked early", i+1)
+		}
+	}
+	if ok, _ := l.Allow(ctx, "unlock", "1.2.3.4", 3); ok {
+		t.Fatal("4th counted hit should be blocked")
+	}
+	// Refund never drives a counter below zero (e.g. across a minute boundary).
+	l.now = func() time.Time { return t0.Add(time.Minute) }
+	for i := 0; i < 3; i++ {
+		if err := l.Refund(ctx, "unlock", "9.9.9.9"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		_, _ = l.Allow(ctx, "unlock", "9.9.9.9", 3)
+	}
+	if ok, _ := l.Allow(ctx, "unlock", "9.9.9.9", 3); ok {
+		t.Fatal("refunds on an empty counter granted extra attempts")
+	}
+}
