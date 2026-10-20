@@ -12,7 +12,12 @@ const maxJSONBody = 64 << 10
 // readJSON decodes the request body into v, rejecting unknown fields and
 // oversized bodies. On failure it writes a 400 and returns false.
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBody))
+	return readJSONLimit(w, r, v, maxJSONBody)
+}
+
+// readJSONLimit is readJSON with an explicit body limit in bytes.
+func readJSONLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "Het verzoek is ongeldig.")
@@ -46,4 +51,9 @@ func errNotFound(w http.ResponseWriter, _ *http.Request) {
 
 func errMethodNotAllowed(w http.ResponseWriter, _ *http.Request) {
 	writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Deze methode is hier niet toegestaan.")
+}
+
+// writeInvalid writes a 400 {"error":"invalid","field":...,"message":...}.
+func writeInvalid(w http.ResponseWriter, field, message string) {
+	writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid", "field": field, "message": message})
 }

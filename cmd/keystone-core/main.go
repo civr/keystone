@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -212,12 +213,17 @@ func resetNetwork(ctx context.Context) error {
 		return err
 	}
 	defer pool.Close()
+	return runResetNetwork(ctx, pool, os.Stdout)
+}
+
+// runResetNetwork clears both allowlists and audits the reset as actor cli.
+func runResetNetwork(ctx context.Context, pool *pgxpool.Pool, out io.Writer) error {
 	if err := settings.NewStore(pool).ResetNetwork(ctx); err != nil {
 		return err
 	}
 	aw := audit.NewWriter(pool, nil)
 	defer aw.Close()
-	aw.Log(ctx, audit.ActorCLI, "network.reset", netip.Addr{}, map[string]any{"cleared": []string{"login_cidrs", "admin_cidrs"}})
-	fmt.Println("Netwerkbeperkingen gewist: login_cidrs en admin_cidrs zijn leeg.")
-	return nil
+	aw.Log(ctx, audit.ActorCLI, "settings.network_reset", netip.Addr{}, map[string]any{"cleared": []string{"login_cidrs", "admin_cidrs"}})
+	_, err := fmt.Fprintln(out, "Netwerkbeperkingen gewist: login_cidrs en admin_cidrs zijn leeg.")
+	return err
 }
