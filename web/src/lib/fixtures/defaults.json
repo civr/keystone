@@ -1,0 +1,42 @@
+{
+  "domain": "",
+  "public_url": "",
+  "session": {
+    "duration_hours": 720,
+    "trusted_device_days": 90,
+    "idle_timeout_minutes": 0,
+    "sliding": true,
+    "same_site": "Lax"
+  },
+  "login": {
+    "passkey_required": true,
+    "passkey_only_on_trusted_device": true,
+    "user_verification": "required",
+    "step_up_minutes": 5
+  },
+  "brute_force": {
+    "login_per_ip_per_minute": 10,
+    "login_per_account_per_minute": 5,
+    "lockout_threshold": 10,
+    "lockout_minutes": 15
+  },
+  "network": {
+    "login_cidrs": [],
+    "admin_cidrs": [],
+    "trusted_proxies": []
+  },
+  "headers": {
+    "hsts": true,
+    "hsts_include_subdomains": true,
+    "hsts_preload": false,
+    "frame_deny": true,
+    "hsts_max_age": 31536000,
+    "csp_extra": ""
+  },
+  "audit": {
+    "retention_days": 365,
+    "syslog_enabled": false,
+    "syslog_addr": "",
+    "syslog_proto": "udp"
+  }
+}

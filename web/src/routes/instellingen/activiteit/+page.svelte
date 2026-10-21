@@ -1,0 +1,176 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { api, ApiError } from '$lib/api';
+	import { auditLabel, auditSummary } from '$lib/format';
+
+	interface Entry {
+		id: number;
+		at: string;
+		actor: string;
+		action: string;
+		ip: string | null;
+		detail: unknown;
+	}
+
+	const PAGE = 50;
+	let entries = $state<Entry[]>([]);
+	let next = $state<number | null>(null);
+	let loaded = $state(false);
+	let loading = $state(false);
+	let error = $state('');
+	let sentinel = $state<HTMLElement | null>(null);
+
+	async function more() {
+		if (loading) return;
+		loading = true;
+		error = '';
+		try {
+			const q = new URLSearchParams({ limit: String(PAGE) });
+			if (next !== null) q.set('before', String(next));
+			const r = await api.get<{ entries: Entry[]; next_before: number | null }>(`/admin/audit?${q}`);
+			entries = [...entries, ...r.entries];
+			next = r.next_before;
+			loaded = true;
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'De activiteit kon niet worden geladen.';
+		} finally {
+			loading = false;
+		}
+	}
+	onMount(more);
+
+	// Load the next page when the end of the list scrolls into view.
+	$effect(() => {
+		if (!sentinel) return;
+		const io = new IntersectionObserver((es) => es[0].isIntersecting && next !== null && !error && more(), {
+			rootMargin: '400px'
+		});
+		io.observe(sentinel);
+		return () => io.disconnect();
+	});
+
+	const dayFmt = new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+	const timeFmt = new Intl.DateTimeFormat('nl-NL', { hour: '2-digit', minute: '2-digit' });
+
+	const days = $derived.by(() => {
+		const out: { day: string; items: Entry[] }[] = [];
+		for (const e of entries) {
+			const day = dayFmt.format(new Date(e.at));
+			if (out.at(-1)?.day !== day) out.push({ day, items: [] });
+			out.at(-1)!.items.push(e);
+		}
+		return out;
+	});
+
+	const ACTORS: Record<string, string> = { owner: 'jij', anonymous: 'onbekend', cli: 'opdrachtregel', system: 'systeem' };
+	const tone = (a: string) =>
+		/failure|locked|not_allowed|denied/.test(a) ? 'bad' : /emergency|recovery|network_reset/.test(a) ? 'warn' : '';
+</script>
+
+<div class="pane-head">
+	<h2 class="pane-title">Activiteit</h2>
+	<a class="btn small" href="/api/admin/audit/export" download="keystone-audit.ndjson">
+		<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9M6 9l4 4 4-4M4 16.5h12" /></svg>
+		Exporteren
+	</a>
+</div>
+<p class="pane-intro">Alles wat er met je account en Keystone gebeurt, nieuwste eerst.</p>
+
+{#if !loaded && error}
+	<div class="empty-note">
+		<p>{error}</p>
+		<button type="button" class="btn small" onclick={more}>Opnieuw proberen</button>
+	</div>
+{:else if !loaded}
+	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
+{:else if entries.length === 0}
+	<p class="empty-note">Nog geen activiteit.</p>
+{:else}
+	{#each days as d (d.day)}
+		<section class="group">
+			<h3>{d.day}</h3>
+			<ul class="card list">
+				{#each d.items as e (e.id)}
+					{@const lines = auditSummary(e)}
+					<li class="srow entry">
+						<span class="dot {tone(e.action)}" aria-hidden="true"></span>
+						<div class="text">
+							<span class="label">{auditLabel(e.action)}</span>
+							<p class="help">
+								{timeFmt.format(new Date(e.at))} · {ACTORS[e.actor] ?? e.actor}{e.ip ? ` · ${e.ip}` : ''}
+							</p>
+							{#if lines.length}
+								<ul class="detail">
+									{#each lines as l}<li>{l}</li>{/each}
+								</ul>
+							{/if}
+						</div>
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/each}
+	{#if error}
+		<div class="empty-note">
+			<p>{error}</p>
+			<button type="button" class="btn small" onclick={more}>Opnieuw proberen</button>
+		</div>
+	{:else if next !== null}
+		<div class="end" bind:this={sentinel}>
+			<button type="button" class="btn small" onclick={more} disabled={loading}>
+				{#if loading}<span class="spinner" aria-hidden="true"></span>{/if}
+				Meer laden
+			</button>
+		</div>
+	{/if}
+{/if}
+
+<style>
+	.pane-head .btn svg {
+		width: 18px;
+		height: 18px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.list {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.entry {
+		align-items: flex-start;
+		min-height: 0;
+	}
+	.dot {
+		flex: none;
+		width: 8px;
+		height: 8px;
+		margin-top: 8px;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+	.dot.bad {
+		background: var(--danger);
+	}
+	.dot.warn {
+		background: #ff9f0a;
+	}
+	.detail {
+		margin: 6px 0 0;
+		padding: 0;
+		list-style: none;
+		font-size: 0.8125rem;
+		line-height: 1.45;
+		color: var(--text-2);
+		font-variant-numeric: tabular-nums;
+		overflow-wrap: anywhere;
+	}
+	.end {
+		display: flex;
+		justify-content: center;
+		padding: 4px 0 8px;
+	}
+</style>

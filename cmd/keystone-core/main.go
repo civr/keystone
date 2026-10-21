@@ -2,6 +2,7 @@
 //
 //	keystone-core [serve]        run the HTTP server (default)
 //	keystone-core reset-network  clear the login/admin network allowlists
+//	keystone-core print-defaults print the factory settings as JSON
 package main
 
 import (
@@ -63,8 +64,10 @@ func main() {
 		err = serve(ctx)
 	case "reset-network":
 		err = resetNetwork(ctx)
+	case "print-defaults":
+		err = printDefaults(os.Stdout)
 	default:
-		fmt.Fprintf(os.Stderr, "usage: keystone-core [serve|reset-network]\n")
+		fmt.Fprintf(os.Stderr, "usage: keystone-core [serve|reset-network|print-defaults]\n")
 		os.Exit(2)
 	}
 	if err != nil {
@@ -226,4 +229,13 @@ func runResetNetwork(ctx context.Context, pool *pgxpool.Pool, out io.Writer) err
 	aw.Log(ctx, audit.ActorCLI, "settings.network_reset", netip.Addr{}, map[string]any{"cleared": []string{"login_cidrs", "admin_cidrs"}})
 	_, err := fmt.Fprintln(out, "Netwerkbeperkingen gewist: login_cidrs en admin_cidrs zijn leeg.")
 	return err
+}
+
+// printDefaults writes settings.Defaults() as indented JSON. The web UI's
+// settingsMeta test uses this output (web/src/lib/fixtures/defaults.json) to
+// prove every setting has a label.
+func printDefaults(out io.Writer) error {
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	return enc.Encode(settings.Defaults())
 }

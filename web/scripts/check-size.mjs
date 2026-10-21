@@ -3,10 +3,11 @@
 // exceeds the budget (100 kB gzip, spec speed target).
 //
 // What is measured: every .js file under build/_app/immutable/ referenced by
-// build/200.html (the entry modules), plus route nodes 0 (root layout) and 2
-// (the "/" page), plus everything those files import *statically*, followed
-// transitively. Dynamic import() targets (other routes, error page) are not
-// counted — they are not loaded for "/". Each file counts once, gzip level 9.
+// build/200.html (the entry modules), plus the route nodes of "/" (root
+// layout and home page, looked up in the client route dictionary), plus
+// everything those files import *statically*, followed transitively. Dynamic
+// import() targets (other routes, error page) are not counted — they are not
+// loaded for "/". Each file counts once, gzip level 9.
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
@@ -32,8 +33,18 @@ for (const m of shell.matchAll(/["'(]\/?((?:[^"'()]*\/)?_app\/immutable\/[^"'()]
 }
 if (roots.size === 0) fail('no _app/immutable/*.js referenced from 200.html');
 
-// 2. Route nodes for "/": 0 = root layout, 2 = home page.
-for (const n of ['0', '2']) {
+// 2. Route nodes for "/": the root layout (0) plus the page and any layouts
+// named by the "/" entry of the client route dictionary, e.g. "/":[3] or
+// "/":[3,[2]]. Node numbers shift as routes are added, so they are read from
+// the build rather than hard-coded.
+const entryDir = join(immutable, 'entry');
+const appFile = readdirSync(entryDir).find((f) => f.startsWith('app.') && f.endsWith('.js'));
+if (!appFile) fail(`entry/app.*.js not found in ${entryDir}`);
+const route = readFileSync(join(entryDir, appFile), 'utf8').match(/"\/":\[(-?\d+)(?:,\[([-\d,]*)\])?/);
+if (!route) fail('route "/" not found in the client route dictionary');
+const layouts = route[2] ? route[2].split(',').filter(Boolean) : [];
+const homeNodes = new Set(['0', route[1], ...layouts].map((n) => String(Math.abs(Number(n)))));
+for (const n of homeNodes) {
 	const dir = join(immutable, 'nodes');
 	const file = readdirSync(dir).find((f) => f.startsWith(`${n}.`) && f.endsWith('.js'));
 	if (!file) fail(`route node ${n} not found in ${dir}`);
