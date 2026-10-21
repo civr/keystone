@@ -33,11 +33,17 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 		writeSettingsError(w, err)
 		return
 	}
+	// Admin routes only run after setup, where public_url is the anchor for
+	// CSRF, cookies and passkeys: it can be changed but never cleared.
+	if strings.TrimSpace(next.PublicURL) == "" {
+		writeInvalid(w, "public_url", "Het publieke adres is verplicht.")
+		return
+	}
 	cur := settingsFrom(ctx)
-	if hostOf(cur.PublicURL) != hostOf(next.PublicURL) && r.URL.Query().Get("confirm") != "1" {
+	if originOf(cur.PublicURL) != originOf(next.PublicURL) && r.URL.Query().Get("confirm") != "1" {
 		writeJSON(w, http.StatusConflict, map[string]string{
 			"error": "confirm_required", "warning": "passkeys_rp_change",
-			"message": "Een andere hostnaam maakt bestaande passkeys onbruikbaar. Bevestig om door te gaan.",
+			"message": "Een ander publiek adres kan bestaande passkeys onbruikbaar maken en sluit deze pagina af tot je het nieuwe adres opent. Bevestig om door te gaan.",
 		})
 		return
 	}
@@ -61,12 +67,15 @@ func writeSettingsError(w http.ResponseWriter, err error) {
 	errInternal(w, "save settings", err)
 }
 
-func hostOf(publicURL string) string {
-	u, err := url.Parse(publicURL)
+// originOf reduces publicURL to scheme://host[:port], lowercased and without
+// the scheme's default port.
+func originOf(publicURL string) string {
+	u, err := url.Parse(strings.TrimSpace(publicURL))
 	if err != nil {
 		return ""
 	}
-	return strings.ToLower(u.Hostname())
+	scheme := strings.ToLower(u.Scheme)
+	return scheme + "://" + normHost(scheme, u.Host)
 }
 
 type change struct {

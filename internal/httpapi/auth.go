@@ -818,5 +818,6 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 		"username": o.Username, "display_name": o.DisplayName, "given_name": o.GivenName, "email": o.Email,
 		"emergency": sess.Emergency, "must_register_passkey": sess.MustRegisterPasskey,
 		"needs_stepup": needsStepUp(*sess, settingsFrom(ctx), time.Now()),
+		"client_ip":    clientIP(ctx).String(),
 	})
 }

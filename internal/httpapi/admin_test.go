@@ -501,3 +501,60 @@ func TestADTestMessagesAreDutch(t *testing.T) {
 		}
 	}
 }
+
+// Any change of the public_url origin (scheme, host or port) changes what
+// browsers and passkeys are bound to, so it needs confirmation.
+func TestSettingsPublicURLOriginChangeNeedsConfirm(t *testing.T) {
+	t.Parallel()
+	_, c := adminClient(t, "192.168.1.20")
+	for _, u := range []string{"http://keystone.home.lan", "https://keystone.home.lan:8443"} {
+		cur := getSettings(t, c)
+		cur.PublicURL = u
+		w := c.do("PUT", "/api/admin/settings", cur)
+		if w.Code != 409 || errCode(t, w) != "confirm_required" {
+			t.Fatalf("PUT public_url %s = %d %s", u, w.Code, w.Body.String())
+		}
+	}
+	// Default port spelled out is the same origin.
+	cur := getSettings(t, c)
+	cur.PublicURL = "https://keystone.home.lan:443"
+	c.must("PUT", "/api/admin/settings", cur, 200)
+}
+
+func TestSettingsRejectEmptyPublicURL(t *testing.T) {
+	t.Parallel()
+	_, c := adminClient(t, "192.168.1.20")
+	cur := getSettings(t, c)
+	cur.PublicURL = ""
+	for _, q := range []string{"", "?confirm=1"} {
+		w := c.do("PUT", "/api/admin/settings"+q, cur)
+		var res map[string]string
+		body(t, w.Body, &res)
+		if w.Code != 400 || res["error"] != "invalid" || res["field"] != "public_url" {
+			t.Fatalf("PUT empty public_url%s = %d %s", q, w.Code, w.Body.String())
+		}
+	}
+	if getSettings(t, c).PublicURL != setupOrigin {
+		t.Fatal("public_url cleared")
+	}
+}
+
+// /api/me reports the client address as Keystone resolved it, so the owner
+// can see which address a reverse proxy shows up as.
+func TestMeReportsClientIP(t *testing.T) {
+	t.Parallel()
+	l, c := adminClient(t, "172.18.0.1")
+	if got := me(c)["client_ip"]; got != "172.18.0.1" {
+		t.Fatalf("client_ip = %v", got)
+	}
+	l.settings(t, func(s *settings.Settings) { s.Network.TrustedProxies = []string{"172.18.0.0/16"} })
+	r := httptest.NewRequest("GET", "/api/me", nil)
+	r.Host, r.RemoteAddr = setupHost, "172.18.0.1:40000"
+	r.Header.Set("X-Forwarded-For", "192.168.1.77")
+	r.AddCookie(&http.Cookie{Name: SessionCookie, Value: c.cookies[SessionCookie]})
+	w := httptest.NewRecorder()
+	l.h.ServeHTTP(w, r)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"client_ip":"192.168.1.77"`) {
+		t.Fatalf("me behind trusted proxy = %d %s", w.Code, w.Body.String())
+	}
+}
