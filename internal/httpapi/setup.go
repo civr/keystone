@@ -258,7 +258,14 @@ func (s *server) setupUnlock(w http.ResponseWriter, r *http.Request) {
 		errUnavailable(w)
 		return
 	}
-	setCookie(w, cfg, PendingCookie, setupKind+"."+tok, setupTTL)
+	// A browser still on the host address (http) after an https public_url
+	// was saved would drop a Secure cookie and be stuck; Secure follows the
+	// origin the request actually came from.
+	ccfg := cfg
+	if !originAllowed(r, cfg.PublicURL) {
+		ccfg.PublicURL = ""
+	}
+	setCookie(w, ccfg, PendingCookie, setupKind+"."+tok, setupTTL)
 	s.d.Audit.Log(ctx, audit.ActorAnonymous, "setup.unlocked", ip, nil)
 	writeJSON(w, http.StatusOK, map[string]string{"step": p.next()})
 }
@@ -586,6 +593,8 @@ func (s *server) setupFinish(w http.ResponseWriter, r *http.Request, token strin
 	_ = s.d.Valkey.Del(ctx, setupKey(token)).Err()
 	setCookie(w, cfg, PendingCookie, "", 0)
 	setCookie(w, cfg, SessionCookie, sess.ID, time.Duration(cfg.Session.DurationHours)*time.Hour)
+	// The setup browser has just used AD (owner step) and a passkey.
+	s.markDevice(w, r, cfg, now)
 	s.d.Audit.Log(ctx, audit.ActorOwner, "setup.completed", ip, map[string]any{"recovery_codes": recoveryCodeCount})
 	writeJSON(w, http.StatusOK, map[string]any{"recovery_codes": codes})
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/passkey/passkeytest"
+	"github.com/civr/keystone/internal/session"
 )
 
 const (
@@ -26,11 +27,13 @@ type client struct {
 	t       *testing.T
 	h       http.Handler
 	ip      string
+	host    string // request Host; setupHost by default
+	origin  string // Origin header; setupOrigin by default
 	cookies map[string]string
 }
 
 func newClient(t *testing.T, e *env, ip string) *client {
-	return &client{t: t, h: e.h, ip: ip, cookies: map[string]string{}}
+	return &client{t: t, h: e.h, ip: ip, host: setupHost, origin: setupOrigin, cookies: map[string]string{}}
 }
 
 func (c *client) do(method, path string, body any) *httptest.ResponseRecorder {
@@ -49,9 +52,9 @@ func (c *client) do(method, path string, body any) *httptest.ResponseRecorder {
 		rd = bytes.NewReader(raw)
 	}
 	r := httptest.NewRequest(method, path, rd)
-	r.Host = setupHost
+	r.Host = c.host
 	r.RemoteAddr = c.ip + ":40000"
-	r.Header.Set("Origin", setupOrigin)
+	r.Header.Set("Origin", c.origin)
 	r.Header.Set("Content-Type", "application/json")
 	for k, v := range c.cookies {
 		r.AddCookie(&http.Cookie{Name: k, Value: v})
@@ -507,5 +510,74 @@ func TestSetupGoneAfterFinish(t *testing.T) {
 				t.Fatalf("%s after finish = %d %s", path, w.Code, w.Body.String())
 			}
 		}
+	}
+}
+
+// A wrong public_url must not lock the operator out of the wizard: until
+// setup is complete, /api/setup accepts an Origin whose host equals the
+// request Host (the unlock cookie is still required).
+func TestSetupDomainRedoFromHostOrigin(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	c := newClient(t, s.env, "192.168.1.90")
+	c.host, c.origin = "192.168.1.5:8080", "http://192.168.1.5:8080"
+	s.unlock(c)
+	c.must("POST", "/api/setup/domain", map[string]string{"domain": "home.lan", "public_url": "https://typo.home.lan"}, 200)
+	// The browser is still on the IP address: it can redo the domain step.
+	s.domain(c)
+	cfg, err := s.deps.Settings.Get(context.Background())
+	if err != nil || cfg.PublicURL != setupOrigin {
+		t.Fatalf("public_url = %q, %v", cfg.PublicURL, err)
+	}
+	// The relaxation is limited to /api/setup: other APIs still need public_url.
+	if w := c.do("POST", "/api/auth/password", map[string]string{"username": "thijs", "password": "x"}); w.Code != http.StatusForbidden || errCode(t, w) != "bad_origin" {
+		t.Fatalf("auth from host origin = %d %s", w.Code, w.Body.String())
+	}
+	// Another Origin than the Host is still rejected.
+	c.origin = "http://evil.example"
+	if w := c.do("POST", "/api/setup/domain", map[string]string{"domain": "home.lan", "public_url": setupOrigin}); w.Code != http.StatusForbidden {
+		t.Fatalf("foreign origin = %d", w.Code)
+	}
+	// Re-unlocking over plain http after an https public_url was saved must
+	// give a cookie the browser keeps (not Secure), or the wizard is stuck.
+	c.origin = "http://192.168.1.5:8080"
+	w := c.must("POST", "/api/setup/unlock", map[string]string{"code": s.code}, 200)
+	if ck := w.Result().Cookies(); len(ck) != 1 || ck[0].Secure {
+		t.Fatalf("unlock cookie over http = %+v", ck)
+	}
+	// From the public_url origin the cookie stays Secure.
+	pub := newClient(t, s.env, "192.168.1.91")
+	w = pub.must("POST", "/api/setup/unlock", map[string]string{"code": s.code}, 200)
+	if ck := w.Result().Cookies(); len(ck) != 1 || !ck[0].Secure {
+		t.Fatalf("unlock cookie from public_url = %+v", ck)
+	}
+}
+
+func TestSetupHostOriginRejectedAfterFinish(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	c := newClient(t, s.env, "192.168.1.92")
+	completeSetup(t, s, c)
+	c.host, c.origin = "192.168.1.5:8080", "http://192.168.1.5:8080"
+	if w := c.do("POST", "/api/setup/domain", map[string]string{"domain": "home.lan", "public_url": setupOrigin}); w.Code != http.StatusForbidden || errCode(t, w) != "bad_origin" {
+		t.Fatalf("setup from host origin after finish = %d %s", w.Code, w.Body.String())
+	}
+}
+
+// The browser that completes setup becomes a trusted device.
+func TestFinishMarksTrustedDevice(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	s.deps.Secrets.SessionKey = bytes.Repeat([]byte{9}, 32)
+	s.h = New(s.deps)
+	c := newClient(t, s.env, "192.168.1.93")
+	completeSetup(t, s, c)
+	cfg, err := s.deps.Settings.Get(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, at, ok := session.VerifyDeviceAt(s.deps.Secrets.SessionKey, c.cookies[DeviceCookie], cfg, time.Now())
+	if !ok || time.Since(at) > time.Minute {
+		t.Fatalf("device cookie after finish: ok=%v at=%v", ok, at)
 	}
 }

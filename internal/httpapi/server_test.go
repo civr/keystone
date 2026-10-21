@@ -238,9 +238,11 @@ func TestOriginMismatchRejected(t *testing.T) {
 
 	e.put(t, func(s *settings.Settings) { s.PublicURL = "https://keystone.home.lan" })
 	cases := map[string]bool{ // origin → allowed
-		"https://keystone.home.lan":      true,
-		"https://KEYSTONE.home.lan:443":  true,
-		"http://keystone.home.lan":       false,
+		"https://keystone.home.lan":     true,
+		"https://KEYSTONE.home.lan:443": true,
+		// Same host as the request: still allowed on /api/setup until setup
+		// completes, so a wrong public_url cannot lock out the wizard.
+		"http://keystone.home.lan":       true,
 		"https://keystone.home.lan:8443": false,
 		"https://evil.example":           false,
 		"null":                           false,

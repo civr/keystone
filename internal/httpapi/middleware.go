@@ -52,7 +52,7 @@ func SessionFrom(ctx context.Context) *session.Session {
 // must-register-passkey gate.
 func (s *server) middlewares() []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
-		s.realIP, s.securityHeaders, requestLog, cidrCheck, originCheck, s.loadSession, mustRegisterGate,
+		s.realIP, s.securityHeaders, requestLog, cidrCheck, s.originCheck, s.loadSession, mustRegisterGate,
 	}
 }
 
@@ -153,17 +153,34 @@ func cidrCheck(next http.Handler) http.Handler {
 
 // originCheck is the CSRF guard: state-changing requests must carry an Origin
 // equal to the origin of public_url, or — while public_url is unset during
-// setup — whose host equals the request Host.
-func originCheck(next http.Handler) http.Handler {
+// setup — whose host equals the request Host. Until setup is complete,
+// /api/setup also accepts the request Host as origin, so a wrong or
+// unreachable public_url saved in the domain step cannot lock the operator
+// out of the wizard (the setup unlock cookie is still required there).
+func (s *server) originCheck(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isSafeMethod(r.Method) || originAllowed(r, settingsFrom(r.Context()).PublicURL) {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if pathUnder(r, "/api/setup") && originAllowed(r, "") {
+			done, err := s.setupDone(r.Context())
+			if err != nil {
+				slog.Error("http: setup state", "err", err)
+				errUnavailable(w)
+				return
+			}
+			if !done {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
 		writeError(w, http.StatusForbidden, "bad_origin", "Verzoek geweigerd: het komt niet van deze Keystone-pagina.")
 	})
 }
 
+// originAllowed reports whether the request Origin equals the origin of
+// publicURL, or — when publicURL is empty — whose host equals the request Host.
 func originAllowed(r *http.Request, publicURL string) bool {
 	o, err := url.Parse(r.Header.Get("Origin"))
 	if err != nil || o.Host == "" || (o.Scheme != "http" && o.Scheme != "https") {

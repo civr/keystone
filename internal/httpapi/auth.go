@@ -59,11 +59,17 @@ func (s *server) authRoutes(r chi.Router) {
 // requireSetupDone answers 409 setup_needed until setup has finished, so an
 // owner stored mid-setup cannot sign in (and register a passkey) without the
 // setup code.
+// setupDone reports whether the setup wizard has been completed.
+func (s *server) setupDone(ctx context.Context) (bool, error) {
+	var done bool
+	err := s.d.Pool.QueryRow(ctx,
+		`select coalesce((select completed_at is not null from setup_state where id = 1), false)`).Scan(&done)
+	return done, err
+}
+
 func (s *server) requireSetupDone(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var done bool
-		err := s.d.Pool.QueryRow(r.Context(),
-			`select coalesce((select completed_at is not null from setup_state where id = 1), false)`).Scan(&done)
+		done, err := s.setupDone(r.Context())
 		if err != nil {
 			slog.Error("auth: setup state", "err", err)
 			errUnavailable(w)

@@ -541,7 +541,7 @@ func TestStepUpRequired(t *testing.T) {
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	})
 	c := newClient(t, l.env, "192.168.1.30")
-	pc := &client{t: t, h: r, ip: c.ip, cookies: c.cookies}
+	pc := &client{t: t, h: r, ip: c.ip, host: c.host, origin: c.origin, cookies: c.cookies}
 
 	if w := pc.do("POST", "/api/test/protected", nil); w.Code != http.StatusUnauthorized {
 		t.Fatalf("no session = %d", w.Code)
