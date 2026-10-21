@@ -1,0 +1,29 @@
+{
+	# TLS terminates at the operator's reverse proxy.
+	auto_https off
+	servers {
+		# keystone-core decides which forwarded headers to trust.
+		trusted_proxies static 0.0.0.0/0 ::/0
+	}
+}
+
+:80 {
+	encode zstd gzip
+	root * /srv
+
+	@immutable path /_app/immutable/*
+	handle @immutable {
+		header Cache-Control "public, max-age=31536000, immutable"
+		header X-Content-Type-Options "nosniff"
+		file_server
+	}
+
+	@static path /favicon.svg /favicon.png /favicon.ico /robots.txt
+	handle @static {
+		file_server
+	}
+
+	handle {
+		reverse_proxy core:8080
+	}
+}

@@ -1,0 +1,7 @@
+.git
+.superpowers
+docs
+web/node_modules
+web/build
+web/.svelte-kit
+**/*_test.go

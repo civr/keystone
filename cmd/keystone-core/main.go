@@ -3,6 +3,7 @@
 //	keystone-core [serve]        run the HTTP server (default)
 //	keystone-core reset-network  clear the login/admin network allowlists
 //	keystone-core print-defaults print the factory settings as JSON
+//	keystone-core healthcheck    exit 0 if the local server answers /api/healthz
 package main
 
 import (
@@ -66,8 +67,10 @@ func main() {
 		err = resetNetwork(ctx)
 	case "print-defaults":
 		err = printDefaults(os.Stdout)
+	case "healthcheck":
+		err = healthcheck(ctx)
 	default:
-		fmt.Fprintf(os.Stderr, "usage: keystone-core [serve|reset-network|print-defaults]\n")
+		fmt.Fprintf(os.Stderr, "usage: keystone-core [serve|reset-network|print-defaults|healthcheck]\n")
 		os.Exit(2)
 	}
 	if err != nil {

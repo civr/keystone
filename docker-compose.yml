@@ -1,0 +1,109 @@
+name: keystone
+
+services:
+  init:
+    image: ghcr.io/civr/keystone-init:latest
+    build:
+      context: .
+      dockerfile: docker/init.Dockerfile
+    user: "65532:65532"
+    restart: "no"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    volumes:
+      - keystone_secrets:/run/keystone
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_USER: keystone
+      POSTGRES_DB: keystone
+      POSTGRES_PASSWORD_FILE: /run/keystone/db_password
+    volumes:
+      - keystone_db:/var/lib/postgresql/data
+      - keystone_secrets:/run/keystone:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keystone -d keystone"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    # The password is read from the secrets volume by the root entrypoint
+    # before valkey drops privileges; it never appears in the environment.
+    entrypoint:
+      - sh
+      - -c
+      - exec docker-entrypoint.sh valkey-server --requirepass "$$(cat /run/keystone/valkey_password)" --appendonly yes
+    volumes:
+      - keystone_secrets:/run/keystone:ro
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/keystone/valkey_password)\" valkey-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  core:
+    image: ghcr.io/civr/keystone-core:latest
+    build:
+      context: .
+      dockerfile: docker/core.Dockerfile
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      KEYSTONE_DB_HOST: postgres
+      KEYSTONE_VALKEY_ADDR: valkey:6379
+      KEYSTONE_SECRETS: /run/keystone
+    volumes:
+      - keystone_secrets:/run/keystone:ro
+    # No published port: core trusts RemoteAddr (= web) for client IPs.
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/keystone-core", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    image: ghcr.io/civr/keystone-web:latest
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp, /data, /config]
+    cap_drop: [ALL]
+    # caddy carries a file capability to bind :80; without it in the bounding
+    # set the binary cannot even exec.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      core:
+        condition: service_healthy
+    ports:
+      - "${KEYSTONE_PORT:-8080}:80"
+
+volumes:
+  keystone_secrets:
+  keystone_db:
