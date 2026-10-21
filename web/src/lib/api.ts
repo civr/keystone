@@ -3,7 +3,9 @@ export class ApiError extends Error {
 	constructor(
 		public code: string,
 		message: string,
-		public status: number
+		public status: number,
+		/** The full JSON error body, e.g. retry_after or emergency. */
+		public data: Record<string, unknown> = {}
 	) {
 		super(message);
 		this.name = 'ApiError';
@@ -21,6 +23,8 @@ let stepUp: StepUp | null = null;
 export function configureStepUp(fn: StepUp | null): void {
 	stepUp = fn;
 }
+
+const NO_REDIRECT = ['/login', '/setup'];
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
 	const init: RequestInit & { headers: Record<string, string> } = {
@@ -44,15 +48,18 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 	}
 	let code = `http_${res.status}`;
 	let message = `Er ging iets mis bij Keystone (${res.status}).`;
+	let data: Record<string, unknown> = {};
 	try {
-		const data = await res.json();
-		if (typeof data?.error === 'string') code = data.error;
-		if (typeof data?.message === 'string' && data.message) message = data.message;
+		const body = await res.json();
+		if (body && typeof body === 'object') data = body;
+		if (typeof body?.error === 'string') code = body.error;
+		if (typeof body?.message === 'string' && body.message) message = body.message;
 	} catch {
 		/* non-JSON body: keep the generic error */
 	}
-	if (res.status === 401 && location.pathname !== '/login') location.assign('/login');
-	throw new ApiError(code, message, res.status);
+	// Sign-in and setup answer 401 for wrong codes/passwords; they handle it themselves.
+	if (res.status === 401 && !NO_REDIRECT.includes(location.pathname)) location.assign('/login');
+	throw new ApiError(code, message, res.status, data);
 }
 
 async function withStepUp<T>(method: string, path: string, body?: unknown): Promise<T> {

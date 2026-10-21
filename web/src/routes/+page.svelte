@@ -29,6 +29,8 @@
 			apps = a;
 		} catch (e) {
 			if (e instanceof ApiError && e.status === 401) return; // api.ts is redirecting
+			// Signed in with a recovery code: a new passkey comes first (on /login).
+			if (e instanceof ApiError && e.code === 'must_register_passkey') return void location.assign('/login');
 			loadError = e instanceof ApiError ? e.message : 'Er ging iets mis bij het laden.';
 		}
 	}

@@ -1,0 +1,450 @@
+<script lang="ts">
+	import '$lib/forms.css';
+	import { onMount, tick } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { api, ApiError, type Me } from '$lib/api';
+	import { formatCode } from '$lib/codes';
+	import { step, pop } from '$lib/motion';
+	import {
+		authenticate,
+		ceremony,
+		conditionalSupported,
+		passkeyError,
+		supported,
+		type OptionsJSON
+	} from '$lib/webauthn';
+
+	type Mode = 'loading' | 'password' | 'emergency' | 'passkey' | 'register' | 'recovery';
+	const ORDER: Mode[] = ['loading', 'password', 'emergency', 'passkey', 'register', 'recovery'];
+	const USER_KEY = 'keystone.username';
+
+	let mode = $state<Mode>('loading');
+	let dir = $state(1);
+	let username = $state(readUser());
+	let password = $state('');
+	let emergencyPassword = $state('');
+	let code = $state('');
+	let busy = $state(false);
+	let error = $state('');
+	let notice = $state('');
+	let trusted = $state(false); // this device may sign in with a passkey only
+	let emergencyOffered = $state(false); // AD down and the emergency account is enabled
+	let wantRecovery = $state(false); // after the password, ask for a recovery code
+	let forced = $state(false); // signed in with a recovery code: new passkey first
+
+	let conditional: AbortController | null = null;
+	let userInput = $state<HTMLInputElement | null>(null);
+	let passwordInput = $state<HTMLInputElement | null>(null);
+
+	function readUser(): string {
+		try {
+			return localStorage.getItem(USER_KEY) ?? '';
+		} catch {
+			return '';
+		}
+	}
+	function saveUser() {
+		if (!username.trim()) return; // passkey-only sign-in: keep what was remembered
+		try {
+			localStorage.setItem(USER_KEY, username.trim());
+		} catch {
+			/* private mode: not remembered */
+		}
+	}
+
+	function go(next: Mode) {
+		dir = ORDER.indexOf(next) >= ORDER.indexOf(mode) ? 1 : -1;
+		error = '';
+		mode = next;
+	}
+
+	function fail(e: unknown) {
+		if (e instanceof ApiError) {
+			if (e.code === 'setup_needed') return void goto('/setup', { replaceState: true });
+			if (e.code === 'password_required') {
+				// The 5-minute pending login expired: start over.
+				go('password');
+				error = 'Je inlogpoging is verlopen. Log opnieuw in.';
+				return;
+			}
+			error = e.message;
+			if (e.code === 'locked' && typeof e.data.retry_after === 'number') {
+				const min = Math.max(1, Math.ceil(e.data.retry_after / 60));
+				error += ` Probeer het over ${min} ${min === 1 ? 'minuut' : 'minuten'} opnieuw.`;
+			}
+			if (e.code === 'ad_unavailable') emergencyOffered = e.data.emergency === true;
+			return;
+		}
+		error = passkeyError(e);
+	}
+
+	async function finished() {
+		saveUser();
+		await goto('/', { replaceState: true });
+	}
+
+	onMount(() => {
+		start();
+		return () => conditional?.abort();
+	});
+
+	async function start() {
+		const [me, status] = await Promise.all([
+			api.get<Me>('/me').catch(() => null),
+			api.get<{ needed: boolean }>('/setup/status').catch(() => null)
+		]);
+		if (status?.needed) return void goto('/setup', { replaceState: true });
+		if (me?.must_register_passkey) {
+			forced = true;
+			go('register');
+			return;
+		}
+		if (me) return void goto('/', { replaceState: true });
+		go('password');
+		await tick();
+		(username ? passwordInput : userInput)?.focus(); // remembered user: straight to the password
+		if (supported()) await probeDevice();
+	}
+
+	/** A trusted device gets passkey options without a password. */
+	async function probeDevice() {
+		let opts: OptionsJSON;
+		try {
+			opts = await api.send<OptionsJSON>('POST', '/auth/passkey/begin');
+		} catch (e) {
+			if (e instanceof ApiError && e.code === 'setup_needed') fail(e);
+			return; // password_required: not a trusted device
+		}
+		trusted = true;
+		if (await conditionalSupported()) armConditional(opts);
+	}
+
+	/** Offers the passkey in the username autofill: no typing needed. */
+	async function armConditional(opts: OptionsJSON) {
+		conditional?.abort();
+		const ctl = new AbortController();
+		conditional = ctl;
+		let body;
+		try {
+			body = await authenticate(opts, { conditional: true, signal: ctl.signal });
+		} catch {
+			return; // aborted, dismissed or unavailable: the button and password still work
+		}
+		busy = true;
+		error = '';
+		try {
+			await api.send('POST', '/auth/passkey/finish', body);
+			await finished();
+		} catch (e) {
+			fail(e);
+		} finally {
+			busy = false;
+		}
+	}
+
+	function stopConditional() {
+		conditional?.abort();
+		conditional = null;
+	}
+
+	async function passkeyOnly() {
+		stopConditional();
+		busy = true;
+		error = '';
+		try {
+			await ceremony('/auth/passkey/begin', '/auth/passkey/finish');
+			await finished();
+		} catch (e) {
+			fail(e);
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function afterPassword(next: string) {
+		if (next === 'done') return finished();
+		saveUser();
+		if (wantRecovery) return go('recovery');
+		go(next === 'register_passkey' ? 'register' : 'passkey');
+		await runPasskey();
+	}
+
+	async function submitPassword(e: SubmitEvent) {
+		e.preventDefault();
+		if (busy) return;
+		stopConditional();
+		busy = true;
+		error = '';
+		emergencyOffered = false;
+		try {
+			const res = await api.send<{ next: string }>('POST', '/auth/password', {
+				username: username.trim(),
+				password
+			});
+			password = '';
+			busy = false;
+			await afterPassword(res.next);
+		} catch (err) {
+			fail(err);
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function submitEmergency(e: SubmitEvent) {
+		e.preventDefault();
+		if (busy) return;
+		busy = true;
+		error = '';
+		try {
+			const res = await api.send<{ next: string }>('POST', '/auth/emergency', { password: emergencyPassword });
+			emergencyPassword = '';
+			busy = false;
+			await afterPassword(res.next);
+		} catch (err) {
+			fail(err);
+		} finally {
+			busy = false;
+		}
+	}
+
+	/** Passkey after the password: sign in, or register when none exists yet. */
+	async function runPasskey() {
+		if (busy) return;
+		busy = true;
+		error = '';
+		try {
+			await ceremony('/auth/passkey/begin', '/auth/passkey/finish');
+			await finished();
+		} catch (e) {
+			fail(e);
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function submitRecovery(e: SubmitEvent) {
+		e.preventDefault();
+		if (busy) return;
+		busy = true;
+		error = '';
+		try {
+			await api.send('POST', '/auth/recovery', { code });
+			code = '';
+			forced = true;
+			busy = false;
+			go('register');
+		} catch (err) {
+			fail(err);
+		} finally {
+			busy = false;
+		}
+	}
+
+	function chooseRecovery() {
+		if (mode === 'passkey' || mode === 'register') return go('recovery');
+		wantRecovery = true;
+		notice = 'Log eerst in met je wachtwoord; daarna vul je een herstelcode in.';
+	}
+
+	function restart() {
+		wantRecovery = false;
+		notice = '';
+		go('password');
+	}
+
+	const titles: Record<Mode, string> = {
+		loading: 'Keystone',
+		password: 'Inloggen bij Keystone',
+		emergency: 'Nood-account',
+		passkey: 'Bevestig met je passkey',
+		register: 'Maak een passkey',
+		recovery: 'Herstelcode'
+	};
+</script>
+
+<svelte:head>
+	<title>Inloggen · Keystone</title>
+</svelte:head>
+
+{#snippet mark()}
+	<div class="auth-mark" aria-hidden="true">
+		<svg viewBox="0 0 24 24">
+			{#if mode === 'passkey' || mode === 'register'}
+				<circle cx="9" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 9.5-4.9" /><circle cx="17.5" cy="15.5" r="2.5" /><path d="M17.5 18v4M17.5 20h2" />
+			{:else}
+				<rect x="4" y="10" width="16" height="11" rx="2.5" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
+			{/if}
+		</svg>
+	</div>
+{/snippet}
+
+{#snippet busyLabel(text: string)}
+	{#if busy}<span class="spinner" aria-hidden="true"></span>{/if}{text}
+{/snippet}
+
+<main class="auth-page">
+	<div class="auth-card glass" in:pop={{ y: 10, scale: 0.97 }}>
+		{#if mode !== 'loading'}
+			{@render mark()}
+		{/if}
+		<div class="auth-stage">
+			{#key mode}
+				<section in:step={{ dir }} out:step={{ dir, out: true }} aria-labelledby="title">
+					{#if mode === 'loading'}
+						<p class="visually-hidden" role="status">Laden…</p>
+					{:else}
+						<h1 id="title">{titles[mode]}</h1>
+					{/if}
+
+					{#if mode === 'password'}
+						<p class="lede">Log in met je AD-account.</p>
+						<form class="form" onsubmit={submitPassword} novalidate>
+							{#if trusted}
+								<button type="button" class="btn primary block" onclick={passkeyOnly} disabled={busy}>
+									<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 9.5-4.9" /><circle cx="17.5" cy="15.5" r="2.5" /><path d="M17.5 18v4M17.5 20h2" /></svg>
+									Inloggen met passkey
+								</button>
+								<div class="divider"><span>of met je wachtwoord</span></div>
+							{/if}
+							{#if notice}<p class="notice" role="status">{notice}</p>{/if}
+							<label class="field">
+								<span>Gebruikersnaam</span>
+								<input
+									bind:this={userInput}
+									class="input"
+									name="username"
+									autocomplete="username webauthn"
+									autocapitalize="none"
+									spellcheck="false"
+									required
+									bind:value={username}
+								/>
+							</label>
+							<label class="field">
+								<span>Wachtwoord</span>
+								<input
+									class="input"
+									bind:this={passwordInput}
+									type="password"
+									name="password"
+									autocomplete="current-password webauthn"
+									required
+									bind:value={password}
+									aria-invalid={error ? 'true' : undefined}
+								/>
+							</label>
+							{#if error}<p class="error" role="alert">{error}</p>{/if}
+							<button
+								class="btn block"
+								class:primary={!trusted}
+								disabled={busy || !username.trim() || !password}
+							>
+								{@render busyLabel('Inloggen')}
+							</button>
+						</form>
+						<div class="links">
+							{#if !wantRecovery}
+								<button type="button" class="link" onclick={chooseRecovery}>Herstelcode gebruiken</button>
+							{:else}
+								<button type="button" class="link" onclick={restart}>Annuleren</button>
+							{/if}
+							{#if emergencyOffered}
+								<button type="button" class="link" onclick={() => go('emergency')}>Nood-account gebruiken</button>
+							{/if}
+						</div>
+					{:else if mode === 'emergency'}
+						<p class="lede">AD is niet bereikbaar. Log in met het noodwachtwoord; daarna bevestig je nog met je passkey.</p>
+						<form class="form" onsubmit={submitEmergency} novalidate>
+							<label class="field">
+								<span>Noodwachtwoord</span>
+								<!-- svelte-ignore a11y_autofocus -->
+								<input
+									class="input"
+									type="password"
+									autocomplete="current-password"
+									autofocus
+									required
+									bind:value={emergencyPassword}
+								/>
+							</label>
+							{#if error}<p class="error" role="alert">{error}</p>{/if}
+							<button class="btn primary block" disabled={busy || !emergencyPassword}>
+								{@render busyLabel('Doorgaan')}
+							</button>
+						</form>
+						<div class="links">
+							<button type="button" class="link" onclick={restart}>Terug</button>
+						</div>
+					{:else if mode === 'passkey' || mode === 'register'}
+						<p class="lede">
+							{#if mode === 'passkey'}
+								Gebruik Face ID, Touch ID, Windows Hello of je beveiligingssleutel.
+							{:else if forced}
+								Je bent binnen met een herstelcode. Maak nu een nieuwe passkey voor dit apparaat.
+							{:else}
+								Er is nog geen passkey. Maak er een op dit apparaat om verder te gaan.
+							{/if}
+						</p>
+						<div class="form">
+							{#if error}<p class="error" role="alert">{error}</p>{/if}
+							<button type="button" class="btn primary block" onclick={runPasskey} disabled={busy}>
+								{@render busyLabel(mode === 'passkey' ? 'Gebruik passkey' : 'Passkey maken')}
+							</button>
+						</div>
+						{#if !forced}
+							<div class="links">
+								{#if mode === 'passkey'}
+									<button type="button" class="link" onclick={chooseRecovery}>Herstelcode gebruiken</button>
+								{/if}
+								<button type="button" class="link" onclick={restart}>Ander account</button>
+							</div>
+						{/if}
+					{:else if mode === 'recovery'}
+						<p class="lede">Vul een van je herstelcodes in. Daarna maak je een nieuwe passkey.</p>
+						<form class="form" onsubmit={submitRecovery} novalidate>
+							<label class="field">
+								<span>Herstelcode</span>
+								<!-- svelte-ignore a11y_autofocus -->
+								<input
+									class="input code"
+									autocomplete="one-time-code"
+									autocapitalize="characters"
+									spellcheck="false"
+									placeholder="XXXX-XXXX-XXXX-XXXX"
+									autofocus
+									value={code}
+									oninput={(e) => (code = e.currentTarget.value = formatCode(e.currentTarget.value))}
+								/>
+							</label>
+							{#if error}<p class="error" role="alert">{error}</p>{/if}
+							<button class="btn primary block" disabled={busy || code.length < 19}>
+								{@render busyLabel('Doorgaan')}
+							</button>
+						</form>
+						<div class="links">
+							<button type="button" class="link" onclick={restart}>Terug</button>
+						</div>
+					{/if}
+				</section>
+			{/key}
+		</div>
+	</div>
+</main>
+
+<style>
+	.divider {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		color: var(--text-3);
+		font-size: 0.8125rem;
+	}
+	.divider::before,
+	.divider::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: var(--hairline);
+	}
+</style>

@@ -29,3 +29,18 @@ export function pop(
 			`opacity:${Math.min(1, t * 1.6)};transform:translateY(${u * y}px) scale(${scale + (1 - scale) * t})`
 	};
 }
+
+/**
+ * Wizard step: slides in from the side it comes from and leaves the way it
+ * goes (dir 1 = forward, -1 = back), on the critically damped spring. Use the
+ * same dir for in and out so the path is symmetric. Reduced motion: cross-fade.
+ */
+export function step(_node: Element, { dir = 1, out = false }: { dir?: number; out?: boolean } = {}): TransitionConfig {
+	if (reducedMotion()) return { duration: 160, css: (t) => `opacity:${t}` };
+	const dx = (out ? -dir : dir) * 28;
+	return {
+		duration: out ? 260 : 600,
+		easing: out ? (t) => t * t : spring,
+		css: (t, u) => `opacity:${out ? t : Math.min(1, t * 1.8)};transform:translateX(${u * dx}px)`
+	};
+}

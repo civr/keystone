@@ -72,6 +72,24 @@ describe('api.get', () => {
 		await rejection(api.get('/me'));
 		expect(assign).not.toHaveBeenCalled();
 	});
+
+	it('does not redirect from the setup wizard (wrong setup code is a 401)', async () => {
+		vi.stubGlobal('location', { pathname: '/setup', assign });
+		fetchMock.mockResolvedValueOnce(json(401, { error: 'bad_code', message: 'De setupcode klopt niet.' }));
+		const err = await rejection(api.send('POST', '/setup/unlock', { code: 'x' }));
+		expect(err.message).toBe('De setupcode klopt niet.');
+		expect(assign).not.toHaveBeenCalled();
+	});
+
+	it('exposes extra error fields as data', async () => {
+		fetchMock.mockResolvedValueOnce(
+			json(503, { error: 'ad_unavailable', message: 'AD is niet bereikbaar.', emergency: true })
+		);
+		const err = await rejection(api.send('POST', '/auth/password', {}));
+		expect(err.data.emergency).toBe(true);
+		fetchMock.mockResolvedValueOnce(json(429, { error: 'locked', message: 'x', retry_after: 900 }));
+		expect((await rejection(api.send('POST', '/auth/password', {}))).data.retry_after).toBe(900);
+	});
 });
 
 describe('api.send', () => {
