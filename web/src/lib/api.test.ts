@@ -148,3 +148,95 @@ describe('api.send', () => {
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('401 handling', () => {
+	it('redirects to /login only for unauthenticated, not for other 401s', async () => {
+		vi.stubGlobal('location', { pathname: '/instellingen/apparaten', assign });
+		fetchMock.mockResolvedValueOnce(
+			json(401, { error: 'passkey_failed', message: 'De passkey werd niet herkend.' })
+		);
+		const err = await rejection(api.send('POST', '/admin/passkeys/finish', {}));
+		expect(err.code).toBe('passkey_failed');
+		expect(assign).not.toHaveBeenCalled();
+		fetchMock.mockResolvedValueOnce(json(401, { error: 'unauthenticated' }));
+		await rejection(api.get('/me'));
+		expect(assign).toHaveBeenCalledWith('/login');
+	});
+});
+
+describe('shared step-up', () => {
+	it('runs one ceremony for concurrent stepup_required answers', async () => {
+		let finish!: () => void;
+		const stepUp = vi.fn(() => new Promise<void>((r) => (finish = r)));
+		configureStepUp(stepUp);
+		fetchMock
+			.mockResolvedValueOnce(json(403, { error: 'stepup_required', message: 'Bevestig' }))
+			.mockResolvedValueOnce(json(403, { error: 'stepup_required', message: 'Bevestig' }))
+			.mockResolvedValueOnce(json(200, { n: 1 }))
+			.mockResolvedValueOnce(json(200, { n: 2 }));
+		const a = api.send('PUT', '/apps/a', {});
+		const b = api.send('PUT', '/apps/b', {});
+		await vi.waitFor(() => expect(stepUp).toHaveBeenCalled());
+		await new Promise((r) => setTimeout(r, 0));
+		finish();
+		await expect(Promise.all([a, b])).resolves.toHaveLength(2);
+		expect(stepUp).toHaveBeenCalledTimes(1);
+		expect(fetchMock).toHaveBeenCalledTimes(4);
+	});
+
+	it('starts a new ceremony once the previous one settled', async () => {
+		const stepUp = vi.fn().mockResolvedValue(undefined);
+		configureStepUp(stepUp);
+		for (let i = 0; i < 2; i++) {
+			fetchMock
+				.mockResolvedValueOnce(json(403, { error: 'stepup_required', message: 'Bevestig' }))
+				.mockResolvedValueOnce(json(200, {}));
+			await api.send('PUT', '/apps/a', {});
+		}
+		expect(stepUp).toHaveBeenCalledTimes(2);
+	});
+
+	it('shares a failed ceremony and lets the next request try again', async () => {
+		const stepUp = vi
+			.fn()
+			.mockRejectedValueOnce(new ApiError('stepup_cancelled', 'Geannuleerd', 0))
+			.mockResolvedValueOnce(undefined);
+		configureStepUp(stepUp);
+		fetchMock
+			.mockResolvedValueOnce(json(403, { error: 'stepup_required', message: 'Bevestig' }))
+			.mockResolvedValueOnce(json(403, { error: 'stepup_required', message: 'Bevestig' }));
+		const [a, b] = await Promise.all([
+			rejection(api.send('PUT', '/apps/a', {})),
+			rejection(api.send('PUT', '/apps/b', {}))
+		]);
+		expect(a.code).toBe('stepup_cancelled');
+		expect(b.code).toBe('stepup_cancelled');
+		expect(stepUp).toHaveBeenCalledTimes(1);
+		fetchMock
+			.mockResolvedValueOnce(json(403, { error: 'stepup_required', message: 'Bevestig' }))
+			.mockResolvedValueOnce(json(200, {}));
+		await api.send('PUT', '/apps/a', {});
+		expect(stepUp).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('api.blob', () => {
+	it('returns the response body as a Blob', async () => {
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"a":1}\n{"a":2}\n', { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } })
+		);
+		const b = await api.blob('/admin/audit/export');
+		expect(fetchMock.mock.calls[0][0]).toBe('/api/admin/audit/export');
+		expect(fetchMock.mock.calls[0][1].credentials).toBe('same-origin');
+		expect(await b.text()).toBe('{"a":1}\n{"a":2}\n');
+	});
+
+	it('maps errors and sends an expired session to /login', async () => {
+		vi.stubGlobal('location', { pathname: '/instellingen/activiteit', assign });
+		fetchMock.mockResolvedValueOnce(json(401, { error: 'unauthenticated', message: 'Je bent niet ingelogd.' }));
+		const err = await rejection(api.blob('/admin/audit/export'));
+		expect(err).toBeInstanceOf(ApiError);
+		expect(err.code).toBe('unauthenticated');
+		expect(assign).toHaveBeenCalledWith('/login');
+	});
+});

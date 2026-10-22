@@ -7,6 +7,7 @@
 	import { appFormError, iconError, moveItem, targetIndex, ICON_TYPES, type AppForm } from '$lib/appEdit';
 	import { reducedMotion, spring } from '$lib/motion';
 	import { toast } from '$lib/toast.svelte';
+	import { latestQueue } from '$lib/serial';
 	import Sheet from '$lib/components/Sheet.svelte';
 
 	const COLORS = ['#007aff', '#5856d6', '#af52de', '#ff2d55', '#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#30b0c7', '#8e8e93'];
@@ -27,19 +28,24 @@
 
 	// ---------- Reorder ----------
 
-	async function saveOrder(prev: App[]) {
-		try {
-			await api.send('PUT', '/apps/order', { ids: apps!.map((a) => a.id) });
-		} catch (e) {
-			apps = prev;
-			toast(e instanceof ApiError ? e.message : 'De volgorde kon niet worden opgeslagen.', 'error');
-		}
+	// Saves run one at a time in move order, each with the order as it was at
+	// that move. Only a failure of the latest save is shown; the list is then
+	// reloaded so it matches what Keystone stored.
+	const orderQueue = latestQueue();
+	function saveOrder() {
+		const ids = apps!.map((a) => a.id);
+		orderQueue(
+			() => api.send('PUT', '/apps/order', { ids }),
+			(e) => {
+				toast(e instanceof ApiError ? e.message : 'De volgorde kon niet worden opgeslagen.', 'error');
+				load();
+			}
+		);
 	}
 
 	/** Keyboard and button path: move one step and keep focus on the moved row's control. */
 	async function move(i: number, to: number, focusSel?: string) {
 		if (!apps || to < 0 || to >= apps.length || to === i) return;
-		const prev = apps;
 		const app = apps[i];
 		apps = moveItem(apps, i, to);
 		announce = `${app.name} staat nu op plaats ${to + 1} van ${apps.length}.`;
@@ -47,7 +53,7 @@
 			await tick();
 			document.querySelector<HTMLElement>(`[data-id="${app.id}"] ${focusSel}`)?.focus();
 		}
-		saveOrder(prev);
+		saveOrder();
 	}
 
 	let list = $state<HTMLElement | null>(null);
@@ -89,7 +95,6 @@
 		settling = true;
 		drag.dy = (to - from) * rowH;
 		await new Promise((r) => setTimeout(r, reducedMotion() ? 0 : 320));
-		const prev = apps!;
 		committing = true;
 		apps = moveItem(apps!, from, to);
 		drag = null;
@@ -98,7 +103,7 @@
 		requestAnimationFrame(() => (committing = false));
 		if (from !== to) {
 			announce = `${apps[to].name} staat nu op plaats ${to + 1} van ${apps.length}.`;
-			saveOrder(prev);
+			saveOrder();
 		}
 	}
 

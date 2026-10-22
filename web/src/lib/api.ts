@@ -14,6 +14,8 @@ export class ApiError extends Error {
 
 type StepUp = () => Promise<void>;
 let stepUp: StepUp | null = null;
+/** The running ceremony, shared by every request that hit stepup_required meanwhile. */
+let stepUpInFlight: Promise<void> | null = null;
 
 /**
  * Registers the passkey step-up ceremony (Task 11 wires WebAuthn). When a
@@ -26,11 +28,11 @@ export function configureStepUp(fn: StepUp | null): void {
 
 const NO_REDIRECT = ['/login', '/setup'];
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, asBlob = false): Promise<T> {
 	const init: RequestInit & { headers: Record<string, string> } = {
 		method,
 		credentials: 'same-origin',
-		headers: { Accept: 'application/json' }
+		headers: { Accept: asBlob ? '*/*' : 'application/json' }
 	};
 	if (method !== 'GET') {
 		init.headers['Content-Type'] = 'application/json';
@@ -43,6 +45,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 		throw new ApiError('network', 'Keystone is niet bereikbaar. Controleer je verbinding.', 0);
 	}
 	if (res.ok) {
+		if (asBlob) return (await res.blob()) as T;
 		const text = await res.text();
 		return (text ? JSON.parse(text) : undefined) as T;
 	}
@@ -57,25 +60,35 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 	} catch {
 		/* non-JSON body: keep the generic error */
 	}
-	// Sign-in and setup answer 401 for wrong codes/passwords; they handle it themselves.
-	if (res.status === 401 && !NO_REDIRECT.includes(location.pathname)) location.assign('/login');
+	// Only a missing/expired session goes to /login; other 401s (wrong setup
+	// code, passkey not recognised, …) are shown by the page itself.
+	if (res.status === 401 && code === 'unauthenticated' && !NO_REDIRECT.includes(location.pathname))
+		location.assign('/login');
 	throw new ApiError(code, message, res.status, data);
 }
 
-async function withStepUp<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** Runs the step-up ceremony, joining one that is already running. */
+function runStepUp(fn: StepUp): Promise<void> {
+	stepUpInFlight ??= fn().finally(() => (stepUpInFlight = null));
+	return stepUpInFlight;
+}
+
+async function withStepUp<T>(method: string, path: string, body?: unknown, asBlob = false): Promise<T> {
 	try {
-		return await request<T>(method, path, body);
+		return await request<T>(method, path, body, asBlob);
 	} catch (e) {
 		if (!(e instanceof ApiError) || e.code !== 'stepup_required' || !stepUp) throw e;
-		await stepUp();
-		return request<T>(method, path, body);
+		await runStepUp(stepUp);
+		return request<T>(method, path, body, asBlob);
 	}
 }
 
 export const api = {
 	get: <T>(path: string) => withStepUp<T>('GET', path),
 	send: <T>(method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown) =>
-		withStepUp<T>(method, path, body)
+		withStepUp<T>(method, path, body),
+	/** GET a non-JSON body (e.g. a download) with the same error and 401 handling. */
+	blob: (path: string) => withStepUp<Blob>('GET', path, undefined, true)
 };
 
 /** GET /api/me */
@@ -87,4 +100,6 @@ export interface Me {
 	emergency: boolean;
 	must_register_passkey: boolean;
 	needs_stepup: boolean;
+	/** The client address as Keystone resolved it (after trusted proxies). */
+	client_ip: string;
 }
