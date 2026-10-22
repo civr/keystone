@@ -9,6 +9,8 @@
 	import { toast } from '$lib/toast.svelte';
 	import { latestQueue } from '$lib/serial';
 	import Sheet from '$lib/components/Sheet.svelte';
+	import AppProtocol from '$lib/components/settings/AppProtocol.svelte';
+	import { protocolError, protocolForm, protocolPayload, type ProtocolForm } from '$lib/protocols';
 
 	const COLORS = ['#007aff', '#5856d6', '#af52de', '#ff2d55', '#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#30b0c7', '#8e8e93'];
 
@@ -129,9 +131,25 @@
 	let saving = $state(false);
 	let confirmDelete = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
+	let proto = $state<ProtocolForm>(protocolForm(null));
+	let protoErrors = $state<Record<string, string>>({});
+	let vault = $state({ username: '', password: '', hasPassword: false });
+
+	async function loadVault(app: App) {
+		try {
+			const v = await api.get<{ username: string; has_password: boolean }>(`/apps/${app.id}/vault`);
+			if (editing?.id === app.id) vault = { username: v.username, password: '', hasPassword: v.has_password };
+		} catch {
+			/* shown as empty; saving still works */
+		}
+	}
 
 	function openEditor(app: App | null) {
 		editing = app;
+		proto = protocolForm(app);
+		protoErrors = {};
+		vault = { username: '', password: '', hasPassword: false };
+		if (app?.protocol === 'vault') loadVault(app);
 		form = app
 			? { name: app.name, url: app.url, color: app.color, icon: app.icon || null }
 			: { name: '', url: 'https://', color: COLORS[(apps?.length ?? 0) % COLORS.length], icon: null };
@@ -168,8 +186,17 @@
 		fieldErrors = bad ? { [bad.field]: bad.message } : {};
 		formError = '';
 		if (bad) return void document.getElementById(`app-${bad.field}`)?.focus();
+		const pbad = protocolError(proto);
+		protoErrors = pbad ? { [pbad.field]: pbad.message } : {};
+		if (pbad) return void document.getElementById(pbad.field)?.focus();
 		saving = true;
-		const body = { name: form.name.trim(), url: form.url.trim(), color: form.color.toLowerCase(), icon: form.icon ?? '' };
+		const body = {
+			name: form.name.trim(),
+			url: form.url.trim(),
+			color: form.color.toLowerCase(),
+			icon: form.icon ?? '',
+			...protocolPayload(proto)
+		};
 		try {
 			if (editing) {
 				const updated = await api.send<App>('PUT', `/apps/${editing.id}`, body);
@@ -178,12 +205,26 @@
 			} else {
 				const created = await api.send<App>('POST', '/apps', body);
 				apps = [...apps!, created];
+				editing = created;
 				toast(`${created.name} toegevoegd`);
 			}
-			sheetOpen = false;
+			if (proto.protocol === 'vault') {
+				const v: { username: string; password?: string } = { username: vault.username.trim() };
+				if (vault.password) v.password = vault.password;
+				await api.send('PUT', `/apps/${editing!.id}/vault`, v);
+			}
+			// Protocols with connection details stay open so they can be copied.
+			const showInfo = ['saml', 'oidc', 'ldap', 'gate'].includes(proto.protocol);
+			if (showInfo) {
+				editing = apps!.find((a) => a.id === editing!.id) ?? editing;
+				proto = protocolForm(editing);
+			} else sheetOpen = false;
 		} catch (err) {
-			if (err instanceof ApiError && err.code === 'invalid' && typeof err.data.field === 'string')
-				fieldErrors = { [err.data.field]: err.message };
+			if (err instanceof ApiError && err.code === 'invalid' && typeof err.data.field === 'string') {
+				const f = err.data.field;
+				if (f.startsWith('config.') || f === 'protocol') protoErrors = { [f]: err.message };
+				else fieldErrors = { [f]: err.message };
+			}
 			else formError = err instanceof ApiError ? err.message : 'Opslaan is niet gelukt.';
 		} finally {
 			saving = false;
@@ -379,6 +420,8 @@
 				<small>PNG, SVG of WebP, maximaal 64 kB. Zonder icoon toont de tegel de eerste letter.</small>
 			{/if}
 		</div>
+
+		<AppProtocol bind:form={proto} bind:vault app={editing} name={form.name} errors={protoErrors} />
 
 		{#if formError}<p class="error" role="alert">{formError}</p>{/if}
 

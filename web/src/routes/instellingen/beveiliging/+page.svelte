@@ -43,7 +43,47 @@
 	let pwError = $state('');
 	let enableAfterPassword = $state(false);
 
+	// --- Sleutels ---
+	type Key = { use: 'saml' | 'oidc' | 'ldap'; id: string; active: boolean; created_at: string; cert_pem: string };
+	const KEY_INFO = {
+		saml: { label: 'SAML-ondertekening', help: 'Ondertekent SAML-antwoorden. Apps die de metadata niet zelf ophalen, moeten het nieuwe certificaat krijgen.' },
+		oidc: { label: 'OIDC-tokens', help: 'Ondertekent ID- en access-tokens. De oude sleutel blijft nog 24 uur geldig.' },
+		ldap: { label: 'LDAPS-certificaat', help: 'Het TLS-certificaat van keystone-ldap. Apps die het certificaat controleren, moeten het nieuwe krijgen.' }
+	} as const;
+	let keyList = $state<Key[] | null>(null);
+	let keyBusy = $state('');
+
+	async function loadKeys() {
+		try {
+			keyList = (await api.get<{ keys: Key[] }>('/admin/keys')).keys.filter((k) => k.active);
+		} catch {
+			toast('De sleutels konden niet worden geladen.', 'error');
+		}
+	}
+
+	async function rotate(k: Key) {
+		const ok = await confirmer.ask({
+			title: `${KEY_INFO[k.use].label} vernieuwen?`,
+			message: KEY_INFO[k.use].help,
+			confirm: 'Vernieuwen'
+		});
+		if (!ok) return;
+		keyBusy = k.use;
+		try {
+			await api.send('POST', `/admin/keys/${k.use}/rotate`);
+			toast('Sleutel vernieuwd');
+			await loadKeys();
+		} catch (e) {
+			toast(e instanceof ApiError ? e.message : 'Vernieuwen is niet gelukt.', 'error');
+		} finally {
+			keyBusy = '';
+		}
+	}
+
+	const date = (iso: string) => new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
+
 	onMount(() => {
+		loadKeys();
 		api.get<{ enabled: boolean; password_set: boolean }>('/admin/emergency').then(
 			(r) => (emergency = r),
 			() => toast('De status van het nood-account kon niet worden geladen.', 'error')
@@ -138,6 +178,27 @@
 				</div>
 			</div>
 		</section>
+
+		<section class="group" aria-labelledby="g-sleutels">
+			<h2 id="g-sleutels">Sleutels</h2>
+			<div class="card">
+				{#each keyList ?? [] as k (k.use)}
+					<div class="srow wrap-phone">
+						<div class="text">
+							<span class="label">{KEY_INFO[k.use].label}</span>
+							<p class="help">Sinds {date(k.created_at)} · <span class="mono">{k.id}</span></p>
+						</div>
+						<div class="control key-actions">
+							<button type="button" class="btn btn-secondary btn-sm" onclick={() => download(`keystone-${k.use}.pem`, k.cert_pem)}>Certificaat</button>
+							<button type="button" class="btn btn-secondary btn-sm" disabled={keyBusy === k.use} onclick={() => rotate(k)}>Vernieuw</button>
+						</div>
+					</div>
+				{:else}
+					<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
+				{/each}
+			</div>
+			<p class="foot">De kluissleutel staat in het secrets-volume en wordt niet via deze pagina vernieuwd.</p>
+		</section>
 	{/snippet}
 </SettingsEditor>
 
@@ -183,5 +244,9 @@
 	}
 	.help .chip {
 		margin-left: 4px;
+	}
+	.key-actions {
+		display: flex;
+		gap: 8px;
 	}
 </style>

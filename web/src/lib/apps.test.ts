@@ -8,6 +8,7 @@ const app = (name: string, url: string): App => ({
 	color: '#007aff',
 	icon: null,
 	protocol: 'link',
+	config: {},
 	sort: 0,
 	created_at: '2026-10-20T00:00:00Z'
 });

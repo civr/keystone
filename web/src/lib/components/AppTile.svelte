@@ -1,9 +1,17 @@
 <script lang="ts">
-	import { hostOf, safeHref, type App } from '$lib/apps';
+	import { hostOf, tileHref, type App } from '$lib/apps';
+	import { openVaultApp } from '$lib/vaultTile';
 
 	let { app, highlighted = false }: { app: App; highlighted?: boolean } = $props();
 
-	const href = $derived(safeHref(app.url));
+	const href = $derived(tileHref(app));
+
+	function click(e: MouseEvent) {
+		// Vault apps: copy the stored password first, then open the app.
+		if (app.protocol !== 'vault' || !href || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+		e.preventDefault();
+		openVaultApp(app, href);
+	}
 	// Icons are only ever data:image URLs rendered via <img src> — never inline markup.
 	const icon = $derived(app.icon?.startsWith('data:image/') ? app.icon : null);
 	const initial = $derived(Array.from(app.name.trim())[0]?.toUpperCase() ?? '?');
@@ -11,7 +19,7 @@
 </script>
 
 <!-- Nimbus browseable tile (.vdc-card): white, resting on --shadow-sm, lifts 2px on hover. -->
-<a class="tile" class:highlighted class:disabled={!href} href={href ?? undefined} aria-disabled={!href || undefined}>
+<a class="tile" class:highlighted class:disabled={!href} href={href ?? undefined} aria-disabled={!href || undefined} onclick={click}>
 	<span class="icon" style:--tile-color={app.color}>
 		{#if icon}
 			<img src={icon} alt="" draggable="false" decoding="async" />
@@ -21,10 +29,23 @@
 	</span>
 	<span class="name">{app.name}</span>
 	<span class="host">{host}</span>
+	{#if app.protocol === 'vault'}<span class="badge" title="Wachtwoord uit de kluis wordt gekopieerd">Kluis</span>{/if}
 </a>
 
 <style>
+	.badge {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		padding: 1px 8px;
+		border-radius: var(--radius-pill, 9999px);
+		background: var(--c-bg-section);
+		color: var(--color-text-muted);
+		font-size: 0.6875rem;
+		font-weight: 600;
+	}
 	.tile {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
