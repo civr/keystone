@@ -63,6 +63,11 @@
 	line-height: 1.4;
 	color: var(--text-3);
 }
+.group > .foot .mono {
+	font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+	color: var(--text);
+	user-select: all;
+}
 
 /* One inset card per group; rows separated by inset hairlines. */
 .card {

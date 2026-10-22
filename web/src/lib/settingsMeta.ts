@@ -212,7 +212,7 @@ export const settingsMeta: Record<string, FieldMeta> = {
 	},
 	'network.trusted_proxies': {
 		label: 'Vertrouwde proxy’s',
-		help: 'Proxy’s waarvan Keystone het X-Forwarded-For-adres gelooft.',
+		help: 'Proxy’s waarvan Keystone het X-Forwarded-For-adres gelooft. Staat er nog een reverse proxy vóór Keystone (bijv. voor https), voeg dan het adres toe waarmee die bij Keystone binnenkomt — vaak de Docker-gateway zoals 172.18.0.1/32. Dat adres zie je hieronder als jouw adres, en bij je sessies onder Apparaten.',
 		kind: 'cidrs',
 		placeholder: '10.0.0.2/32',
 		weakens: added
@@ -294,7 +294,16 @@ export const settingsMeta: Record<string, FieldMeta> = {
 };
 
 /** The Beveiliging page, top to bottom. Herstel (codes, nood-account) follows separately. */
-export const securityGroups: { id: string; title: string; paths: string[] }[] = [
+export interface SettingsGroup {
+	id: string;
+	title: string;
+	paths: string[];
+	foot?: string;
+	/** Show "Jouw adres volgens Keystone" under the group (from GET /me). */
+	showClientIP?: boolean;
+}
+
+export const securityGroups: SettingsGroup[] = [
 	{
 		id: 'sessies',
 		title: 'Sessies',
@@ -329,7 +338,8 @@ export const securityGroups: { id: string; title: string; paths: string[] }[] = 
 	{
 		id: 'netwerk',
 		title: 'Netwerk',
-		paths: ['network.login_cidrs', 'network.admin_cidrs', 'network.trusted_proxies']
+		paths: ['network.login_cidrs', 'network.admin_cidrs', 'network.trusted_proxies'],
+		showClientIP: true
 	},
 	{
 		id: 'headers',

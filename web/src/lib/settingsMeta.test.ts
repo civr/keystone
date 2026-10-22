@@ -172,3 +172,12 @@ describe('fieldError', () => {
 		expect(fieldError(settingsMeta['network.login_cidrs'], ['x'])).toBeNull();
 	});
 });
+
+describe('Netwerk group', () => {
+	it('shows the client address and explains outer reverse proxies', () => {
+		const net = securityGroups.find((g) => g.id === 'netwerk');
+		expect(net?.showClientIP).toBe(true);
+		expect(settingsMeta['network.trusted_proxies'].help).toMatch(/reverse proxy/);
+		expect(settingsMeta['network.trusted_proxies'].help).toMatch(/Docker-gateway/);
+	});
+});

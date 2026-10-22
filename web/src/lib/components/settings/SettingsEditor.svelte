@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick, type Snippet } from 'svelte';
-	import { api, ApiError } from '$lib/api';
+	import { api, ApiError, type Me } from '$lib/api';
 	import {
 		settingsMeta,
 		changedPaths,
@@ -8,7 +8,8 @@
 		getPath,
 		setPath,
 		weakenedPaths,
-		type Settings
+		type Settings,
+		type SettingsGroup
 	} from '$lib/settingsMeta';
 	import { saveSettings } from '$lib/settingsSave';
 	import { formatValue } from '$lib/format';
@@ -22,7 +23,7 @@
 		after
 	}: {
 		/** Groups of settings paths to edit, in display order. */
-		groups: { id: string; title: string; paths: string[]; foot?: string }[];
+		groups: SettingsGroup[];
 		/** Extra content below the groups (e.g. Herstel on Beveiliging). */
 		after?: Snippet;
 	} = $props();
@@ -45,8 +46,16 @@
 			: {}
 	);
 
+	/** The client address as Keystone sees it, for groups with showClientIP. */
+	let clientIP = $state('');
+
 	async function load() {
 		loadError = '';
+		if (groups.some((g) => g.showClientIP))
+			api
+				.get<Me>('/me')
+				.then((me) => (clientIP = me.client_ip))
+				.catch(() => {});
 		try {
 			saved = await api.get<Settings>('/admin/settings');
 			draft = saved;
@@ -150,6 +159,9 @@
 						/>
 					{/each}
 				</div>
+				{#if g.showClientIP && clientIP}
+					<p class="foot">Jouw adres volgens Keystone: <span class="mono">{clientIP}</span></p>
+				{/if}
 				{#if g.foot}<p class="foot">{g.foot}</p>{/if}
 			</section>
 		{/each}
