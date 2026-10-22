@@ -59,6 +59,9 @@ services:
     build:
       context: .
       dockerfile: docker/core.Dockerfile
+      args:
+        # core and web must be built with the same value (asset names).
+        KEYSTONE_VERSION: ${KEYSTONE_VERSION:-dev}
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp]
@@ -90,6 +93,9 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+      args:
+        # core and web must be built with the same value (asset names).
+        KEYSTONE_VERSION: ${KEYSTONE_VERSION:-dev}
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp, /data, /config]

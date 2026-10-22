@@ -36,4 +36,18 @@ headers="$(curl -fsS -D - -o /dev/null "$BASE/")"
 echo "$headers" | grep -qi '^content-security-policy:' || fail "missing Content-Security-Policy"
 echo "$headers" | grep -qi '^x-content-type-options:' || fail "missing X-Content-Type-Options"
 
+# The shell (embedded in core) must reference assets that web actually
+# serves: both images are built separately from the same KEYSTONE_VERSION.
+html="$(curl -fsS "$BASE/")"
+assets="$(echo "$html" | grep -oE '/_app/immutable/[^"'"'"' ]+\.js' | sort -u)"
+[ -n "$assets" ] || fail "no /_app/immutable/*.js referenced from GET /"
+for a in $assets; do
+  code="$(curl -s -o /dev/null -w '%{http_code}' "$BASE$a")"
+  [ "$code" = "200" ] || fail "asset $a referenced by the shell returned $code"
+done
+curl -fsS -D - -o /dev/null "$BASE$(echo "$assets" | head -1)" | grep -qi '^cache-control: .*immutable' \
+  || fail "immutable asset without immutable Cache-Control"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/_app/version.json")" = "200" ] || fail "/_app/version.json not served"
+echo "shell assets OK: $(echo "$assets" | wc -l | tr -d ' ') files"
+
 echo "SMOKE PASS"
