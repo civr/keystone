@@ -33,7 +33,9 @@
 		"setup.passkey",
 		"setup.unlock_failed",
 		"setup.unlocked",
-		"stepup"
+		"stepup",
+		"vault.revealed",
+		"vault.updated"
 	],
 	"methods": ["emergency", "passkey", "passkey_register", "password", "recovery", "stepup", "trusted_device"]
 }

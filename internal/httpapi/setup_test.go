@@ -100,6 +100,7 @@ func newSetupEnv(t *testing.T) *setupEnv {
 	}}
 	e.deps.SetupCodeHash = hash
 	e.deps.Secrets.DataKey = bytes.Repeat([]byte{7}, 32)
+	e.deps.Secrets.VaultKey = bytes.Repeat([]byte{8}, 32)
 	e.deps.Dir = func() ad.Directory { return dir }
 	e.deps.TestAD = func(context.Context, ad.Config) (int, error) { return 42, nil }
 	e.h = New(e.deps)

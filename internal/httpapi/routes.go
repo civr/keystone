@@ -45,4 +45,7 @@ func (s *server) appRoutes(r chi.Router) {
 	w.Put("/{id}", s.updateApp)
 	w.Delete("/{id}", s.deleteApp)
 	w.Post("/{id}/secret", s.appSecret)
+	g.Get("/{id}/vault", s.getVault)
+	w.Put("/{id}/vault", s.putVault)
+	g.Post("/{id}/vault/password", s.vaultPassword)
 }
