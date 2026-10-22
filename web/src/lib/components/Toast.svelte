@@ -1,21 +1,24 @@
 <script lang="ts">
-	import { fade } from 'svelte/transition';
+	import { fade, fly } from 'svelte/transition';
 	import { flip } from 'svelte/animate';
 	import { toasts, dismiss } from '$lib/toast.svelte';
-	import { pop, spring } from '$lib/motion';
+	import { easeOut, reducedMotion } from '$lib/motion';
+
+	const still = reducedMotion();
 </script>
 
 <div class="stack" aria-live="polite" aria-atomic="false">
 	{#each toasts as t (t.id)}
 		<div
-			class="toast glass"
+			class="toast"
 			class:error={t.kind === 'error'}
 			role={t.kind === 'error' ? 'alert' : 'status'}
-			in:pop={{ y: 16, scale: 0.9 }}
-			out:fade={{ duration: 160 }}
-			animate:flip={{ duration: 400, easing: spring }}
+			in:fly={{ x: still ? 0 : 14, duration: still ? 0 : 220, easing: easeOut }}
+			out:fade={{ duration: still ? 0 : 150 }}
+			animate:flip={{ duration: still ? 0 : 200, easing: easeOut }}
 		>
-			<span>{t.text}</span>
+			<span class="dot" aria-hidden="true"></span>
+			<span class="text">{t.text}</span>
 			<button type="button" aria-label="Sluiten" onclick={() => dismiss(t.id)}>
 				<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
 			</button>
@@ -26,38 +29,44 @@
 <style>
 	.stack {
 		position: fixed;
-		left: 50%;
-		bottom: max(20px, env(safe-area-inset-bottom));
-		transform: translateX(-50%);
+		right: max(16px, env(safe-area-inset-right));
+		bottom: max(16px, env(safe-area-inset-bottom));
+		z-index: var(--z-toast);
 		display: flex;
 		flex-direction: column;
-		align-items: center;
+		align-items: flex-end;
 		gap: 8px;
-		z-index: 50;
-		width: min(440px, calc(100vw - 32px));
+		width: min(380px, calc(100vw - 32px));
 		pointer-events: none;
 	}
 	.toast {
 		pointer-events: auto;
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		padding: 10px 10px 10px 18px;
-		border-radius: 999px;
-		font-size: 0.9375rem;
+		gap: 10px;
+		width: 100%;
+		padding: 10px 8px 10px 14px;
+		border: 1px solid var(--c-border2);
+		border-radius: var(--radius-md);
+		background: var(--c-bg-card);
+		box-shadow: var(--shadow-md);
+		font-size: 0.8125rem;
 		font-weight: 500;
-		background: var(--glass-strong);
-		box-shadow: var(--popover-shadow);
+		line-height: 1.45;
 	}
-	.toast.error span::before {
-		content: '';
-		display: inline-block;
+	.dot {
+		flex: none;
 		width: 8px;
 		height: 8px;
 		border-radius: 50%;
-		background: var(--danger);
-		margin-right: 10px;
-		vertical-align: 1px;
+		background: var(--color-success);
+	}
+	.error .dot {
+		background: var(--color-danger);
+	}
+	.text {
+		flex: 1;
+		min-width: 0;
 	}
 	button {
 		flex: none;
@@ -66,13 +75,15 @@
 		width: 28px;
 		height: 28px;
 		border: 0;
-		border-radius: 50%;
+		border-radius: var(--radius-sm);
 		background: transparent;
-		color: var(--text-2);
+		color: var(--color-text-faint);
 		cursor: pointer;
+		transition: background-color var(--dur-2) var(--ease);
 	}
 	button:hover {
-		background: var(--hover);
+		background: var(--c-bg-section);
+		color: var(--color-text);
 	}
 	svg {
 		width: 12px;
@@ -80,5 +91,13 @@
 		stroke: currentColor;
 		stroke-width: 2;
 		stroke-linecap: round;
+	}
+	@media (max-width: 599px) {
+		.stack {
+			left: 50%;
+			right: auto;
+			transform: translateX(-50%);
+			align-items: stretch;
+		}
 	}
 </style>

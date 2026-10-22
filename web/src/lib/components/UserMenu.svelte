@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { fade } from 'svelte/transition';
-	import { pop } from '$lib/motion';
+	import { rise } from '$lib/motion';
+	import { initials } from '$lib/nav';
 
 	let {
 		name,
@@ -13,16 +14,6 @@
 	let root: HTMLDivElement;
 	let button: HTMLButtonElement;
 	let menu = $state<HTMLDivElement>();
-
-	const initials = $derived(
-		name
-			.split(/\s+/)
-			.filter(Boolean)
-			.slice(0, 2)
-			.map((w) => Array.from(w)[0])
-			.join('')
-			.toUpperCase() || '?'
-	);
 
 	function items(): HTMLElement[] {
 		return Array.from(menu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
@@ -72,31 +63,35 @@
 	<button
 		bind:this={button}
 		type="button"
-		class="avatar"
+		class="trigger"
 		aria-haspopup="menu"
 		aria-expanded={open}
 		aria-label="Account van {name}"
 		onclick={toggle}
 	>
-		<span aria-hidden="true">{initials}</span>
+		<span class="avatar" aria-hidden="true">{initials(name)}</span>
+		<span class="who" aria-hidden="true">
+			<strong>{name}</strong>
+			<span>{username}</span>
+		</span>
+		<svg class="caret" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4" /></svg>
 	</button>
 
 	{#if open}
 		<div
 			bind:this={menu}
-			class="menu glass"
+			class="menu"
 			role="menu"
 			tabindex="-1"
 			aria-label="Account"
 			onkeydown={onMenuKey}
-			in:pop={{ scale: 0.92, y: -4 }}
-			out:fade={{ duration: 120 }}
+			in:rise={{ y: -4, scale: 0.98, duration: 200 }}
+			out:fade={{ duration: 100 }}
 		>
-			<div class="who">
+			<div class="head">
 				<strong>{name}</strong>
 				<span>{username}</span>
 			</div>
-			<div class="sep" role="separator"></div>
 			<a role="menuitem" href="/instellingen" onclick={() => close(false)}>
 				<svg viewBox="0 0 20 20" aria-hidden="true">
 					<circle cx="10" cy="10" r="2.6" />
@@ -126,90 +121,130 @@
 <style>
 	.wrap {
 		position: relative;
+		flex: none;
 	}
-	.avatar {
-		display: grid;
-		place-items: center;
-		width: 40px;
-		height: 40px;
-		padding: 0;
+	/* Nimbus .topbar-menu: avatar, bold name, the account underneath. */
+	.trigger {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		height: 48px;
+		padding: 0 8px 0 6px;
 		border: 0;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #7aa2ff, #b07aff);
-		color: #fff;
-		font-size: 0.875rem;
-		font-weight: 600;
-		letter-spacing: 0.01em;
-		box-shadow:
-			0 0 0 2px rgba(255, 255, 255, 0.7),
-			0 4px 12px rgba(80, 90, 200, 0.25);
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: var(--topbar-ink);
+		text-align: left;
 		cursor: pointer;
-		transition: transform var(--spring-dur) var(--spring-bounce);
+		transition: background-color var(--dur-2) var(--ease);
 	}
-	.avatar:active {
-		transform: scale(0.92);
-		transition: transform 90ms ease-out;
-	}
-	.menu {
-		position: absolute;
-		top: calc(100% + 10px);
-		right: 0;
-		z-index: 20;
-		min-width: 232px;
-		padding: 6px;
-		border-radius: var(--radius-m);
-		background: var(--menu-bg);
-		box-shadow: var(--popover-shadow);
-		transform-origin: top right;
+	.trigger:hover,
+	.trigger[aria-expanded='true'] {
+		background: var(--topbar-hover);
 	}
 	.who {
 		display: flex;
 		flex-direction: column;
-		padding: 8px 10px 10px;
+		min-width: 0;
+		max-width: 180px;
 		line-height: 1.3;
 	}
 	.who strong {
-		font-size: 0.9375rem;
-		font-weight: 600;
-		letter-spacing: -0.01em;
+		font-size: 0.8125rem;
+		font-weight: 700;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.who span {
-		font-size: 0.8125rem;
-		color: var(--text-2);
+		font-size: 0.75rem;
+		color: var(--topbar-ink-2);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
-	.sep {
-		height: 1px;
-		margin: 0 6px 6px;
-		background: var(--hairline);
+	.caret {
+		width: 16px;
+		height: 16px;
+		fill: none;
+		stroke: var(--topbar-ink-2);
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	@media (max-width: 767px) {
+		.who,
+		.caret {
+			display: none;
+		}
+		.trigger {
+			padding: 0 4px;
+		}
+	}
+
+	.menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		z-index: var(--z-dropdown);
+		min-width: 232px;
+		padding: 6px;
+		border: 1px solid var(--c-border2);
+		border-radius: var(--radius-lg);
+		background: var(--c-bg-card);
+		box-shadow: var(--shadow-md);
+		transform-origin: top right;
+	}
+	.head {
+		display: flex;
+		flex-direction: column;
+		padding: 8px 10px 10px;
+		margin-bottom: 4px;
+		border-bottom: 1px solid var(--c-border2);
+		line-height: 1.35;
+	}
+	.head strong {
+		font-size: 0.875rem;
+		font-weight: 700;
+	}
+	.head span {
+		font-size: 0.75rem;
+		color: var(--color-text-faint);
 	}
 	[role='menuitem'] {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		width: 100%;
-		padding: 9px 10px;
+		padding: 8px 10px;
 		border: 0;
-		border-radius: var(--radius-s);
+		border-radius: var(--radius-sm);
 		background: transparent;
-		color: var(--text);
-		font-size: 0.9375rem;
+		color: var(--color-text);
+		font-size: 0.8125rem;
+		font-weight: 500;
 		text-align: left;
 		text-decoration: none;
 		cursor: pointer;
-		outline: none;
+		transition: background-color var(--dur-1) var(--ease);
 	}
 	[role='menuitem']:hover,
 	[role='menuitem']:focus-visible {
-		background: var(--hover);
+		background: var(--c-bg-section);
+		color: var(--color-text);
+	}
+	[role='menuitem']:focus-visible {
+		outline: 2px solid var(--primary);
+		outline-offset: -2px;
 	}
 	[role='menuitem']:active {
-		background: var(--press);
+		background: var(--c-bg-sunken);
 	}
-	svg {
-		width: 18px;
-		height: 18px;
+	[role='menuitem'] svg {
+		width: 16px;
+		height: 16px;
 		fill: none;
-		stroke: var(--text-2);
+		stroke: var(--color-text-muted);
 		stroke-width: 1.6;
 		stroke-linecap: round;
 		stroke-linejoin: round;

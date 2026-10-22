@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { api, ApiError, type Me } from '$lib/api';
 	import { formatCode } from '$lib/codes';
-	import { step, pop } from '$lib/motion';
+	import { step } from '$lib/motion';
 	import {
 		authenticate,
 		ceremony,
@@ -255,7 +255,7 @@
 
 	const titles: Record<Mode, string> = {
 		loading: 'Keystone',
-		password: 'Inloggen bij Keystone',
+		password: 'Inloggen',
 		emergency: 'Nood-account',
 		passkey: 'Bevestig met je passkey',
 		register: 'Maak een passkey',
@@ -267,16 +267,8 @@
 	<title>Inloggen · Keystone</title>
 </svelte:head>
 
-{#snippet mark()}
-	<div class="auth-mark" aria-hidden="true">
-		<svg viewBox="0 0 24 24">
-			{#if mode === 'passkey' || mode === 'register'}
-				<circle cx="9" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 9.5-4.9" /><circle cx="17.5" cy="15.5" r="2.5" /><path d="M17.5 18v4M17.5 20h2" />
-			{:else}
-				<rect x="4" y="10" width="16" height="11" rx="2.5" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
-			{/if}
-		</svg>
-	</div>
+{#snippet brand()}
+	<div class="auth-brand"><span class="mark" aria-hidden="true">◆</span>Keystone</div>
 {/snippet}
 
 {#snippet busyLabel(text: string)}
@@ -284,10 +276,8 @@
 {/snippet}
 
 <main class="auth-page">
-	<div class="auth-card glass" in:pop={{ y: 10, scale: 0.97 }}>
-		{#if mode !== 'loading'}
-			{@render mark()}
-		{/if}
+	<div class="auth-card">
+		{@render brand()}
 		<div class="auth-stage">
 			{#key mode}
 				<section in:step={{ dir }} out:step={{ dir, out: true }} aria-labelledby="title">
@@ -301,7 +291,7 @@
 						<p class="lede">Log in met je AD-account.</p>
 						<form class="form" onsubmit={submitPassword} novalidate>
 							{#if trusted}
-								<button type="button" class="btn primary block" onclick={passkeyOnly} disabled={busy}>
+								<button type="button" class="btn btn-primary block" onclick={passkeyOnly} disabled={busy}>
 									<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 9.5-4.9" /><circle cx="17.5" cy="15.5" r="2.5" /><path d="M17.5 18v4M17.5 20h2" /></svg>
 									Inloggen met passkey
 								</button>
@@ -336,8 +326,7 @@
 							</label>
 							{#if error}<p class="error" role="alert">{error}</p>{/if}
 							<button
-								class="btn block"
-								class:primary={!trusted}
+								class="btn block {trusted ? 'btn-secondary' : 'btn-primary'}"
 								disabled={busy || !username.trim() || !password}
 							>
 								{@render busyLabel('Inloggen')}
@@ -369,7 +358,7 @@
 								/>
 							</label>
 							{#if error}<p class="error" role="alert">{error}</p>{/if}
-							<button class="btn primary block" disabled={busy || !emergencyPassword}>
+							<button class="btn btn-primary block" disabled={busy || !emergencyPassword}>
 								{@render busyLabel('Doorgaan')}
 							</button>
 						</form>
@@ -388,7 +377,7 @@
 						</p>
 						<div class="form">
 							{#if error}<p class="error" role="alert">{error}</p>{/if}
-							<button type="button" class="btn primary block" onclick={runPasskey} disabled={busy}>
+							<button type="button" class="btn btn-primary block" onclick={runPasskey} disabled={busy}>
 								{@render busyLabel(mode === 'passkey' ? 'Gebruik passkey' : 'Passkey maken')}
 							</button>
 						</div>
@@ -418,7 +407,7 @@
 								/>
 							</label>
 							{#if error}<p class="error" role="alert">{error}</p>{/if}
-							<button class="btn primary block" disabled={busy || code.length < 19}>
+							<button class="btn btn-primary block" disabled={busy || code.length < 19}>
 								{@render busyLabel('Doorgaan')}
 							</button>
 						</form>
@@ -437,14 +426,15 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		color: var(--text-3);
-		font-size: 0.8125rem;
+		color: var(--color-text-faint);
+		font-size: 0.75rem;
+		font-weight: 600;
 	}
 	.divider::before,
 	.divider::after {
 		content: '';
 		flex: 1;
 		height: 1px;
-		background: var(--hairline);
+		background: var(--c-border);
 	}
 </style>

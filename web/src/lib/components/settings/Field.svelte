@@ -48,7 +48,7 @@
 		{#if error}
 			<p class="field-error" role="alert">{error}</p>
 		{:else if weakened}
-			<span class="chip-warn">
+			<span class="chip warn">
 				<svg viewBox="0 0 20 20" aria-hidden="true" width="12" height="12"
 					><path d="M10 3.2 17.6 16.5H2.4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg
 				>

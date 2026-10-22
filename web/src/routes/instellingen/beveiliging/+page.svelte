@@ -93,7 +93,7 @@
 	}
 </script>
 
-<div class="pane-head"><h2 class="pane-title">Beveiliging</h2></div>
+<div class="pane-head"><h1 class="pane-title">Beveiliging</h1></div>
 <p class="pane-intro">
 	Elke beveiligingsmaatregel van Keystone. Wijzigingen vragen om je passkey en komen in de activiteitenlog.
 </p>
@@ -101,7 +101,7 @@
 <SettingsEditor groups={securityGroups}>
 	{#snippet after()}
 		<section class="group" aria-labelledby="g-herstel">
-			<h3 id="g-herstel">Herstel</h3>
+			<h2 id="g-herstel">Herstel</h2>
 			<div class="card">
 				<div class="srow wrap-phone">
 					<div class="text">
@@ -109,7 +109,7 @@
 						<p class="help">Voor als je je passkey kwijt bent. Elke code werkt één keer.</p>
 					</div>
 					<div class="control">
-						<button type="button" class="btn small" onclick={regenerate} disabled={regenBusy}>Nieuwe codes maken</button>
+						<button type="button" class="btn btn-secondary btn-sm" onclick={regenerate} disabled={regenBusy}>Nieuwe codes maken</button>
 					</div>
 				</div>
 				<div class="srow">
@@ -117,7 +117,7 @@
 						<label class="label" for="em-switch">Nood-account</label>
 						<p class="help" id="em-help">
 							Inloggen met een apart wachtwoord als AD niet bereikbaar is. Een passkey blijft nodig.
-							{#if emergency?.enabled}<span class="badge warn">Aan</span>{/if}
+							{#if emergency?.enabled}<span class="chip warn">Aan</span>{/if}
 						</p>
 						{#if emergency?.password_set}
 							<button type="button" class="link pw-link" onclick={() => openPassword(false)}>Noodwachtwoord wijzigen</button>
@@ -148,10 +148,10 @@
 			{#each codes as c}<li>{c}</li>{/each}
 		</ul>
 		<div class="sheet-actions">
-			<button type="button" class="btn" onclick={() => download('keystone-herstelcodes.txt', codesFile(codes!, location.origin))}>
+			<button type="button" class="btn btn-secondary" onclick={() => download('keystone-herstelcodes.txt', codesFile(codes!, location.origin))}>
 				Download
 			</button>
-			<button type="button" class="btn primary" onclick={() => (codesOpen = false)}>Ik heb ze bewaard</button>
+			<button type="button" class="btn btn-primary" onclick={() => (codesOpen = false)}>Ik heb ze bewaard</button>
 		</div>
 	{/if}
 </Sheet>
@@ -169,8 +169,8 @@
 		</label>
 		{#if pwError}<p class="error" role="alert">{pwError}</p>{/if}
 		<div class="sheet-actions">
-			<button type="button" class="btn" onclick={() => (pwOpen = false)}>Annuleren</button>
-			<button class="btn primary" disabled={emBusy}>Opslaan</button>
+			<button type="button" class="btn btn-secondary" onclick={() => (pwOpen = false)}>Annuleren</button>
+			<button class="btn btn-primary" disabled={emBusy}>Opslaan</button>
 		</div>
 	</form>
 </Sheet>
@@ -178,17 +178,10 @@
 <Confirm bind:this={confirmer} />
 
 <style>
-	.sheet-msg {
-		margin: 0;
-		color: var(--text-2);
-		font-size: 0.9375rem;
-		line-height: 1.45;
-	}
 	.pw-link {
-		margin: 4px 0 0 -4px;
-		font-size: 0.875rem;
+		margin: 4px 0 0 -6px;
 	}
-	.badge {
+	.help .chip {
 		margin-left: 4px;
 	}
 </style>

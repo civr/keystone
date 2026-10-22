@@ -8,8 +8,10 @@
 	}: { open?: boolean; title: string; children: Snippet } = $props();
 
 	let dialog: HTMLDialogElement;
+	const uid = $props.id();
+	const titleId = `dlg-${uid}`;
 
-	// Native <dialog>: focus trap, Esc and inert background for free.
+	// Native <dialog>: focus trap, Esc, inert background and focus restore for free.
 	$effect(() => {
 		if (open && !dialog.open) dialog.showModal();
 		else if (!open && dialog.open) dialog.close();
@@ -20,11 +22,12 @@
 	}
 </script>
 
-<dialog bind:this={dialog} aria-label={title} onclose={() => (open = false)} onclick={onBackdrop}>
-	<div class="sheet glass">
-		<div class="grabber" aria-hidden="true"></div>
+<!-- Nimbus modal: 16px corner on the dialog depth; backdrop fades in 200 ms,
+     the panel rises 12px from 98% scale over 250 ms on the decelerate curve. -->
+<dialog bind:this={dialog} aria-labelledby={titleId} onclose={() => (open = false)} onclick={onBackdrop}>
+	<div class="panel">
 		<header>
-			<h2>{title}</h2>
+			<h2 id={titleId}>{title}</h2>
 			<button type="button" class="close" aria-label="Sluiten" onclick={() => (open = false)}>
 				<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
 			</button>
@@ -41,57 +44,61 @@
 		color: inherit;
 		max-width: none;
 		max-height: none;
-		width: min(560px, 100vw - 32px);
+		width: min(520px, 100vw - 32px);
 		overflow: visible;
 	}
 	dialog::backdrop {
 		background: var(--scrim);
-		-webkit-backdrop-filter: blur(2px);
-		backdrop-filter: blur(2px);
 	}
-	.sheet {
-		border-radius: var(--radius-l);
-		background: var(--glass-strong);
-		box-shadow: var(--popover-shadow);
-		max-height: min(80dvh, 720px);
+	.panel {
 		display: flex;
 		flex-direction: column;
-	}
-	dialog[open] .sheet {
-		animation: rise var(--spring-dur) var(--spring);
+		max-height: min(86dvh, 760px);
+		border: 1px solid var(--c-border2);
+		border-radius: var(--radius-lg);
+		background: var(--c-bg-card);
+		box-shadow: var(--shadow-lg);
 	}
 	dialog[open]::backdrop {
-		animation: dim 240ms ease;
+		animation: overlay-in var(--dur-3) var(--ease-out) both;
 	}
-	.grabber {
-		display: none;
+	dialog[open] .panel {
+		animation: modal-in var(--dur-4) var(--ease-out) both;
 	}
 	header {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 16px 12px 4px 22px;
+		gap: 12px;
+		padding: 18px 14px 6px 24px;
 	}
 	h2 {
 		margin: 0;
-		font-size: 1.25rem;
+		font-size: 1.125rem;
 		font-weight: 700;
-		letter-spacing: -0.015em;
+		line-height: 1.3;
+		letter-spacing: -0.01em;
 	}
 	.body {
-		padding: 8px 22px 22px;
+		padding: 8px 24px 24px;
 		overflow: auto;
 	}
 	.close {
+		flex: none;
 		display: grid;
 		place-items: center;
 		width: 32px;
 		height: 32px;
 		border: 0;
-		border-radius: 50%;
-		background: var(--hover);
-		color: var(--text-2);
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--color-text-faint);
 		cursor: pointer;
+		transition: background-color var(--dur-2) var(--ease);
+	}
+	.close:hover {
+		background: var(--c-bg-section);
+		color: var(--color-text);
 	}
 	.close svg {
 		width: 12px;
@@ -100,48 +107,23 @@
 		stroke-width: 2;
 		stroke-linecap: round;
 	}
-	/* Phone: a bottom sheet that rises from the edge it belongs to. */
 	@media (max-width: 599px) {
-		dialog {
-			width: 100vw;
-			margin: auto 0 0;
+		header {
+			padding: 16px 10px 4px 18px;
 		}
-		.sheet {
-			border-radius: var(--radius-l) var(--radius-l) 0 0;
-			padding-bottom: env(safe-area-inset-bottom);
-			max-height: 88dvh;
-		}
-		.grabber {
-			display: block;
-			width: 36px;
-			height: 5px;
-			margin: 8px auto 0;
-			border-radius: 3px;
-			background: var(--hairline);
-		}
-		dialog[open] .sheet {
-			animation-name: slide;
+		.body {
+			padding: 8px 18px 20px;
 		}
 	}
-	@keyframes rise {
-		from {
-			opacity: 0;
-			transform: translateY(12px) scale(0.96);
-		}
-	}
-	@keyframes slide {
-		from {
-			transform: translateY(100%);
-		}
-	}
-	@keyframes dim {
+	@keyframes overlay-in {
 		from {
 			opacity: 0;
 		}
 	}
-	@media (prefers-reduced-motion: reduce) {
-		dialog[open] .sheet {
-			animation: dim 160ms ease;
+	@keyframes modal-in {
+		from {
+			opacity: 0;
+			transform: translateY(12px) scale(0.98);
 		}
 	}
 </style>

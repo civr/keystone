@@ -5,7 +5,7 @@
 	import { api, ApiError } from '$lib/api';
 	import { ceremony, passkeyError, supported } from '$lib/webauthn';
 	import { describeUA, relativeTime } from '$lib/format';
-	import { spring } from '$lib/motion';
+	import { easeOut, reducedMotion } from '$lib/motion';
 	import { toast } from '$lib/toast.svelte';
 	import Confirm from '$lib/components/settings/Confirm.svelte';
 
@@ -138,38 +138,39 @@
 		}
 	}
 
+	const still = reducedMotion();
 	const dateFmt = new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
 </script>
 
-<div class="pane-head"><h2 class="pane-title">Apparaten</h2></div>
+<div class="pane-head"><h1 class="pane-title">Apparaten</h1></div>
 <p class="pane-intro">Waar je bent aangemeld en met welke passkeys je kunt inloggen.</p>
 
 {#if loadError}
 	<div class="empty-note">
 		<p>{loadError}</p>
-		<button type="button" class="btn small" onclick={load}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Opnieuw proberen</button>
 	</div>
 {:else if !sessions || !passkeys}
 	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
 {:else}
 	<section class="group" aria-labelledby="g-sessions">
-		<h3 id="g-sessions">Aangemeld</h3>
+		<h2 id="g-sessions">Aangemeld</h2>
 		<ul class="card list">
 			{#each sessions as s (s.id)}
-				<li class="srow wrap-phone" animate:flip={{ duration: 400, easing: spring }} out:fade={{ duration: 160 }}>
+				<li class="srow wrap-phone" animate:flip={{ duration: still ? 0 : 200, easing: easeOut }} out:fade={{ duration: still ? 0 : 150 }}>
 					<span class="glyph" aria-hidden="true">
 						<svg viewBox="0 0 20 20"><path d="M2.5 4.5h11v8h-11zM6 15.5h4M15 7.5h3v8.5h-3z" /></svg>
 					</span>
 					<div class="text">
 						<span class="label">
 							{describeUA(s.user_agent)}
-							{#if s.current}<span class="badge">Dit apparaat</span>{/if}
-							{#if s.emergency}<span class="badge warn">Nood-account</span>{/if}
+							{#if s.current}<span class="chip accent">Dit apparaat</span>{/if}
+							{#if s.emergency}<span class="chip warn">Nood-account</span>{/if}
 						</span>
 						<p class="help">{s.ip} · actief {relativeTime(s.last_seen_at, now)} · sinds {dateFmt.format(new Date(s.created_at))}</p>
 					</div>
 					<div class="control">
-						<button type="button" class="btn small danger" disabled={busy === s.id} onclick={() => revoke(s)}>
+						<button type="button" class="btn btn-secondary btn-sm danger-ink" disabled={busy === s.id} onclick={() => revoke(s)}>
 							{s.current ? 'Hier afmelden' : 'Afmelden'}
 						</button>
 					</div>
@@ -180,9 +181,9 @@
 
 	<section class="group" aria-labelledby="g-passkeys">
 		<div class="group-head">
-			<h3 id="g-passkeys">Passkeys</h3>
+			<h2 id="g-passkeys">Passkeys</h2>
 			{#if supported()}
-				<button type="button" class="btn small" onclick={addPasskey} disabled={busy === 'add'}>
+				<button type="button" class="btn btn-secondary btn-sm" onclick={addPasskey} disabled={busy === 'add'}>
 					{#if busy === 'add'}<span class="spinner" aria-hidden="true"></span>{:else}
 						<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11" /></svg>
 					{/if}
@@ -192,7 +193,7 @@
 		</div>
 		<ul class="card list">
 			{#each passkeys as p (p.id)}
-				<li class="srow wrap-phone" animate:flip={{ duration: 400, easing: spring }} out:fade={{ duration: 160 }}>
+				<li class="srow wrap-phone" animate:flip={{ duration: still ? 0 : 200, easing: easeOut }} out:fade={{ duration: still ? 0 : 150 }}>
 					<span class="glyph" aria-hidden="true">
 						<svg viewBox="0 0 20 20"
 							><path d="M7.5 3.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM10.3 9.3l6.2 6.2M14 13l1.8-1.8M12.4 11.4l1.6-1.6" /></svg
@@ -210,7 +211,7 @@
 									bind:value={newName}
 									onkeydown={(e) => e.key === 'Escape' && (e.stopPropagation(), (renaming = null))}
 								/>
-								<button class="btn small primary" disabled={busy === p.id}>Bewaar</button>
+								<button class="btn btn-primary btn-sm" disabled={busy === p.id}>Bewaar</button>
 							</form>
 						{:else}
 							<span class="label">{p.name}</span>
@@ -221,10 +222,10 @@
 					</div>
 					{#if renaming !== p.id}
 						<div class="control row-actions">
-							<button type="button" class="btn small" onclick={() => startRename(p)}>Wijzig naam</button>
+							<button type="button" class="btn btn-secondary btn-sm" onclick={() => startRename(p)}>Wijzig naam</button>
 							<button
 								type="button"
-								class="btn small danger"
+								class="btn btn-secondary btn-sm danger-ink"
 								disabled={busy === p.id || passkeys.length === 1}
 								title={passkeys.length === 1 ? 'Je laatste passkey kan niet worden verwijderd.' : undefined}
 								onclick={() => removePasskey(p)}>Verwijder</button
@@ -248,15 +249,16 @@
 		padding: 0;
 		list-style: none;
 	}
+	/* Round tinted icon, as on a Nimbus stat tile. */
 	.glyph {
 		flex: none;
 		display: grid;
 		place-items: center;
 		width: 36px;
 		height: 36px;
-		border-radius: 10px;
-		background: var(--seg-bg);
-		color: var(--text-2);
+		border-radius: var(--radius-full);
+		background: var(--t-slate-bg);
+		color: var(--t-slate);
 	}
 	.glyph svg,
 	.group-head svg {
@@ -273,15 +275,10 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-		margin: 0 0 8px;
+		margin: 0 0 4px;
 	}
-	.group-head h3 {
-		margin: 0 0 0 16px;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		text-transform: uppercase;
-		color: var(--text-2);
+	.group-head h2 {
+		margin: 0;
 	}
 	.rename {
 		display: flex;
@@ -289,10 +286,9 @@
 		align-items: center;
 	}
 	.rename .input {
-		height: 36px;
 		max-width: 260px;
 	}
-	.label .badge {
+	.label .chip {
 		margin-left: 6px;
 	}
 </style>

@@ -1,26 +1,65 @@
-/* Shared by the sign-in and setup pages: one glass card on the backdrop. */
+/*
+ * Sign-in and setup (Nimbus AuthShell): a 420px white card centred on the
+ * canvas on --shadow-md, the logo centred at the top, a centred 1.5rem/800
+ * heading, a muted subtitle, Nimbus fields, a full-width primary button,
+ * tinted rounded notes and a text link for the secondary path. Buttons,
+ * fields and notes themselves live in theme.css.
+ */
 
 .auth-page {
 	min-height: 100dvh;
 	display: grid;
 	place-items: center;
-	padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+	padding: max(32px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+	background: var(--color-bg);
 }
 
 .auth-card {
 	width: min(420px, 100%);
-	padding: 32px 28px 28px;
-	border-radius: var(--radius-l);
-	background: var(--glass-strong);
-	box-shadow: var(--popover-shadow);
+	padding: 32px;
+	border: 1px solid var(--c-border2);
+	border-radius: var(--radius-card);
+	background: var(--c-bg-card);
+	box-shadow: var(--shadow-md);
+	animation: auth-settle 300ms var(--ease-out) both;
 }
 .auth-card.wide {
-	width: min(520px, 100%);
+	width: min(500px, 100%);
 }
 @media (max-width: 480px) {
 	.auth-card {
-		padding: 28px 20px 22px;
+		padding: 24px 20px;
 	}
+}
+@keyframes auth-settle {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+}
+
+/* Logo: an accent tile with the mark plus the product name at 800. */
+.auth-brand {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	margin: 0 0 24px;
+	color: var(--color-text);
+	font-size: 1.125rem;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+}
+.auth-brand .mark {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-md);
+	background: var(--primary);
+	color: #fff;
+	font-size: 1rem;
+	line-height: 1;
 }
 
 /* Steps overlap during a transition instead of stacking. */
@@ -32,40 +71,20 @@
 	min-width: 0;
 }
 
-.auth-mark {
-	display: grid;
-	place-items: center;
-	width: 52px;
-	height: 52px;
-	margin: 0 auto 16px;
-	border-radius: 15px;
-	background: linear-gradient(160deg, #4b8dff, #0a5cdb);
-	box-shadow: 0 6px 18px rgba(10, 92, 219, 0.3);
-	color: #fff;
-}
-.auth-mark svg {
-	width: 26px;
-	height: 26px;
-	fill: none;
-	stroke: currentColor;
-	stroke-width: 2;
-	stroke-linecap: round;
-	stroke-linejoin: round;
-}
-
 .auth-card h1 {
 	margin: 0 0 6px;
 	font-size: 1.5rem;
-	line-height: 1.15;
-	font-weight: 700;
+	font-weight: 800;
+	line-height: 1.3;
 	letter-spacing: -0.02em;
 	text-align: center;
+	text-wrap: balance;
 }
 .auth-card .lede {
-	margin: 0 0 22px;
-	color: var(--text-2);
-	font-size: 0.9375rem;
-	line-height: 1.45;
+	margin: 0 0 24px;
+	color: var(--color-text-muted);
+	font-size: 0.875rem;
+	line-height: 1.55;
 	text-align: center;
 	text-wrap: pretty;
 }
@@ -73,135 +92,7 @@
 .form {
 	display: flex;
 	flex-direction: column;
-	gap: 14px;
-}
-
-.field {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-.field > span,
-.field-label {
-	font-size: 0.8125rem;
-	font-weight: 600;
-	color: var(--text-2);
-	letter-spacing: 0.002em;
-}
-.field small {
-	color: var(--text-3);
-	font-size: 0.8125rem;
-	line-height: 1.35;
-}
-
-.input {
-	width: 100%;
-	height: 46px;
-	padding: 0 14px;
-	border-radius: var(--radius-m);
-	border: 1px solid var(--hairline);
-	background: var(--glass);
-	font-size: 1rem; /* ≥16px: no zoom-on-focus on iOS */
-	outline: none;
-	transition:
-		border-color 150ms ease,
-		box-shadow 150ms ease;
-}
-textarea.input {
-	height: auto;
-	min-height: 96px;
-	padding: 10px 14px;
-	font: 0.8125rem/1.4 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-	resize: vertical;
-}
-select.input {
-	appearance: none;
-	background-image: linear-gradient(45deg, transparent 50%, var(--text-2) 50%),
-		linear-gradient(135deg, var(--text-2) 50%, transparent 50%);
-	background-position:
-		calc(100% - 19px) 20px,
-		calc(100% - 14px) 20px;
-	background-size: 5px 5px;
-	background-repeat: no-repeat;
-}
-.input:focus {
-	border-color: var(--accent);
-	box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-.input[aria-invalid='true'] {
-	border-color: var(--danger);
-}
-.input.code {
-	font: 600 1.125rem/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-	letter-spacing: 0.08em;
-	text-align: center;
-	text-transform: uppercase;
-}
-
-.check {
-	display: flex;
-	align-items: flex-start;
-	gap: 10px;
-	font-size: 0.9375rem;
-	line-height: 1.35;
-	cursor: pointer;
-}
-.check input {
-	flex: none;
-	width: 20px;
-	height: 20px;
-	margin: 0;
-	accent-color: var(--accent);
-}
-.check small {
-	display: block;
-	color: var(--text-3);
-	font-size: 0.8125rem;
-}
-
-.btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 8px;
-	height: 46px;
-	padding: 0 20px;
-	border-radius: var(--radius-m);
-	border: 1px solid var(--hairline);
-	background: var(--glass);
-	color: var(--text);
-	font-size: 1rem;
-	font-weight: 600;
-	text-decoration: none;
-	cursor: pointer;
-	transition:
-		transform var(--spring-dur) var(--spring-bounce),
-		opacity 150ms ease;
-}
-.btn.primary {
-	background: var(--accent);
-	border-color: transparent;
-	color: var(--accent-text);
-}
-.btn.block {
-	width: 100%;
-}
-.btn:active:not(:disabled) {
-	transform: scale(0.97);
-	transition: transform 90ms ease-out;
-}
-.btn:disabled {
-	opacity: 0.45;
-	cursor: default;
-}
-.btn svg {
-	width: 20px;
-	height: 20px;
-	fill: none;
-	stroke: currentColor;
-	stroke-width: 1.8;
-	stroke-linecap: round;
-	stroke-linejoin: round;
+	gap: 16px;
 }
 
 .row {
@@ -212,64 +103,10 @@ select.input {
 	flex: 1;
 }
 
-.link {
-	padding: 6px 4px;
-	border: 0;
-	background: none;
-	color: var(--accent);
-	font-size: 0.9375rem;
-	font-weight: 500;
-	cursor: pointer;
-	border-radius: 6px;
-}
-.link:hover {
-	text-decoration: underline;
-}
 .links {
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: center;
 	gap: 4px 16px;
-	margin-top: 18px;
-}
-
-.error,
-.notice {
-	margin: 0;
-	padding: 10px 14px;
-	border-radius: var(--radius-s);
-	font-size: 0.9375rem;
-	line-height: 1.4;
-	text-wrap: pretty;
-}
-.error {
-	background: color-mix(in srgb, var(--danger) 10%, transparent);
-	color: var(--danger);
-}
-.notice {
-	background: color-mix(in srgb, var(--accent) 10%, transparent);
-	color: var(--text);
-}
-.notice.warn {
-	background: var(--warn-bg);
-	border: 1px solid var(--warn-border);
-}
-
-.spinner {
-	width: 18px;
-	height: 18px;
-	border-radius: 50%;
-	border: 2px solid currentColor;
-	border-right-color: transparent;
-	animation: spin 700ms linear infinite;
-}
-@keyframes spin {
-	to {
-		transform: rotate(360deg);
-	}
-}
-@media (prefers-reduced-motion: reduce) {
-	.spinner {
-		animation-duration: 2s;
-	}
+	margin-top: 16px;
 }

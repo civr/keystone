@@ -3,10 +3,8 @@
 	import { api, ApiError, type Me } from '$lib/api';
 	import { filterApps, safeHref, type App } from '$lib/apps';
 	import { firstName, greeting } from '$lib/greeting';
-	import { toast } from '$lib/toast.svelte';
-	import GlassSearch from '$lib/components/GlassSearch.svelte';
+	import AppShell from '$lib/components/AppShell.svelte';
 	import AppGrid from '$lib/components/AppGrid.svelte';
-	import Avatar from '$lib/components/Avatar.svelte';
 
 	let now = $state(new Date());
 	let me = $state<Me | null>(null);
@@ -36,6 +34,8 @@
 	}
 
 	onMount(() => {
+		// Arriving from the search on another page: /?q=…
+		query = new URLSearchParams(location.search).get('q') ?? '';
 		load();
 		// Keep the greeting right if the page stays open across a boundary.
 		const t = setInterval(() => (now = new Date()), 60_000);
@@ -43,17 +43,9 @@
 	});
 
 	function openFirst() {
+		if (!query.trim()) return;
 		const href = matches[0] && safeHref(matches[0].url);
 		if (href) location.assign(href);
-	}
-
-	async function logout() {
-		try {
-			await api.send('POST', '/auth/logout');
-			location.assign('/login');
-		} catch (e) {
-			toast(e instanceof ApiError ? e.message : 'Uitloggen is niet gelukt.', 'error');
-		}
 	}
 </script>
 
@@ -61,9 +53,9 @@
 	<title>Keystone</title>
 </svelte:head>
 
-<main>
+<AppShell {me} bind:query onsearch={openFirst}>
 	{#if me?.emergency}
-		<div class="banner" role="status">
+		<div class="notice warn banner" role="status">
 			<svg viewBox="0 0 20 20" aria-hidden="true">
 				<path d="M10 3.2 17.6 16.5H2.4z" />
 				<path d="M10 8.3v3.6M10 14.2v.01" />
@@ -75,249 +67,152 @@
 		</div>
 	{/if}
 
-	<header>
-		<div class="hello">
-			<p class="date">{today}</p>
-			<h1>
-				{hello}{#if me}<span class="name">, {firstName(me)}</span>{/if}
-			</h1>
-		</div>
-		{#if me}
-			<Avatar name={me.display_name?.trim() || firstName(me)} username={me.username} onlogout={logout} />
-		{:else}
-			<div class="avatar-skeleton" aria-hidden="true"></div>
-		{/if}
+	<header class="page-head">
+		<h1>{hello}{#if me}<span class="name">, {firstName(me)}</span>{/if}</h1>
+		<p class="sub">{today}</p>
 	</header>
 
-	<div class="search">
-		<GlassSearch bind:value={query} onsubmit={openFirst} />
-	</div>
-
 	{#if loadError}
-		<div class="state">
+		<div class="surface state">
 			<p>{loadError}</p>
-			<button type="button" class="pill" onclick={load}>Opnieuw proberen</button>
+			<button type="button" class="btn btn-secondary" onclick={load}>Opnieuw proberen</button>
 		</div>
 	{:else if apps === null}
 		<ul class="skeleton" aria-hidden="true">
-			{#each { length: 10 } as _}
-				<li><span></span><i></i></li>
+			{#each { length: 8 } as _}
+				<li><span class="ghost icon"></span><span class="ghost line"></span><span class="ghost line short"></span></li>
 			{/each}
 		</ul>
 		<p class="visually-hidden" role="status">Apps worden geladen…</p>
 	{:else if apps.length === 0}
-		<div class="state empty">
-			<div class="empty-icon" aria-hidden="true">
-				<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
-			</div>
-			<p class="empty-title">Nog geen apps — voeg je eerste app toe</p>
-			<a class="pill primary" href="/instellingen/apps">Naar Instellingen › Apps</a>
+		<div class="surface state">
+			<p class="state-title">Nog geen apps</p>
+			<p>Voeg je eerste app toe; hij verschijnt meteen hier.</p>
+			<a class="btn btn-primary" href="/instellingen/apps">Naar Instellingen › Apps</a>
 		</div>
 	{:else}
 		<AppGrid apps={matches} highlightFirst={query.trim() !== '' && matches.length > 0} />
 		{#if matches.length === 0}
-			<div class="state">
+			<div class="surface state">
 				<p>Geen app gevonden voor “{query.trim()}”.</p>
 			</div>
 		{/if}
 	{/if}
-</main>
+</AppShell>
 
 <style>
-	main {
-		width: min(820px, 100%);
-		margin: 0 auto;
-		padding: max(28px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 72px
-			max(16px, env(safe-area-inset-left));
-	}
-	@media (min-width: 600px) {
-		main {
-			padding-top: clamp(40px, 9vh, 96px);
-			padding-inline: 32px;
-		}
-	}
-
-	header {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: 16px;
-	}
-	.date {
-		margin: 0 0 2px;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		text-transform: uppercase;
-		color: var(--text-2);
+	/* Page header on the canvas: 1.5rem/800 title, muted subtitle, no rule. */
+	.page-head {
+		margin: 12px 0 24px;
 	}
 	h1 {
 		margin: 0;
-		font-size: clamp(1.75rem, 1.2rem + 2.4vw, 2.5rem);
-		font-weight: 700;
-		line-height: 1.08;
-		letter-spacing: -0.025em;
-		font-optical-sizing: auto;
+		font-size: 1.5rem;
+		font-weight: 800;
+		line-height: 1.3;
+		letter-spacing: -0.02em;
 		text-wrap: balance;
 	}
 	.name {
-		animation: appear 420ms ease both;
+		animation: appear var(--dur-3) var(--ease-out) both;
 	}
-	.avatar-skeleton {
-		width: 40px;
-		height: 40px;
-		flex: none;
-		border-radius: 50%;
-		background: var(--skeleton);
+	.sub {
+		margin: 2px 0 0;
+		color: var(--color-text-muted);
+		font-size: 0.875rem;
 	}
-
-	.search {
-		margin: 20px 0 28px;
-	}
-	@media (min-width: 600px) {
-		.search {
-			margin: 24px 0 36px;
-		}
+	.sub::first-letter {
+		text-transform: uppercase;
 	}
 
 	.banner {
 		display: flex;
-		gap: 12px;
+		gap: 10px;
 		align-items: flex-start;
-		margin: 0 0 24px;
-		padding: 12px 16px;
-		border-radius: var(--radius-m);
-		background: var(--warn-bg);
-		border: 1px solid var(--warn-border);
-		color: var(--text);
-		font-size: 0.9375rem;
-		line-height: 1.4;
-		-webkit-backdrop-filter: var(--glass-blur);
-		backdrop-filter: var(--glass-blur);
+		margin: 12px 0 0;
+		font-size: 0.875rem;
 	}
 	.banner p {
 		margin: 0;
 	}
 	.banner strong {
-		color: var(--warn-text);
-		font-weight: 600;
+		color: var(--color-warning-text);
+		font-weight: 700;
 	}
 	.banner svg {
 		flex: none;
-		width: 20px;
-		height: 20px;
-		margin-top: 1px;
+		width: 18px;
+		height: 18px;
+		margin-top: 2px;
 		fill: none;
-		stroke: var(--warn-text);
-		stroke-width: 1.7;
+		stroke: var(--color-warning-text);
+		stroke-width: 1.8;
 		stroke-linecap: round;
 		stroke-linejoin: round;
 	}
 
-	/* Placeholder tiles appear only if loading takes longer than a blink. */
+	/* Ghost tiles appear only if loading takes longer than a blink. */
 	.skeleton {
 		list-style: none;
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 14px 6px;
-		animation: appear 300ms ease 180ms both;
+		grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+		gap: 16px;
+		animation: appear var(--dur-3) var(--ease) 180ms both;
 	}
 	.skeleton li {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 12px;
-		padding: 10px 4px 8px;
+		gap: 8px;
+		padding: 16px;
+		border: 1px solid var(--c-border2);
+		border-radius: var(--radius-md);
+		background: var(--c-bg-card);
+		box-shadow: var(--shadow-sm);
 	}
-	.skeleton span {
-		width: clamp(60px, 15vw, 76px);
-		aspect-ratio: 1;
-		border-radius: 22.5%;
-		background: var(--skeleton);
+	.skeleton .icon {
+		width: 44px;
+		height: 44px;
+		margin-bottom: 6px;
+		border-radius: var(--radius-md);
 	}
-	.skeleton i {
-		width: 56%;
-		height: 9px;
-		border-radius: 5px;
-		background: var(--skeleton);
+	.skeleton .line {
+		width: 60%;
+		height: 10px;
 	}
-	@media (min-width: 600px) {
+	.skeleton .short {
+		width: 40%;
+	}
+	@media (max-width: 520px) {
 		.skeleton {
-			grid-template-columns: repeat(4, minmax(0, 1fr));
-			gap: 18px 10px;
-		}
-	}
-	@media (min-width: 900px) {
-		.skeleton {
-			grid-template-columns: repeat(5, minmax(0, 1fr));
-			gap: 22px 12px;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 12px;
 		}
 	}
 
 	.state {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 14px;
-		padding: 32px 16px;
-		text-align: center;
-		color: var(--text-2);
-		animation: appear 300ms ease both;
+		align-items: flex-start;
+		gap: 10px;
+		padding: 20px;
+		color: var(--color-text-muted);
 	}
 	.state p {
 		margin: 0;
 	}
-	.empty {
-		padding-top: 48px;
+	.state .btn {
+		margin-top: 6px;
 	}
-	.empty-icon {
-		display: grid;
-		place-items: center;
-		width: 76px;
-		height: 76px;
-		border-radius: 22.5%;
-		border: 1.5px dashed color-mix(in srgb, var(--text-2) 45%, transparent);
-		background: var(--glass);
+	.state-title {
+		color: var(--color-text);
+		font-size: 1rem;
+		font-weight: 700;
 	}
-	.empty-icon svg {
-		width: 28px;
-		height: 28px;
-		fill: none;
-		stroke: var(--text-2);
-		stroke-width: 1.8;
-		stroke-linecap: round;
-	}
-	.empty-title {
-		font-size: 1.0625rem;
-		font-weight: 600;
-		color: var(--text);
-		letter-spacing: -0.01em;
-	}
-	.pill {
-		display: inline-flex;
-		align-items: center;
-		height: 38px;
-		padding: 0 18px;
-		border-radius: 999px;
-		border: 1px solid var(--glass-border);
-		background: var(--glass);
-		color: var(--text);
-		font-size: 0.9375rem;
-		font-weight: 500;
-		text-decoration: none;
-		cursor: pointer;
-		transition: transform var(--spring-dur) var(--spring-bounce);
-	}
-	.pill.primary {
-		background: var(--accent);
-		border-color: transparent;
-		color: var(--accent-text);
-	}
-	.pill:active {
-		transform: scale(0.96);
-		transition: transform 90ms ease-out;
+	.surface + :global(.grid),
+	:global(.grid) + .surface {
+		margin-top: 16px;
 	}
 
 	@keyframes appear {

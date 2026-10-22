@@ -12,7 +12,7 @@ Waarom: Thijs heeft eigen (vibe coded) apps en homelab-diensten, elk met losse a
 
 **Doelen**
 - Eén login (AD + passkey) → toegang tot alle apps.
-- Startpagina in **stijl A** (zie §6): groet, zoekbalk, grote app-iconen, glas, zacht kleurverloop.
+- Startpagina in het **Project Nimbus-thema** (zie §6): groet, zoekbalk, app-tegels, wit op een licht canvas.
 - Per app een **accountkoppeling**: Keystone-gebruiker `thijs` → in app 1 `t.willems`, in app 2 `civr`. Keystone stuurt de juiste naam mee.
 - Protocollen naar apps: **SAML 2.0 IdP**, **OIDC provider**, **LDAP-server** (proxy naar AD) en **forward auth** (poortwachter achter reverse proxy).
 - **Kluis** voor app-credentials, alleen voor apps die geen SAML/LDAP/OIDC kunnen.
@@ -61,18 +61,18 @@ Elke app krijgt in Keystone: naam, icoon/kleur, URL, protocol, protocolinstellin
 - Op de tegel: één klik → app openen + wachtwoord naar het klembord (wordt na 30 s gewist). Gebruikersnaam ook kopieerbaar.
 - Tonen/kopiëren van een wachtwoord vereist een sessie jonger dan X minuten, anders eerst een passkey-bevestiging (mijn keuze: 15 min).
 
-## 6. Uiterlijk (stijl A, goedgekeurd)
+## 6. Uiterlijk (Project Nimbus-thema)
 
-Referentie-mockup: `.superpowers/brainstorm/*/content/visual-style.html`, optie A.
+Op verzoek van Thijs (22-10-2026: "kijk naar het thema van project nimbus … dat thema wil ik hebben") vervangt het thema van Project Nimbus de eerder goedgekeurde stijl A (radiaal verloop, glas, veerbeweging, donkere modus). Bron: `proxmox-cloud/DESIGN.md` en `frontend/src/index.css`; tokens staan in `web/src/lib/theme.css`.
 
-- Achtergrond: zacht radiaal kleurverloop (blauw → lila → perzik); in donkere modus een diepe variant.
-- Grote groet ("Goedemiddag, Thijs"), avatar rechtsboven.
-- Glazen zoekbalk (backdrop-blur); `⌘K` / `Ctrl+K` focust de zoekbalk, typen + Enter opent de app.
-- Grid met grote, afgeronde app-iconen (squircle) met zachte schaduw, naam eronder.
-- Systeemlettertype (SF Pro op Apple, Segoe UI Variable op Windows).
-- Licht en donker volgen het systeem.
-- Vloeiende, onderbreekbare animaties met veerbeweging; respecteert `prefers-reduced-motion`.
-- Dezelfde stijl voor het **inlogscherm** en **Instellingen** (beheer): Instellingen is een glazen sheet/paneel, geen apart admin-thema.
+- Eén licht thema, geen donkere modus. Een lichtblauwgrijs canvas (`#f5f7fb`) waar balk, menu en pagina's op staan; witte kaarten met hoeken van 20px, een bijna onzichtbare rand en een heel lichte schaduw. Geen verlopen, geen glas (`backdrop-filter`), geen geneste kaarten.
+- Eén accentkleur, blauw `#0b5cff` (`--primary`), alleen voor de primaire knop, de actieve menuknop, focus en links.
+- Lettertype Plus Jakarta Sans, zelf gehost onder `/fonts/` (CSP `'self'`, werkt zonder internet). Paginatitels 1.5rem/800, kaarttitels 1rem/700, labels 0.75rem/600 in zinsnotatie.
+- App-shell: een balk van 64px op het canvas met links het logoblok "◆ Keystone" (zo breed als het menu, in de menukleur), een witte zoekbalk van 300px met vergrootglas en `Ctrl K`/`⌘K`, en rechts het gebruikersmenu (initialen, vetgedrukte naam). Een wit menu links met "Mijn apps" en de groep "Instellingen"; het actieve item is een gevulde blauwe pil met witte tekst. Het menu klapt in tot iconen; op een telefoon wordt het een lade die je vanuit de balk opent.
+- Startpagina: groet ("Goedemiddag, Thijs") als paginatitel met de datum eronder, daaronder de apps als witte tegels (12px-hoeken) met een getint icoon in de app-kleur, de naam en de host. Bij hover komt een tegel 2px omhoog. Zoeken filtert zoals voorheen (`⌘K`/`Ctrl+K` en `/` focussen, Enter opent de eerste treffer alleen als er een zoekterm is, Esc wist).
+- Inloggen en installatie: één witte kaart van 420px midden op het canvas met het logo bovenaan, Nimbus-velden en een volle primaire knop. De installatiestappen tonen de voortgang als rustige getinte pillen.
+- Instellingen: per groep een witte kaart met rijen gescheiden door een dunne lijn; schakelaars, knoppen, chips en dialogen volgen Nimbus (dialoog: 16px-hoeken, komt 12px omhoog vanaf 98% schaal in 250 ms).
+- Beweging is functioneel en kort (100–250 ms, `--ease` / `--ease-out`), zonder vering of stuiter; `prefers-reduced-motion` zet alles uit.
 - Werkt ook op telefoon.
 
 **Instellingen-onderdelen:** AD-verbinding (met testknop), Apps (toevoegen/bewerken, met per protocol een begeleid formulier en kopieerbare metadata-URL's), Accountkoppelingen (per app), Kluis, Beveiliging (passkeys, herstelcodes, sessies/apparaten), Activiteit (recente logins).
@@ -131,7 +131,7 @@ Eerlijke noot aan Thijs (gecommuniceerd): de snelheid komt vooral van Go + cachi
 
 - `git clone` → `docker compose up -d` → klaar. **Niets vooraf invullen**: geen `.env` nodig.
 - Een `init`-container genereert bij de eerste start alle secrets (DB-wachtwoord, sessiesleutel, kluissleutel, SAML/OIDC-signing-keys) en bewaart ze in een eigen volume, gescheiden van de database.
-- Eerste bezoek → setup-wizard (stijl A), ontgrendeld met een eenmalige setup-code uit `docker compose logs`. Wizard: domein → AD-verbinding (met test) → eigen AD-account kiezen → passkey registreren → herstelcodes tonen → startpagina.
+- Eerste bezoek → setup-wizard (Nimbus-thema), ontgrendeld met een eenmalige setup-code uit `docker compose logs`. Wizard: domein → AD-verbinding (met test) → eigen AD-account kiezen → passkey registreren → herstelcodes tonen → startpagina.
 - Images worden via CI gebouwd en gepubliceerd (GHCR), zodat `docker compose pull && up -d` updatet. Migraties draaien automatisch.
 
 ## 12. Beveiliging hardenen via de GUI

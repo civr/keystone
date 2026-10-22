@@ -41,7 +41,7 @@
 
 <svelte:window onkeydown={onWindowKey} />
 
-<label class="search glass">
+<label class="search">
 	<span class="visually-hidden">Zoek een app</span>
 	<svg class="lens" viewBox="0 0 20 20" aria-hidden="true">
 		<circle cx="8.5" cy="8.5" r="5.75" />
@@ -68,30 +68,38 @@
 </label>
 
 <style>
+	/* Nimbus .topbar-search: a white 12px-cornered box with a magnifier and the shortcut key. */
 	.search {
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		height: 48px;
-		padding: 0 8px 0 14px;
-		border-radius: var(--radius-m);
+		width: 300px;
+		max-width: 100%;
+		height: 42px;
+		padding: 0 6px 0 14px;
+		border: 1px solid var(--topbar-field-stroke);
+		border-radius: var(--radius-md);
+		background: var(--topbar-field);
+		color: var(--topbar-ink-2);
 		cursor: text;
 		transition:
-			box-shadow 240ms ease,
-			background-color 240ms ease;
+			border-color var(--dur-2) var(--ease),
+			box-shadow var(--dur-2) var(--ease);
+	}
+	.search:hover {
+		border-color: var(--topbar-stroke);
+		box-shadow: var(--shadow-sm);
 	}
 	.search:focus-within {
-		background: var(--glass-strong);
-		box-shadow:
-			0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent),
-			var(--glass-shadow);
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
 	}
 	.lens {
 		flex: none;
-		width: 18px;
-		height: 18px;
+		width: 16px;
+		height: 16px;
 		fill: none;
-		stroke: var(--text-2);
+		stroke: currentColor;
 		stroke-width: 1.8;
 		stroke-linecap: round;
 	}
@@ -99,14 +107,16 @@
 		flex: 1;
 		min-width: 0;
 		height: 100%;
+		padding: 0;
 		border: 0;
 		outline: 0;
 		background: transparent;
-		font-size: 1.0625rem;
-		letter-spacing: -0.01em;
+		color: var(--topbar-ink);
+		font-size: 0.8125rem;
+		font-weight: 500;
 	}
 	input::placeholder {
-		color: var(--text-2);
+		color: var(--topbar-ink-2);
 		opacity: 1;
 	}
 	input::-webkit-search-cancel-button {
@@ -114,12 +124,12 @@
 	}
 	kbd {
 		flex: none;
-		font: 500 0.75rem/1 var(--font);
-		color: var(--text-3);
-		padding: 5px 7px;
-		border-radius: 7px;
-		border: 1px solid var(--hairline);
-		margin-right: 4px;
+		margin-right: 2px;
+		padding: 2px 7px;
+		border-radius: var(--radius-xs);
+		background: var(--topbar-hover);
+		color: var(--topbar-ink-2);
+		font: 600 0.6875rem/1.45 var(--font);
 	}
 	@media (hover: none) {
 		kbd {
@@ -130,22 +140,28 @@
 		flex: none;
 		display: grid;
 		place-items: center;
-		width: 32px;
-		height: 32px;
+		width: 28px;
+		height: 28px;
 		border: 0;
-		border-radius: 50%;
+		border-radius: var(--radius-sm);
 		background: transparent;
-		color: var(--text-2);
+		color: var(--topbar-ink-2);
 		cursor: pointer;
 	}
 	.clear:hover {
-		background: var(--hover);
+		background: var(--topbar-hover);
+		color: var(--topbar-ink);
 	}
 	.clear svg {
-		width: 14px;
-		height: 14px;
+		width: 12px;
+		height: 12px;
 		stroke: currentColor;
 		stroke-width: 2;
 		stroke-linecap: round;
+	}
+	@media (pointer: coarse) {
+		input {
+			font-size: 16px;
+		}
 	}
 </style>

@@ -13,7 +13,7 @@
 	} from '$lib/settingsMeta';
 	import { saveSettings } from '$lib/settingsSave';
 	import { formatValue } from '$lib/format';
-	import { pop } from '$lib/motion';
+	import { rise } from '$lib/motion';
 	import { toast } from '$lib/toast.svelte';
 	import Confirm from './Confirm.svelte';
 	import Field from './Field.svelte';
@@ -138,7 +138,7 @@
 {#if loadError}
 	<div class="empty-note">
 		<p>{loadError}</p>
-		<button type="button" class="btn small" onclick={load}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Opnieuw proberen</button>
 	</div>
 {:else if !draft}
 	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
@@ -146,7 +146,7 @@
 	<form onsubmit={(e) => (e.preventDefault(), save())} novalidate>
 		{#each groups as g (g.id)}
 			<section class="group" aria-labelledby="g-{g.id}">
-				<h3 id="g-{g.id}">{g.title}</h3>
+				<h2 id="g-{g.id}">{g.title}</h2>
 				<div class="card">
 					{#each g.paths as p (p)}
 						<Field
@@ -167,10 +167,10 @@
 		{/each}
 
 		{#if dirty.length}
-			<div class="savebar" transition:pop={{ y: 16, scale: 0.96 }}>
+			<div class="savebar" transition:rise={{ y: 8, duration: 200 }}>
 				<span class="count">{dirty.length === 1 ? '1 wijziging' : `${dirty.length} wijzigingen`}</span>
-				<button type="button" class="btn" onclick={reset} disabled={busy}>Herstel</button>
-				<button type="submit" class="btn primary" disabled={busy}>
+				<button type="button" class="btn btn-secondary" onclick={reset} disabled={busy}>Herstel</button>
+				<button type="submit" class="btn btn-primary" disabled={busy}>
 					{#if busy}<span class="spinner" aria-hidden="true"></span>{/if}
 					Opslaan
 				</button>

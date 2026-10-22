@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { safeHref, type App } from '$lib/apps';
+	import { hostOf, safeHref, type App } from '$lib/apps';
 
 	let { app, highlighted = false }: { app: App; highlighted?: boolean } = $props();
 
@@ -7,114 +7,107 @@
 	// Icons are only ever data:image URLs rendered via <img src> — never inline markup.
 	const icon = $derived(app.icon?.startsWith('data:image/') ? app.icon : null);
 	const initial = $derived(Array.from(app.name.trim())[0]?.toUpperCase() ?? '?');
+	const host = $derived(hostOf(app.url) || app.url);
 </script>
 
-<a class="tile" class:highlighted class:disabled={!href} href={href ?? undefined} aria-disabled={!href || undefined} title={app.name}>
+<!-- Nimbus browseable tile (.vdc-card): white, resting on --shadow-sm, lifts 2px on hover. -->
+<a class="tile" class:highlighted class:disabled={!href} href={href ?? undefined} aria-disabled={!href || undefined}>
 	<span class="icon" style:--tile-color={app.color}>
 		{#if icon}
 			<img src={icon} alt="" draggable="false" decoding="async" />
 		{:else}
-			<span class="letter" aria-hidden="true">{initial}</span>
+			<span aria-hidden="true">{initial}</span>
 		{/if}
 	</span>
 	<span class="name">{app.name}</span>
+	<span class="host">{host}</span>
 </a>
 
 <style>
 	.tile {
-		--size: clamp(60px, 15vw, 76px);
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 9px;
-		padding: 10px 4px 8px;
-		border-radius: var(--radius-l);
-		color: var(--text);
+		align-items: flex-start;
+		gap: 2px;
+		height: 100%;
+		padding: 16px;
+		border: 1px solid var(--c-border2);
+		border-radius: var(--radius-md);
+		background: var(--c-bg-card);
+		box-shadow: var(--shadow-sm);
+		color: var(--color-text);
 		text-decoration: none;
-		outline: none;
-		-webkit-touch-callout: none;
-		user-select: none;
+		transition:
+			border-color var(--dur-3) var(--ease),
+			box-shadow var(--dur-3) var(--ease-out),
+			transform var(--dur-3) var(--ease-out);
 	}
 	.icon {
-		position: relative;
 		display: grid;
 		place-items: center;
-		width: var(--size);
-		height: var(--size);
-		border-radius: 22.5%;
-		background: var(--tile-color, #8e8e93);
-		/* Light catching the top edge of the squircle. */
-		background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 55%);
-		box-shadow: var(--tile-shadow);
+		width: 44px;
+		height: 44px;
+		margin-bottom: 12px;
+		border-radius: var(--radius-md);
+		/* A tint of the app's colour, its initial in a dark step of the same hue. */
+		background: color-mix(in srgb, var(--tile-color, #64748b) 14%, white);
+		color: color-mix(in oklch, var(--tile-color, #64748b) 72%, black);
+		font-size: 1.125rem;
+		font-weight: 800;
+		letter-spacing: -0.02em;
 		overflow: hidden;
-		transition:
-			transform var(--spring-dur) var(--spring-bounce),
-			box-shadow 300ms ease;
-		will-change: transform;
-	}
-	@supports (corner-shape: squircle) {
-		.icon {
-			border-radius: 30%;
-			corner-shape: squircle;
-		}
-	}
-	.icon::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		border-radius: inherit;
-		box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
-		pointer-events: none;
 	}
 	img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 	}
-	.letter {
-		color: #fff;
-		font-size: calc(var(--size) * 0.42);
-		font-weight: 600;
-		letter-spacing: -0.02em;
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-	}
 	.name {
+		max-width: 100%;
+		font-size: 0.9375rem;
+		font-weight: 700;
+		line-height: 1.4;
+		letter-spacing: -0.01em;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		transition: color var(--dur-2) var(--ease);
+	}
+	.host {
 		max-width: 100%;
 		font-size: 0.8125rem;
 		font-weight: 500;
-		letter-spacing: 0;
-		line-height: 1.25;
-		text-align: center;
+		line-height: 1.5;
+		color: var(--color-text-faint);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	@media (hover: hover) {
-		.tile:hover .icon {
-			transform: translateY(-2px) scale(1.04);
-			box-shadow: var(--tile-shadow-hover);
+		.tile:hover {
+			border-color: var(--c-border);
+			box-shadow: var(--shadow-hover);
+			transform: translateY(-2px);
 		}
 	}
-	/* Instant feedback on press; the spring brings it back on release. */
-	.tile:active .icon {
-		transform: scale(0.92);
-		transition: transform 90ms ease-out;
+	.tile:hover .name,
+	.tile:focus-visible .name,
+	.highlighted .name {
+		color: var(--primary);
 	}
-	.tile:focus-visible .icon,
-	.highlighted .icon {
-		box-shadow:
-			0 0 0 3px var(--bg-base),
-			0 0 0 6px var(--focus-ring),
-			var(--tile-shadow);
+	.tile:focus-visible,
+	.highlighted {
+		border-color: var(--primary);
+	}
+	.highlighted {
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent), var(--shadow-sm);
+	}
+	.tile:active {
+		transform: scale(0.98);
+		transition-duration: var(--dur-1);
 	}
 	.disabled {
 		cursor: not-allowed;
 		opacity: 0.55;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.tile:hover .icon,
-		.tile:active .icon {
-			transform: none;
-		}
 	}
 </style>

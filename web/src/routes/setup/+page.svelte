@@ -6,7 +6,7 @@
 	import { api, ApiError } from '$lib/api';
 	import { passkeysNeedHttps } from '$lib/publicUrl';
 	import { codesFile, download, formatCode } from '$lib/codes';
-	import { pop, step as slide } from '$lib/motion';
+	import { step as slide } from '$lib/motion';
 	import { ceremony, passkeyError, supported } from '$lib/webauthn';
 
 	type Step = 'loading' | 'unlock' | 'domain' | 'ad' | 'owner' | 'passkey' | 'emergency' | 'codes' | 'done';
@@ -259,7 +259,8 @@
 {/snippet}
 
 <main class="auth-page">
-	<div class="auth-card wide glass" in:pop={{ y: 10, scale: 0.97 }}>
+	<div class="auth-card wide">
+		<div class="auth-brand"><span class="mark" aria-hidden="true">◆</span>Keystone</div>
 		{#if current !== 'loading'}
 			{@const i = index(current)}
 			<nav class="stepper" aria-label="Voortgang">
@@ -270,7 +271,7 @@
 						</li>
 					{/each}
 				</ol>
-				<p>Stap {i + 1} van {STEPS.length} · <strong>{STEPS[i].label}</strong></p>
+				<p class="chip accent">Stap {i + 1} van {STEPS.length} · {STEPS[i].label}</p>
 			</nav>
 		{/if}
 
@@ -306,7 +307,7 @@
 								/>
 							</label>
 							{@render errorBox()}
-							<button class="btn primary block" disabled={busy || unlockCode.length < 19}>
+							<button class="btn btn-primary block" disabled={busy || unlockCode.length < 19}>
 								{@render busyLabel('Ontgrendelen')}
 							</button>
 						</form>
@@ -356,7 +357,7 @@
 									</p>
 								{/if}
 								{@render errorBox()}
-								<button class="btn primary block" disabled={busy || !domain.trim() || !publicURL.trim()}>
+								<button class="btn btn-primary block" disabled={busy || !domain.trim() || !publicURL.trim()}>
 									{@render busyLabel('Volgende')}
 								</button>
 							</form>
@@ -427,7 +428,7 @@
 							</details>
 
 							{#if adTest}
-								<p class={adTest.ok ? 'notice' : 'error'} role="status">
+								<p class={adTest.ok ? 'notice ok' : 'error'} role="status">
 									{#if adTest.ok}
 										Verbinding gelukt — {adTest.users_found}
 										{adTest.users_found === 1 ? 'gebruiker' : 'gebruikers'} gevonden.
@@ -438,8 +439,8 @@
 							{/if}
 							{@render errorBox()}
 							<div class="row">
-								<button type="button" class="btn" onclick={testAD} disabled={busy || !adReady}>Test verbinding</button>
-								<button class="btn primary" disabled={busy || !adReady}>{@render busyLabel('Volgende')}</button>
+								<button type="button" class="btn btn-secondary" onclick={testAD} disabled={busy || !adReady}>Test verbinding</button>
+								<button class="btn btn-primary" disabled={busy || !adReady}>{@render busyLabel('Volgende')}</button>
 							</div>
 						</form>
 						<div class="links">
@@ -459,7 +460,7 @@
 								<input class="input" type="password" autocomplete="current-password" bind:value={ownerPassword} />
 							</label>
 							{@render errorBox()}
-							<button class="btn primary block" disabled={busy || !ownerUser.trim() || !ownerPassword}>
+							<button class="btn btn-primary block" disabled={busy || !ownerUser.trim() || !ownerPassword}>
 								{@render busyLabel('Volgende')}
 							</button>
 						</form>
@@ -477,7 +478,7 @@
 								<p class="error">Deze browser ondersteunt geen passkeys. Open de installatie in een recente browser.</p>
 							{/if}
 							{@render errorBox()}
-							<button type="button" class="btn primary block" onclick={createPasskey} disabled={busy || !supported()}>
+							<button type="button" class="btn btn-primary block" onclick={createPasskey} disabled={busy || !supported()}>
 								{@render busyLabel('Passkey maken')}
 							</button>
 						</div>
@@ -504,8 +505,8 @@
 							</label>
 							{@render errorBox()}
 							<div class="row">
-								<button type="button" class="btn" onclick={finish} disabled={busy}>Overslaan</button>
-								<button class="btn primary" disabled={busy || !emValid}>{@render busyLabel('Opslaan')}</button>
+								<button type="button" class="btn btn-secondary" onclick={finish} disabled={busy}>Overslaan</button>
+								<button class="btn btn-primary" disabled={busy || !emValid}>{@render busyLabel('Opslaan')}</button>
 							</div>
 						</form>
 					{:else if current === 'codes'}
@@ -521,7 +522,7 @@
 										<li><code>{c}</code></li>
 									{/each}
 								</ol>
-								<button type="button" class="btn block" onclick={downloadCodes}>
+								<button type="button" class="btn btn-secondary block" onclick={downloadCodes}>
 									<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
 									Download als tekstbestand
 								</button>
@@ -529,13 +530,13 @@
 									<input type="checkbox" bind:checked={saved} />
 									<span>Ik heb ze bewaard</span>
 								</label>
-								<button type="button" class="btn primary block" disabled={!saved} onclick={() => go('done')}>Klaar</button>
+								<button type="button" class="btn btn-primary block" disabled={!saved} onclick={() => go('done')}>Klaar</button>
 							</div>
 						{:else}
 							<p class="lede">Rond de installatie af; je krijgt dan je herstelcodes te zien.</p>
 							<div class="form">
 								{@render errorBox()}
-								<button type="button" class="btn primary block" onclick={finish} disabled={busy}>
+								<button type="button" class="btn btn-primary block" onclick={finish} disabled={busy}>
 									{@render busyLabel('Herstelcodes maken')}
 								</button>
 							</div>
@@ -546,7 +547,7 @@
 						</div>
 						<h1>Keystone is klaar</h1>
 						<p class="lede">Je bent ingelogd. Voeg je eerste apps toe op je startpagina.</p>
-						<button type="button" class="btn primary block" onclick={() => goto('/', { replaceState: true })}>
+						<button type="button" class="btn btn-primary block" onclick={() => goto('/', { replaceState: true })}>
 							Naar je startpagina
 						</button>
 					{/if}
@@ -557,87 +558,92 @@
 </main>
 
 <style>
+	/* Progress as quiet tinted pills; the current step's name in an accent chip. */
 	.stepper {
-		margin: -6px 0 22px;
-		text-align: center;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		margin: -8px 0 24px;
 	}
 	.stepper ol {
 		display: flex;
 		gap: 4px;
-		margin: 0 0 10px;
+		width: 100%;
+		margin: 0;
 		padding: 0;
 		list-style: none;
 	}
 	.stepper li {
 		flex: 1;
-		height: 4px;
-		border-radius: 2px;
-		background: var(--hairline);
-		transition: background-color 400ms ease;
+		height: 6px;
+		border-radius: var(--radius-full);
+		background: var(--c-bg-sunken);
+		transition:
+			background-color var(--dur-3) var(--ease),
+			flex-grow var(--dur-3) var(--ease);
 	}
-	.stepper li.done,
-	.stepper li.now {
-		background: var(--accent);
+	.stepper li.done {
+		background: var(--c-selected);
 	}
 	.stepper li.now {
-		opacity: 0.55;
+		flex-grow: 2;
+		background: var(--primary);
 	}
 	.stepper p {
 		margin: 0;
-		font-size: 0.8125rem;
-		color: var(--text-2);
-	}
-	.stepper strong {
-		color: var(--text);
-		font-weight: 600;
 	}
 
 	.lede code {
 		font-size: 0.8125rem;
 		padding: 1px 6px;
-		border-radius: 6px;
-		background: var(--hover);
+		border-radius: var(--radius-xs);
+		background: var(--c-bg-sunken);
+		color: var(--color-text);
 		white-space: nowrap;
 	}
 
 	details {
-		border-top: 1px solid var(--hairline);
-		padding-top: 10px;
+		border-top: 1px solid var(--c-border2);
+		padding-top: 12px;
 	}
 	summary {
 		cursor: pointer;
-		font-size: 0.9375rem;
-		font-weight: 500;
-		color: var(--accent);
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--primary);
 		width: fit-content;
+		border-radius: var(--radius-xs);
 	}
 	.adv {
-		margin-top: 14px;
+		margin-top: 16px;
 	}
 
 	.moving {
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		padding: 14px 16px;
-		border-radius: var(--radius-m);
-		background: var(--hover);
+		padding: 12px 14px;
+		border-radius: var(--radius-md);
+		background: var(--color-info-tint);
+		color: var(--primary-dark);
 	}
 	.moving p {
 		margin: 0;
-		line-height: 1.4;
+		color: var(--color-text);
+		line-height: 1.5;
 		overflow-wrap: anywhere;
 	}
 
 	.codes {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
-		gap: 8px;
+		gap: 6px 16px;
 		margin: 0;
-		padding: 14px;
-		border-radius: var(--radius-m);
-		background: var(--glass);
-		border: 1px solid var(--hairline);
+		padding: 14px 16px;
+		border-radius: var(--radius-md);
+		background: var(--c-bg-section);
+		border: 1px solid var(--c-border2);
 		list-style: none;
 		counter-reset: code;
 	}
@@ -651,12 +657,12 @@
 		content: counter(code);
 		width: 1.4em;
 		text-align: right;
-		color: var(--text-3);
+		color: var(--color-text-faint);
 		font-size: 0.75rem;
 		font-variant-numeric: tabular-nums;
 	}
 	.codes code {
-		font: 500 0.9375rem/1.6 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+		font: 500 0.875rem/1.7 var(--font-mono);
 		letter-spacing: 0.02em;
 		user-select: all;
 	}
@@ -666,31 +672,24 @@
 		}
 	}
 
+	/* Done: a round success-tinted icon, like a Nimbus stat icon. */
 	.done-mark {
 		display: grid;
 		place-items: center;
-		width: 64px;
-		height: 64px;
-		margin: 4px auto 16px;
+		width: 56px;
+		height: 56px;
+		margin: 0 auto 16px;
 		border-radius: 50%;
-		background: #34c759;
-		color: #fff;
-		box-shadow: 0 8px 24px rgba(52, 199, 89, 0.35);
-		animation: land var(--spring-dur) var(--spring-bounce) both;
+		background: var(--color-success-tint);
+		color: var(--color-success-text);
 	}
 	.done-mark svg {
-		width: 32px;
-		height: 32px;
+		width: 28px;
+		height: 28px;
 		fill: none;
 		stroke: currentColor;
-		stroke-width: 2.6;
+		stroke-width: 2.4;
 		stroke-linecap: round;
 		stroke-linejoin: round;
-	}
-	@keyframes land {
-		from {
-			transform: scale(0.6);
-			opacity: 0;
-		}
 	}
 </style>

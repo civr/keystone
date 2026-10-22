@@ -90,8 +90,8 @@
 </script>
 
 <div class="pane-head">
-	<h2 class="pane-title">Activiteit</h2>
-	<button type="button" class="btn small" onclick={exportLog} disabled={exporting} aria-busy={exporting}>
+	<h1 class="pane-title">Activiteit</h1>
+	<button type="button" class="btn btn-secondary btn-sm" onclick={exportLog} disabled={exporting} aria-busy={exporting}>
 		<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9M6 9l4 4 4-4M4 16.5h12" /></svg>
 		Exporteren
 	</button>
@@ -101,7 +101,7 @@
 {#if !loaded && error}
 	<div class="empty-note">
 		<p>{error}</p>
-		<button type="button" class="btn small" onclick={more}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={more}>Opnieuw proberen</button>
 	</div>
 {:else if !loaded}
 	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
@@ -110,7 +110,7 @@
 {:else}
 	{#each days as d (d.day)}
 		<section class="group">
-			<h3>{d.day}</h3>
+			<h2>{d.day}</h2>
 			<ul class="card list">
 				{#each d.items as e (e.id)}
 					{@const lines = auditSummary(e)}
@@ -135,11 +135,11 @@
 	{#if error}
 		<div class="empty-note">
 			<p>{error}</p>
-			<button type="button" class="btn small" onclick={more}>Opnieuw proberen</button>
+			<button type="button" class="btn btn-secondary btn-sm" onclick={more}>Opnieuw proberen</button>
 		</div>
 	{:else if next !== null}
 		<div class="end" bind:this={sentinel}>
-			<button type="button" class="btn small" onclick={more} disabled={loading}>
+			<button type="button" class="btn btn-secondary btn-sm" onclick={more} disabled={loading}>
 				{#if loading}<span class="spinner" aria-hidden="true"></span>{/if}
 				Meer laden
 			</button>
@@ -148,15 +148,6 @@
 {/if}
 
 <style>
-	.pane-head .btn svg {
-		width: 18px;
-		height: 18px;
-		fill: none;
-		stroke: currentColor;
-		stroke-width: 1.8;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-	}
 	.list {
 		margin: 0;
 		padding: 0;
@@ -166,33 +157,34 @@
 		align-items: flex-start;
 		min-height: 0;
 	}
+	/* Status dot: neutral by default, warning and danger fills where it matters. */
 	.dot {
 		flex: none;
-		width: 8px;
-		height: 8px;
+		width: 7px;
+		height: 7px;
 		margin-top: 8px;
 		border-radius: 50%;
-		background: var(--accent);
+		background: var(--c-400);
 	}
 	.dot.bad {
-		background: var(--danger);
+		background: var(--color-danger);
 	}
 	.dot.warn {
-		background: #ff9f0a;
+		background: var(--color-warning);
 	}
 	.detail {
 		margin: 6px 0 0;
 		padding: 0;
 		list-style: none;
 		font-size: 0.8125rem;
-		line-height: 1.45;
-		color: var(--text-2);
+		line-height: 1.5;
+		color: var(--color-text-muted);
 		font-variant-numeric: tabular-nums;
 		overflow-wrap: anywhere;
 	}
 	.end {
 		display: flex;
 		justify-content: center;
-		padding: 4px 0 8px;
+		padding: 0 0 16px;
 	}
 </style>

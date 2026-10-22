@@ -130,20 +130,20 @@
 	}
 </script>
 
-<div class="pane-head"><h2 class="pane-title">Active Directory</h2></div>
+<div class="pane-head"><h1 class="pane-title">Active Directory</h1></div>
 <p class="pane-intro">Keystone controleert je wachtwoord bij je domeincontroller.</p>
 
 {#if loadError}
 	<div class="empty-note">
 		<p>{loadError}</p>
-		<button type="button" class="btn small" onclick={load}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Opnieuw proberen</button>
 	</div>
 {:else if !form}
 	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
 {:else}
 	<form onsubmit={save} novalidate>
 		<section class="group" aria-labelledby="g-conn">
-			<h3 id="g-conn">Verbinding</h3>
+			<h2 id="g-conn">Verbinding</h2>
 			<div class="card form-card">
 				<label class="field">
 					<span>Server</span>
@@ -185,7 +185,7 @@
 		</section>
 
 		<section class="group" aria-labelledby="g-adv">
-			<h3 id="g-adv">Geavanceerd</h3>
+			<h2 id="g-adv">Geavanceerd</h2>
 			<div class="card">
 				<div class="srow">
 					<div class="text">
@@ -246,7 +246,7 @@
 		</section>
 
 		{#if test}
-			<p class={test.ok ? 'notice' : 'error'} role="status">
+			<p class={test.ok ? 'notice ok' : 'error'} role="status">
 				{#if test.ok}
 					Verbinding gelukt — {test.users_found}
 					{test.users_found === 1 ? 'gebruiker' : 'gebruikers'} gevonden.
@@ -258,11 +258,11 @@
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 
 		<div class="actions">
-			<button type="button" class="btn" onclick={runTest} disabled={busy !== ''}>
+			<button type="button" class="btn btn-secondary" onclick={runTest} disabled={busy !== ''}>
 				{#if busy === 'test'}<span class="spinner" aria-hidden="true"></span>{/if}
 				Test verbinding
 			</button>
-			<button class="btn primary" disabled={busy !== ''}>
+			<button class="btn btn-primary" disabled={busy !== ''}>
 				{#if busy === 'save'}<span class="spinner" aria-hidden="true"></span>{/if}
 				Opslaan
 			</button>
@@ -276,22 +276,21 @@
 	.form-card {
 		display: flex;
 		flex-direction: column;
-		gap: 14px;
-		padding: 16px;
+		gap: 16px;
+		padding: 12px 0 16px;
 	}
-	.form-card > *::before {
-		display: none;
+	.card.form-card > * + * {
+		border-top: 0;
 	}
 	.actions {
 		display: flex;
 		justify-content: flex-end;
-		gap: 10px;
-		margin-top: 18px;
+		gap: 8px;
+		margin-top: 8px;
 	}
 	.notice,
 	.error {
-		margin-top: -6px;
-		margin-bottom: 4px;
+		margin-bottom: 8px;
 	}
 	@media (max-width: 599px) {
 		.actions > .btn {

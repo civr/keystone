@@ -5,7 +5,7 @@
 	import { api, ApiError } from '$lib/api';
 	import { hostOf, type App } from '$lib/apps';
 	import { appFormError, iconError, moveItem, targetIndex, ICON_TYPES, type AppForm } from '$lib/appEdit';
-	import { reducedMotion, spring } from '$lib/motion';
+	import { easeOut, reducedMotion } from '$lib/motion';
 	import { toast } from '$lib/toast.svelte';
 	import { latestQueue } from '$lib/serial';
 	import Sheet from '$lib/components/Sheet.svelte';
@@ -91,10 +91,10 @@
 	async function dragEnd() {
 		if (!drag || settling) return;
 		const { from, to, rowH } = drag;
-		// Glide into the new slot on the spring, then commit the order without animation.
+		// Glide into the new slot, then commit the order without animation.
 		settling = true;
 		drag.dy = (to - from) * rowH;
-		await new Promise((r) => setTimeout(r, reducedMotion() ? 0 : 320));
+		await new Promise((r) => setTimeout(r, reducedMotion() ? 0 : 200));
 		committing = true;
 		apps = moveItem(apps!, from, to);
 		drag = null;
@@ -222,9 +222,9 @@
 {/snippet}
 
 <div class="pane-head">
-	<h2 class="pane-title">Apps</h2>
+	<h1 class="pane-title">Apps</h1>
 	{#if apps}
-		<button type="button" class="btn small primary" onclick={() => openEditor(null)}>
+		<button type="button" class="btn btn-primary btn-sm" onclick={() => openEditor(null)}>
 			<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11" /></svg>
 			Nieuwe app
 		</button>
@@ -235,77 +235,79 @@
 {#if loadError}
 	<div class="empty-note">
 		<p>{loadError}</p>
-		<button type="button" class="btn small" onclick={load}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Opnieuw proberen</button>
 	</div>
 {:else if !apps}
 	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
 {:else if apps.length === 0}
-	<div class="empty">
+	<div class="group empty">
 		<p class="empty-title">Nog geen apps</p>
 		<p>Voeg je eerste app toe; hij verschijnt meteen op je startpagina.</p>
-		<button type="button" class="btn primary" onclick={() => openEditor(null)}>Eerste app toevoegen</button>
+		<button type="button" class="btn btn-primary" onclick={() => openEditor(null)}>Eerste app toevoegen</button>
 	</div>
 {:else}
-	<ul class="card list" class:dragging={drag} class:committing bind:this={list} aria-describedby="reorder-help">
-		{#each apps as app, i (app.id)}
-			<li
-				data-id={app.id}
-				class="app-row"
-				class:lifted={drag?.id === app.id}
-				class:settling={settling && drag?.id === app.id}
-				style:transform={drag?.id === app.id
-					? `translateY(${drag.dy}px)${settling ? '' : ' scale(1.02)'}`
-					: shift(i)
-						? `translateY(${shift(i)}px)`
-						: undefined}
-				animate:flip={{ duration: committing ? 0 : 450, easing: spring }}
-				out:fade={{ duration: 160 }}
-			>
-				<button
-					type="button"
-					class="handle"
-					aria-label="Verplaats {app.name} (pijltjes omhoog/omlaag)"
-					onpointerdown={(e) => dragStart(e, i)}
-					onpointermove={dragMove}
-					onpointerup={dragEnd}
-					onpointercancel={dragEnd}
-					onkeydown={(e) => handleKey(e, i)}
+	<section class="group apps-group" aria-label="Apps op je startpagina">
+		<ul class="card list" class:dragging={drag} class:committing bind:this={list} aria-describedby="reorder-help">
+			{#each apps as app, i (app.id)}
+				<li
+					data-id={app.id}
+					class="app-row"
+					class:lifted={drag?.id === app.id}
+					class:settling={settling && drag?.id === app.id}
+					style:transform={drag?.id === app.id
+						? `translateY(${drag.dy}px)${settling ? '' : ' scale(1.02)'}`
+						: shift(i)
+							? `translateY(${shift(i)}px)`
+							: undefined}
+					animate:flip={{ duration: committing || reducedMotion() ? 0 : 200, easing: easeOut }}
+					out:fade={{ duration: reducedMotion() ? 0 : 150 }}
 				>
-					<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 7h10M5 10h10M5 13h10" /></svg>
-				</button>
-				<button type="button" class="open" onclick={() => openEditor(app)}>
-					{@render tile(app.name, app.color, app.icon, 40)}
-					<span class="text">
-						<span class="label">{app.name}</span>
-						<span class="host">{hostOf(app.url) || app.url}</span>
-					</span>
-				</button>
-				<span class="steps">
-					<button type="button" class="step up" aria-label="{app.name} omhoog" disabled={i === 0} onclick={() => move(i, i - 1, '.up')}>
-						<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 12.5 10 8l4.5 4.5" /></svg>
-					</button>
 					<button
 						type="button"
-						class="step down"
-						aria-label="{app.name} omlaag"
-						disabled={i === apps.length - 1}
-						onclick={() => move(i, i + 1, '.down')}
+						class="handle"
+						aria-label="Verplaats {app.name} (pijltjes omhoog/omlaag)"
+						onpointerdown={(e) => dragStart(e, i)}
+						onpointermove={dragMove}
+						onpointerup={dragEnd}
+						onpointercancel={dragEnd}
+						onkeydown={(e) => handleKey(e, i)}
 					>
-						<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+						<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 7h10M5 10h10M5 13h10" /></svg>
 					</button>
-				</span>
-				<svg class="chev" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5l5 5-5 5" /></svg>
-			</li>
-		{/each}
-	</ul>
-	<p class="foot" id="reorder-help">Tip: met het toetsenbord verplaats je een app met de pijltjestoetsen op de greep.</p>
+					<button type="button" class="open" onclick={() => openEditor(app)}>
+						{@render tile(app.name, app.color, app.icon, 40)}
+						<span class="text">
+							<span class="label">{app.name}</span>
+							<span class="host">{hostOf(app.url) || app.url}</span>
+						</span>
+					</button>
+					<span class="steps">
+						<button type="button" class="step up" aria-label="{app.name} omhoog" disabled={i === 0} onclick={() => move(i, i - 1, '.up')}>
+							<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 12.5 10 8l4.5 4.5" /></svg>
+						</button>
+						<button
+							type="button"
+							class="step down"
+							aria-label="{app.name} omlaag"
+							disabled={i === apps.length - 1}
+							onclick={() => move(i, i + 1, '.down')}
+						>
+							<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" /></svg>
+						</button>
+					</span>
+					<svg class="chev" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5l5 5-5 5" /></svg>
+				</li>
+			{/each}
+		</ul>
+		<p class="foot reorder-help" id="reorder-help">Tip: met het toetsenbord verplaats je een app met de pijltjestoetsen op de greep.</p>
+	</section>
 {/if}
 <p class="visually-hidden" role="status" aria-live="polite">{announce}</p>
 
 <Sheet bind:open={sheetOpen} title={editing ? 'App wijzigen' : 'Nieuwe app'}>
 	<form class="form" onsubmit={saveApp} novalidate>
 		<div class="preview">
-			{@render tile(form.name || '?', form.color, form.icon, 76)}
+			{@render tile(form.name || '?', form.color, form.icon, 48)}
 			<span class="preview-name">{form.name.trim() || 'Naam'}</span>
 		</div>
 
@@ -355,11 +357,11 @@
 		<div class="field">
 			<span class="field-label">Icoon</span>
 			<div class="icon-row">
-				<button type="button" class="btn small" onclick={() => fileInput?.click()}>
+				<button type="button" class="btn btn-secondary btn-sm" onclick={() => fileInput?.click()}>
 					{form.icon ? 'Ander icoon kiezen' : 'Icoon kiezen'}
 				</button>
 				{#if form.icon}
-					<button type="button" class="btn small danger" onclick={() => (form.icon = null)}>Verwijder icoon</button>
+					<button type="button" class="btn btn-secondary btn-sm danger-ink" onclick={() => (form.icon = null)}>Verwijder icoon</button>
 				{/if}
 				<input
 					id="app-icon"
@@ -382,11 +384,11 @@
 
 		<div class="sheet-actions">
 			{#if editing}
-				<button type="button" class="btn danger" class:filled={confirmDelete} onclick={deleteApp} disabled={saving}>
+				<button type="button" class="btn {confirmDelete ? 'btn-danger' : 'btn-secondary danger-ink'}" onclick={deleteApp} disabled={saving}>
 					{confirmDelete ? 'Zeker weten?' : 'Verwijder'}
 				</button>
 			{/if}
-			<button class="btn primary" disabled={saving}>
+			<button class="btn btn-primary" disabled={saving}>
 				{#if saving}<span class="spinner" aria-hidden="true"></span>{/if}
 				{editing ? 'Bewaar' : 'Voeg toe'}
 			</button>
@@ -395,51 +397,43 @@
 </Sheet>
 
 <style>
-	.pane-head .btn svg {
-		width: 18px;
-		height: 18px;
-		fill: none;
-		stroke: currentColor;
-		stroke-width: 2;
-		stroke-linecap: round;
-	}
 	.list {
 		margin: 0;
 		padding: 0;
 		list-style: none;
-		overflow: visible;
+	}
+	/* Apps sit in one card; each is a data row. */
+	.apps-group {
+		padding-top: 8px;
 	}
 	.app-row {
 		display: flex;
 		align-items: center;
 		gap: 4px;
 		min-height: 64px;
-		padding: 0 10px 0 4px;
-		background: var(--card-bg);
-		transition: transform var(--spring-dur) var(--spring);
+		padding: 0 4px 0 0;
+		background: var(--c-bg-card);
+		transition:
+			transform var(--dur-3) var(--ease-out),
+			background-color var(--dur-1) var(--ease);
 	}
-	.app-row:first-child {
-		border-radius: var(--radius-m) var(--radius-m) 0 0;
-	}
-	.app-row:last-child {
-		border-radius: 0 0 var(--radius-m) var(--radius-m);
-	}
-	.app-row:only-child {
-		border-radius: var(--radius-m);
+	.app-row:hover {
+		background: var(--c-hover);
 	}
 	.app-row.lifted {
 		z-index: 2;
 		transition: none;
-		border-radius: var(--radius-m);
-		background: var(--menu-bg);
-		box-shadow: var(--popover-shadow);
+		border-radius: var(--radius-md);
+		background: var(--c-bg-card);
+		box-shadow: var(--shadow-md);
 	}
-	.app-row.lifted::before,
-	.dragging .app-row::before {
-		display: none;
+	.list .app-row.lifted,
+	.list.dragging .app-row,
+	.list.dragging .app-row + .app-row {
+		border-top-color: transparent;
 	}
 	.app-row.settling {
-		transition: transform 320ms var(--spring);
+		transition: transform var(--dur-3) var(--ease-out);
 	}
 	.committing .app-row {
 		transition: none;
@@ -449,25 +443,28 @@
 		flex: none;
 		display: grid;
 		place-items: center;
-		width: 40px;
+		width: 36px;
 		height: 48px;
 		border: 0;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		background: none;
-		color: var(--text-3);
+		color: var(--color-text-faint);
 		cursor: grab;
 		touch-action: none;
+	}
+	.handle:hover {
+		color: var(--color-text);
 	}
 	.handle:active,
 	.lifted .handle {
 		cursor: grabbing;
-		color: var(--text);
+		color: var(--color-text);
 	}
 	.handle svg,
 	.step svg,
 	.chev {
-		width: 20px;
-		height: 20px;
+		width: 18px;
+		height: 18px;
 		fill: none;
 		stroke: currentColor;
 		stroke-width: 1.8;
@@ -482,10 +479,10 @@
 		gap: 12px;
 		padding: 10px 4px;
 		border: 0;
+		border-radius: var(--radius-sm);
 		background: none;
 		text-align: left;
 		cursor: pointer;
-		border-radius: 10px;
 	}
 	.text {
 		min-width: 0;
@@ -493,23 +490,28 @@
 		flex-direction: column;
 	}
 	.label {
-		font-size: 1rem;
-		font-weight: 500;
-		letter-spacing: -0.006em;
+		font-size: 0.875rem;
+		font-weight: 600;
+		line-height: 1.45;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		transition: color var(--dur-2) var(--ease);
+	}
+	.open:hover .label,
+	.open:focus-visible .label {
+		color: var(--primary);
 	}
 	.host {
 		font-size: 0.8125rem;
-		color: var(--text-2);
+		color: var(--color-text-faint);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	.chev {
 		flex: none;
-		color: var(--text-3);
+		color: var(--color-text-faint);
 		width: 16px;
 		height: 16px;
 	}
@@ -529,41 +531,40 @@
 	.step {
 		display: grid;
 		place-items: center;
-		width: 32px;
-		height: 32px;
-		border: 0;
-		border-radius: 50%;
-		background: var(--hover);
-		color: var(--text-2);
+		width: 30px;
+		height: 30px;
+		border: 1px solid var(--c-border);
+		border-radius: var(--radius-sm);
+		background: var(--c-bg-card);
+		color: var(--color-text-muted);
 		cursor: pointer;
 	}
+	.step:hover:not(:disabled) {
+		background: var(--c-bg-section);
+		color: var(--color-text);
+	}
 	.step:disabled {
-		opacity: 0.3;
-		cursor: default;
+		opacity: 0.4;
+		cursor: not-allowed;
 	}
 
+	/* The app's tile: a tint of its colour, its initial in a dark step of the hue. */
 	.tile {
-		position: relative;
 		flex: none;
 		display: grid;
 		place-items: center;
 		width: var(--size);
 		height: var(--size);
-		border-radius: 22.5%;
-		background: var(--tile-color);
-		background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 55%);
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--tile-color) 14%, white);
+		color: color-mix(in oklch, var(--tile-color) 72%, black);
+		font-size: calc(var(--size) * 0.4);
+		font-weight: 800;
+		letter-spacing: -0.02em;
 		overflow: hidden;
-		color: #fff;
-		font-size: calc(var(--size) * 0.42);
-		font-weight: 600;
-		transition: background-color 200ms ease;
-	}
-	@supports (corner-shape: squircle) {
-		.tile {
-			border-radius: 30%;
-			corner-shape: squircle;
-		}
+		transition:
+			background-color var(--dur-3) var(--ease),
+			color var(--dur-3) var(--ease);
 	}
 	.tile img {
 		width: 100%;
@@ -574,45 +575,40 @@
 	.empty {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 8px;
-		padding: 40px 16px;
-		text-align: center;
-		color: var(--text-2);
+		align-items: flex-start;
+		gap: 6px;
+		padding-bottom: 20px;
+		color: var(--color-text-muted);
 	}
 	.empty p {
 		margin: 0;
 	}
 	.empty-title {
-		color: var(--text);
-		font-size: 1.0625rem;
-		font-weight: 600;
+		color: var(--color-text);
+		font-size: 1rem;
+		font-weight: 700;
 	}
 	.empty .btn {
 		margin-top: 10px;
 	}
-	.foot {
-		margin: 8px 16px 0;
-		font-size: 0.8125rem;
-		color: var(--text-3);
-	}
 	@media (pointer: coarse) {
-		.foot {
+		.reorder-help {
 			display: none;
 		}
 	}
 
 	.preview {
 		display: flex;
-		flex-direction: column;
 		align-items: center;
-		gap: 8px;
-		padding: 6px 0 4px;
+		gap: 12px;
+		padding: 12px;
+		border: 1px solid var(--c-border2);
+		border-radius: var(--radius-md);
+		background: var(--c-bg-section);
 	}
 	.preview-name {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		max-width: 160px;
+		font-size: 0.9375rem;
+		font-weight: 700;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -625,7 +621,7 @@
 	}
 	legend {
 		padding: 0;
-		margin-bottom: 6px;
+		margin-bottom: 8px;
 	}
 	.swatches {
 		display: flex;
@@ -634,26 +630,27 @@
 	}
 	.swatch {
 		position: relative;
-		width: 30px;
-		height: 30px;
+		display: grid;
+		place-items: center;
+		width: 28px;
+		height: 28px;
 		border-radius: 50%;
 		background: var(--c);
-		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+		box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
 		cursor: pointer;
-		transition: transform 200ms var(--spring-bounce);
+		transition: transform var(--dur-1) var(--ease);
 	}
 	.swatch:has(input:checked) {
 		box-shadow:
-			0 0 0 2px var(--bg-base),
+			0 0 0 2px var(--c-bg-card),
 			0 0 0 4px var(--c);
 	}
 	.swatch:has(input:focus-visible) {
-		outline: 3px solid var(--focus-ring);
-		outline-offset: 3px;
+		outline: 2px solid var(--primary);
+		outline-offset: 5px;
 	}
 	.swatch:active {
-		transform: scale(0.9);
-		transition-duration: 90ms;
+		transform: scale(0.94);
 	}
 	.swatch input {
 		position: absolute;
@@ -662,15 +659,25 @@
 		margin: 0;
 		cursor: pointer;
 	}
+	/* Own colour: an empty dashed ring with a plus until a colour is picked. */
 	.swatch.custom {
-		background:
-			radial-gradient(circle, var(--c) 0 42%, transparent 44%),
-			conic-gradient(#ff3b30, #ffcc00, #34c759, #30b0c7, #007aff, #af52de, #ff3b30);
+		box-shadow: inset 0 0 0 1.5px var(--c-400);
+	}
+	.swatch.custom::after {
+		content: '+';
+		color: var(--color-text-muted);
+		font-size: 1rem;
+		font-weight: 600;
+		line-height: 1;
+		pointer-events: none;
 	}
 	.swatch.custom:not([style*='transparent']) {
 		box-shadow:
-			0 0 0 2px var(--bg-base),
+			0 0 0 2px var(--c-bg-card),
 			0 0 0 4px var(--c);
+	}
+	.swatch.custom:not([style*='transparent'])::after {
+		content: none;
 	}
 	.icon-row {
 		display: flex;
