@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 
 PORT="${KEYSTONE_PORT:-18080}"
 export KEYSTONE_PORT="$PORT"
+export KEYSTONE_GATE_PORT="${KEYSTONE_GATE_PORT:-18081}" KEYSTONE_LDAPS_PORT="${KEYSTONE_LDAPS_PORT:-18636}"
 BASE="http://127.0.0.1:${PORT}"
 
 cleanup() {
@@ -49,5 +50,15 @@ curl -fsS -D - -o /dev/null "$BASE$(echo "$assets" | head -1)" | grep -qi '^cach
   || fail "immutable asset without immutable Cache-Control"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/_app/version.json")" = "200" ] || fail "/_app/version.json not served"
 echo "shell assets OK: $(echo "$assets" | wc -l | tr -d ' ') files"
+
+GATE="http://127.0.0.1:${KEYSTONE_GATE_PORT:-18081}"
+for _ in $(seq 1 30); do
+  [ "$(curl -s -o /dev/null -w '%{http_code}' "$GATE/healthz" || true)" = "200" ] && break
+  sleep 2
+done
+code="$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Proto: https' -H 'X-Forwarded-Host: nope.home.lan' -H 'X-Forwarded-Uri: /' "$GATE/verify")"
+[ "$code" = "403" ] || fail "gate /verify for an unknown app returned $code"
+(exec 3<>"/dev/tcp/127.0.0.1/${KEYSTONE_LDAPS_PORT:-18636}") 2>/dev/null || fail "LDAPS port not open"
+echo "gate and ldap OK"
 
 echo "SMOKE PASS"
