@@ -113,15 +113,16 @@ class KeystoneAuthProvider(AuthProvider):
         return cred
 
     async def _ha_user(self, username: str):
-        """The active HA user whose regular login name (or display name) is username."""
+        """The active HA user whose Home Assistant login name is username.
+
+        Only the login name counts: it is unique, display names are not.
+        """
         for user in await self.store.async_get_users():
             if user.system_generated or not user.is_active:
                 continue
             for cred in user.credentials:
                 if cred.auth_provider_type == "homeassistant" and cred.data.get("username", "").lower() == username:
                     return user
-            if (user.name or "").lower() == username:
-                return user
         return None
 
     async def async_user_meta_for_credentials(self, credentials: Credentials) -> UserMeta:
