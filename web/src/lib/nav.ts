@@ -58,3 +58,22 @@ export function searchHref(query: string): string {
 	const q = query.trim();
 	return q ? `/?q=${encodeURIComponent(q)}` : '/';
 }
+
+/**
+ * Where the sign-in page may send the browser after logging in: only back to
+ * keystone-core's own sign-in continuations (SAML, OIDC, gate). Anything else,
+ * including other hosts and dot-segment tricks, becomes "/".
+ */
+export function safeNext(raw: string | null): string {
+	if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return '/';
+	let u: URL;
+	try {
+		u = new URL(raw, 'https://keystone.invalid');
+	} catch {
+		return '/';
+	}
+	const path = raw.split(/[?#]/, 1)[0];
+	if (u.origin !== 'https://keystone.invalid' || u.pathname !== path) return '/';
+	const ok = path === '/oidc/authorize' || path === '/api/gate/start' || /^\/saml\/[a-z]/.test(path);
+	return ok ? raw : '/';
+}

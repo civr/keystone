@@ -271,3 +271,16 @@ func containsIP(prefixes []netip.Prefix, ip netip.Addr) bool {
 	}
 	return false
 }
+
+// requireSessionOrLogin sends browsers without a session to the sign-in page,
+// which returns them here afterwards (web: safeNext).
+func requireSessionOrLogin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if SessionFrom(r.Context()) == nil {
+			w.Header().Set("Cache-Control", "no-store")
+			http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

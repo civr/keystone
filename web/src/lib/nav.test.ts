@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV, initials, isActive, searchHref } from './nav';
+import { NAV, initials, isActive, searchHref, safeNext } from './nav';
 
 describe('isActive', () => {
 	it.each([
@@ -49,5 +49,18 @@ describe('searchHref', () => {
 	});
 	it('is the plain home page for a blank query', () => {
 		expect(searchHref('   ')).toBe('/');
+	});
+});
+
+describe('safeNext', () => {
+	it('allows the server sign-in continuations', () => {
+		expect(safeNext('/oidc/authorize?client_id=x&state=y')).toBe('/oidc/authorize?client_id=x&state=y');
+		expect(safeNext('/saml/sso?resume=abc')).toBe('/saml/sso?resume=abc');
+		expect(safeNext('/api/gate/start?rd=https%3A%2F%2Fha.home.lan%2F')).toBe('/api/gate/start?rd=https%3A%2F%2Fha.home.lan%2F');
+	});
+	it('rejects everything else', () => {
+		for (const bad of [null, '', '//evil.com/oidc/authorize', 'https://evil.com', '/instellingen', '/\\evil.com', '/oidc/authorizex', '/saml/../instellingen', ' /saml/sso']) {
+			expect(safeNext(bad)).toBe('/');
+		}
 	});
 });

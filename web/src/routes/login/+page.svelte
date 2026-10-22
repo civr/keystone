@@ -2,6 +2,8 @@
 	import '$lib/forms.css';
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { safeNext } from '$lib/nav';
 	import { api, ApiError, type Me } from '$lib/api';
 	import { formatCode } from '$lib/codes';
 	import { step } from '$lib/motion';
@@ -80,6 +82,13 @@
 
 	async function finished() {
 		saveUser();
+		await leave();
+	}
+
+	/** Back to the app sign-in that sent us here (a server route), else home. */
+	async function leave() {
+		const next = safeNext(page.url.searchParams.get('next'));
+		if (next !== '/') return location.replace(next);
 		await goto('/', { replaceState: true });
 	}
 
@@ -99,7 +108,7 @@
 			go('register');
 			return;
 		}
-		if (me) return void goto('/', { replaceState: true });
+		if (me) return void leave();
 		go('password');
 		await tick();
 		(username ? passwordInput : userInput)?.focus(); // remembered user: straight to the password
