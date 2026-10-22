@@ -76,6 +76,14 @@ const ACTIONS: Record<string, string> = {
 	'app.deleted': 'App verwijderd',
 	'app.reordered': 'Apps opnieuw geordend',
 	'audit.exported': 'Activiteit geëxporteerd',
+	'setup.unlocked': 'Installatie ontgrendeld',
+	'setup.unlock_failed': 'Verkeerde setupcode',
+	'setup.domain': 'Installatie: domein ingesteld',
+	'setup.ad': 'Installatie: Active Directory ingesteld',
+	'setup.owner': 'Installatie: eigenaar gekozen',
+	'setup.owner_failed': 'Installatie: eigenaar niet herkend',
+	'setup.passkey': 'Installatie: passkey geregistreerd',
+	'setup.emergency': 'Installatie: nood-account ingesteld',
 	'setup.completed': 'Installatie voltooid'
 };
 
@@ -83,15 +91,35 @@ export function auditLabel(action: string): string {
 	return ACTIONS[action] ?? action;
 }
 
-const KEYS: Record<string, string> = { username: 'gebruiker', method: 'methode', reason: 'reden', name: 'naam', remaining: 'over' };
+const KEYS: Record<string, string> = {
+	username: 'gebruiker',
+	method: 'methode',
+	reason: 'reden',
+	name: 'naam',
+	remaining: 'over',
+	domain: 'domein',
+	public_url: 'adres',
+	url: 'server',
+	rows: 'regels',
+	recovery_codes: 'herstelcodes',
+	after: 'na'
+};
 const VALUES: Record<string, string> = {
 	password: 'wachtwoord',
 	passkey: 'passkey',
+	passkey_register: 'nieuwe passkey',
+	trusted_device: 'vertrouwd apparaat (passkey)',
+	emergency: 'nood-account',
 	recovery: 'herstelcode',
 	stepup: 'bevestiging',
 	ad_unavailable: 'AD niet bereikbaar',
 	ad_error: 'AD-fout'
 };
+
+/** Dutch text for a known detail value (e.g. a login method), else undefined. */
+export function auditValueLabel(v: string): string | undefined {
+	return VALUES[v];
+}
 
 interface Change {
 	path: string;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { auditLabel, auditSummary, describeUA, formatValue, relativeTime } from './format';
+import { auditLabel, auditSummary, auditValueLabel, describeUA, formatValue, relativeTime } from './format';
 import { settingsMeta } from './settingsMeta';
+import auditFixture from './fixtures/audit-actions.json';
 
 describe('relativeTime', () => {
 	const now = new Date('2026-10-21T12:00:00Z');
@@ -74,5 +75,16 @@ describe('audit text', () => {
 		]);
 		expect(auditSummary({ action: 'logout', detail: {} })).toEqual([]);
 		expect(auditSummary({ action: 'logout', detail: null })).toEqual([]);
+	});
+});
+
+describe('audit labels', () => {
+	it.each(auditFixture.actions)('labels %s in Dutch', (action) => {
+		expect(auditLabel(action)).not.toBe(action);
+	});
+	it.each(auditFixture.methods)('names login method %s in Dutch', (method) => {
+		const label = auditValueLabel(method);
+		expect(label).toBeTruthy();
+		expect(auditSummary({ action: 'login.success', detail: { method } })).toEqual([`methode ${label}`]);
 	});
 });
