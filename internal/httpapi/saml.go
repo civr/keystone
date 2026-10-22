@@ -1,0 +1,143 @@
+package httpapi
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/redis/go-redis/v9"
+
+	"github.com/civr/keystone/internal/apps"
+	"github.com/civr/keystone/internal/audit"
+	"github.com/civr/keystone/internal/samlidp"
+)
+
+// A SAML request that arrives before sign-in waits here while the browser
+// goes through /login; the login page returns to /saml/sso?resume=<token>.
+const samlStashTTL = 10 * time.Minute
+
+func samlStashKey(tok string) string { return "samlreq:" + tok }
+
+func (s *server) samlRoutes(r chi.Router) {
+	r.Use(s.requireSetupDone)
+	r.Get("/metadata", s.samlMetadata)
+	r.Get("/sso", s.samlSSO)
+	r.Post("/sso", s.samlSSO)
+	r.With(requireSessionOrLogin).Get("/idp/{id}", s.samlIdPInitiated)
+}
+
+func (s *server) samlProvider() *samlidp.Provider {
+	return &samlidp.Provider{Keys: s.keys, Apps: s.d.Pool}
+}
+
+func (s *server) samlMetadata(w http.ResponseWriter, r *http.Request) {
+	md, err := s.samlProvider().Metadata(r.Context(), settingsFrom(r.Context()).PublicURL)
+	if err != nil {
+		errInternal(w, "saml metadata", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/samlmetadata+xml")
+	_, _ = w.Write(md)
+}
+
+// samlFail answers a request that cannot be honoured. It never redirects:
+// the target of a bad request is not trusted.
+func samlFail(w http.ResponseWriter, status int, msg string) {
+	writeError(w, status, "saml_invalid", msg)
+}
+
+func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req samlidp.Request
+	if tok := r.URL.Query().Get("resume"); tok != "" && r.Method == http.MethodGet {
+		raw, err := s.d.Valkey.GetDel(ctx, samlStashKey(tok)).Bytes()
+		if errors.Is(err, redis.Nil) {
+			samlFail(w, http.StatusBadRequest, "Deze inlogpoging is verlopen. Open de app opnieuw.")
+			return
+		}
+		if err != nil {
+			errInternal(w, "saml resume", err)
+			return
+		}
+		if err := json.Unmarshal(raw, &req); err != nil {
+			errInternal(w, "saml resume", err)
+			return
+		}
+	} else {
+		var err error
+		if req, err = samlidp.Parse(r); err != nil {
+			slog.Info("saml: bad request", "err", err)
+			samlFail(w, http.StatusBadRequest, "Ongeldig SAML-verzoek.")
+			return
+		}
+	}
+	sess := SessionFrom(ctx)
+	if sess == nil || sess.MustRegisterPasskey {
+		tok, err := randomToken()
+		if err != nil {
+			errInternal(w, "saml stash", err)
+			return
+		}
+		raw, _ := json.Marshal(req)
+		if err := s.d.Valkey.Set(ctx, samlStashKey(tok), raw, samlStashTTL).Err(); err != nil {
+			errInternal(w, "saml stash", err)
+			return
+		}
+		r.URL.RawQuery = "resume=" + tok
+		r.Method = http.MethodGet
+		requireSessionOrLogin(nil).ServeHTTP(w, r)
+		return
+	}
+	owner, err := apps.LoadOwner(ctx, s.d.Pool)
+	if err != nil {
+		errInternal(w, "saml owner", err)
+		return
+	}
+	f, a, err := s.samlProvider().Respond(ctx, settingsFrom(ctx).PublicURL, r, req, owner, sess.ID, sess.LastFullAuthAt)
+	switch {
+	case errors.Is(err, samlidp.ErrUnknownSP):
+		samlFail(w, http.StatusBadRequest, "Deze app is niet als SAML-app in Keystone ingesteld.")
+		return
+	case err != nil:
+		slog.Info("saml: request refused", "err", err)
+		samlFail(w, http.StatusBadRequest, "Het SAML-verzoek van de app klopt niet met de instellingen in Keystone.")
+		return
+	}
+	s.appAccess(ctx, a, "saml")
+	_ = samlidp.WriteForm(w, f)
+}
+
+func (s *server) samlIdPInitiated(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	a, err := apps.ByID(ctx, s.d.Pool, chi.URLParam(r, "id"))
+	if errors.Is(err, apps.ErrNotFound) || (err == nil && (a.Config.SAML == nil || !a.Config.SAML.IdPInitiated)) {
+		errNotFound(w, r)
+		return
+	}
+	if err != nil {
+		errInternal(w, "saml app", err)
+		return
+	}
+	owner, err := apps.LoadOwner(ctx, s.d.Pool)
+	if err != nil {
+		errInternal(w, "saml owner", err)
+		return
+	}
+	sess := SessionFrom(ctx)
+	f, err := s.samlProvider().RespondIdPInitiated(ctx, settingsFrom(ctx).PublicURL, r, a, owner, sess.ID, sess.LastFullAuthAt)
+	if err != nil {
+		errInternal(w, "saml idp-initiated", err)
+		return
+	}
+	s.appAccess(ctx, a, "saml")
+	_ = samlidp.WriteForm(w, f)
+}
+
+// appAccess audits a sign-in into an app.
+func (s *server) appAccess(ctx context.Context, a apps.App, protocol string) {
+	s.d.Audit.Log(ctx, audit.ActorOwner, "app.access", clientIP(ctx), map[string]any{"app": a.Name, "id": a.ID, "protocol": protocol})
+}

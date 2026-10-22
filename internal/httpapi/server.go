@@ -13,6 +13,7 @@ import (
 
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/audit"
+	"github.com/civr/keystone/internal/keys"
 	"github.com/civr/keystone/internal/secrets"
 	"github.com/civr/keystone/internal/session"
 	"github.com/civr/keystone/internal/settings"
@@ -29,6 +30,7 @@ type Deps struct {
 	Audit    *audit.Writer
 	Secrets  secrets.Secrets
 	Shell    []byte // SPA shell; EmbeddedShell when empty
+	Keys     *keys.Store // signing keys; keys.New(Pool, Secrets.DataKey) when nil
 
 	// SetupCodeHash is the argon2 hash of the setup code printed at startup;
 	// empty once setup is complete.
@@ -40,6 +42,7 @@ type Deps struct {
 
 type server struct {
 	d     Deps
+	keys  *keys.Store
 	shell []byte
 	csp   string // policy for shell, without settings headers.csp_extra
 }
@@ -49,7 +52,11 @@ func newServer(d Deps) *server {
 	if len(shell) == 0 {
 		shell = EmbeddedShell
 	}
-	return &server{d: d, shell: shell, csp: CSP(shell, "")}
+	k := d.Keys
+	if k == nil {
+		k = keys.New(d.Pool, d.Secrets.DataKey)
+	}
+	return &server{d: d, keys: k, shell: shell, csp: CSP(shell, "")}
 }
 
 // New returns the core HTTP handler.
@@ -68,6 +75,7 @@ func (s *server) router() chi.Router {
 		api.Route("/admin", s.adminRoutes)
 		api.Route("/apps", s.appRoutes)
 	})
+	r.Route("/saml", s.samlRoutes)
 	r.NotFound(s.serveShell)
 	r.MethodNotAllowed(errMethodNotAllowed)
 	return r

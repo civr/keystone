@@ -159,7 +159,7 @@ func cidrCheck(next http.Handler) http.Handler {
 // out of the wizard (the setup unlock cookie is still required there).
 func (s *server) originCheck(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isSafeMethod(r.Method) || originAllowed(r, settingsFrom(r.Context()).PublicURL) {
+		if isSafeMethod(r.Method) || crossSiteEndpoint(r) || originAllowed(r, settingsFrom(r.Context()).PublicURL) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -177,6 +177,15 @@ func (s *server) originCheck(next http.Handler) http.Handler {
 		}
 		writeError(w, http.StatusForbidden, "bad_origin", "Verzoek geweigerd: het komt niet van deze Keystone-pagina.")
 	})
+}
+
+// crossSiteEndpoint reports whether r targets a protocol endpoint that other
+// sites post to by design: SAML AuthnRequests (POST binding) and the OIDC token
+// endpoint (server-to-server, client-authenticated). Neither acts on the
+// session cookie without its own proof.
+func crossSiteEndpoint(r *http.Request) bool {
+	p := r.URL.Path
+	return (p == "/saml/sso" || p == "/oidc/token") && (r.URL.RawPath == "" || r.URL.RawPath == p)
 }
 
 // originAllowed reports whether the request Origin equals the origin of
@@ -276,7 +285,7 @@ func containsIP(prefixes []netip.Prefix, ip netip.Addr) bool {
 // which returns them here afterwards (web: safeNext).
 func requireSessionOrLogin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if SessionFrom(r.Context()) == nil {
+		if sess := SessionFrom(r.Context()); sess == nil || sess.MustRegisterPasskey {
 			w.Header().Set("Cache-Control", "no-store")
 			http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
 			return
