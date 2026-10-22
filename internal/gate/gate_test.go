@@ -116,6 +116,19 @@ func TestVerify(t *testing.T) {
 		}
 	})
 
+	t.Run("SpoofedOriginalURLIgnored", func(t *testing.T) {
+		r := httptest.NewRequest("GET", "/verify", nil)
+		r.Header.Set("X-Forwarded-Proto", "https")
+		r.Header.Set("X-Forwarded-Host", "ha.home.lan")
+		r.Header.Set("X-Forwarded-Uri", "/lovelace")
+		r.Header.Set("X-Original-URL", "https://ha.home.lan/api/states") // client-supplied, passed on by Traefik
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != 302 {
+			t.Fatalf("spoofed bypass = %d", w.Code)
+		}
+	})
+
 	t.Run("UnknownHost403", func(t *testing.T) {
 		if w := verify(h, "", "evil.home.lan", "/", tok); w.Code != 403 {
 			t.Fatalf("got %d", w.Code)

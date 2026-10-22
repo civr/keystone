@@ -47,11 +47,15 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-// original reconstructs the URL the browser asked the proxy for.
+// original reconstructs the URL the browser asked the proxy for. Traefik and
+// Caddy set X-Forwarded-Proto/Host/Uri themselves but pass other client
+// headers through, so X-Original-URL (set by nginx's auth_request config) is
+// only read in nginx mode.
 func original(r *http.Request) (*url.URL, bool) {
-	if raw := r.Header.Get("X-Original-URL"); raw != "" {
+	if r.URL.Query().Get("mode") == "nginx" {
+		raw := r.Header.Get("X-Original-URL")
 		u, err := url.Parse(raw)
-		return u, err == nil && u.Host != ""
+		return u, err == nil && u.Host != "" && u.User == nil
 	}
 	proto, host := r.Header.Get("X-Forwarded-Proto"), r.Header.Get("X-Forwarded-Host")
 	if proto != "http" && proto != "https" || host == "" {
