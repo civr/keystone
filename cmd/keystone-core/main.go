@@ -13,10 +13,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -24,13 +22,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 
-	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
-	"github.com/civr/keystone/internal/db"
 	"github.com/civr/keystone/internal/httpapi"
+	"github.com/civr/keystone/internal/runtime"
 	"github.com/civr/keystone/internal/secrets"
 	"github.com/civr/keystone/internal/session"
 	"github.com/civr/keystone/internal/settings"
@@ -42,13 +38,6 @@ const (
 	dbName          = "keystone"
 	shutdownTimeout = 15 * time.Second
 )
-
-func env(name, def string) string {
-	if v := os.Getenv(name); v != "" {
-		return v
-	}
-	return def
-}
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
@@ -81,26 +70,7 @@ func main() {
 
 // openDB loads the secrets, connects to Postgres and applies migrations.
 func openDB(ctx context.Context) (secrets.Secrets, *pgxpool.Pool, error) {
-	sec, err := secrets.Load(env("KEYSTONE_SECRETS", "/run/keystone"))
-	if err != nil {
-		return sec, nil, err
-	}
-	dsn := url.URL{
-		Scheme:   "postgres",
-		User:     url.UserPassword(dbUser, sec.DBPassword),
-		Host:     net.JoinHostPort(env("KEYSTONE_DB_HOST", "postgres"), "5432"),
-		Path:     "/" + dbName,
-		RawQuery: "sslmode=disable",
-	}
-	pool, err := db.Open(ctx, dsn.String())
-	if err != nil {
-		return sec, nil, err
-	}
-	if err := db.Migrate(ctx, pool); err != nil {
-		pool.Close()
-		return sec, nil, err
-	}
-	return sec, pool, nil
+	return runtime.OpenDB(ctx, true)
 }
 
 func serve(ctx context.Context) error {
@@ -110,11 +80,11 @@ func serve(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	rdb := redis.NewClient(&redis.Options{Addr: env("KEYSTONE_VALKEY_ADDR", "valkey:6379"), Password: sec.ValkeyPassword})
-	defer rdb.Close()
-	if err := rdb.Ping(ctx).Err(); err != nil {
-		return fmt.Errorf("valkey: %w", err)
+	rdb, err := runtime.Valkey(ctx, sec)
+	if err != nil {
+		return err
 	}
+	defer rdb.Close()
 
 	st := settings.NewStore(pool)
 	aw := audit.NewWriter(pool, st)
@@ -132,7 +102,7 @@ func serve(ctx context.Context) error {
 		Valkey:        rdb,
 		Sessions:      session.NewStore(rdb),
 		Limiter:       session.NewLimiter(rdb),
-		Dir:           directory(pool, sec.DataKey),
+		Dir:           runtime.Directory(pool, sec.DataKey),
 		Audit:         aw,
 		Secrets:       sec,
 		Shell:         httpapi.EmbeddedShell,
@@ -186,31 +156,6 @@ func setupCode(ctx context.Context, pool *pgxpool.Pool) (string, error) {
 	}
 	slog.Info("Keystone setup code: " + code)
 	return hash, nil
-}
-
-// directory returns the AD client for the stored configuration, or nil when
-// AD has not been configured yet. It reads ad_config on every call so changes
-// made in setup or Instellingen apply immediately.
-func directory(pool *pgxpool.Pool, dataKey []byte) func() ad.Directory {
-	return func() ad.Directory {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		var raw []byte
-		err := pool.QueryRow(ctx, `select data from ad_config where id = 1`).Scan(&raw)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
-			slog.Error("ad: load config", "err", err)
-			return nil
-		}
-		var cfg ad.Config
-		if err := json.Unmarshal(raw, &cfg); err != nil {
-			slog.Error("ad: decode config", "err", err)
-			return nil
-		}
-		return ad.NewLDAP(cfg, dataKey)
-	}
 }
 
 func resetNetwork(ctx context.Context) error {
