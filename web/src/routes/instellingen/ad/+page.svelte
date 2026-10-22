@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { api, ApiError } from '$lib/api';
 	import { toast } from '$lib/toast.svelte';
+	import { adWeakenings } from '$lib/adSecurity';
+	import Confirm from '$lib/components/settings/Confirm.svelte';
 
 	interface ADConfig {
 		url: string;
@@ -30,6 +32,9 @@
 	};
 
 	let form = $state<ADConfig | null>(null);
+	/** The configuration as stored; null when none is stored yet. */
+	let saved: ADConfig | null = null;
+	let confirmer: Confirm;
 	let storedURL = $state('');
 	let passwordSet = $state(false);
 	let password = $state('');
@@ -47,11 +52,13 @@
 			const r = await api.get<ADConfig & { bind_password_set: boolean }>('/admin/ad');
 			const { bind_password_set, ...cfg } = r;
 			form = { ...blank, ...cfg };
+			saved = { ...form };
 			storedURL = cfg.url;
 			passwordSet = bind_password_set;
 		} catch (e) {
 			if (e instanceof ApiError && e.status === 404) {
 				form = { ...blank };
+				saved = null;
 				return;
 			}
 			loadError = e instanceof ApiError ? e.message : 'De AD-instellingen konden niet worden geladen.';
@@ -91,10 +98,26 @@
 				: 'Vul het wachtwoord van het service-account in.';
 			return;
 		}
+		const weakened = adWeakenings(saved, form!);
+		if (
+			weakened.length &&
+			!(await confirmer.ask({
+				title: 'Dit verlaagt de beveiliging',
+				message:
+					weakened.length === 1
+						? 'Deze wijziging maakt de verbinding met AD minder veilig. Weet je het zeker?'
+						: 'Deze wijzigingen maken de verbinding met AD minder veilig. Weet je het zeker?',
+				confirm: 'Toch opslaan',
+				danger: true,
+				items: weakened
+			}))
+		)
+			return;
 		busy = 'save';
 		error = passwordError = '';
 		try {
 			await api.send('PUT', '/admin/ad', body());
+			saved = { ...form!, url: form!.url.trim() };
 			storedURL = form!.url.trim();
 			passwordSet = true;
 			password = '';
@@ -246,6 +269,8 @@
 		</div>
 	</form>
 {/if}
+
+<Confirm bind:this={confirmer} />
 
 <style>
 	.form-card {
