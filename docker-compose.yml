@@ -41,12 +41,15 @@ services:
       init:
         condition: service_completed_successfully
     # The password is read from the secrets volume by the root entrypoint
-    # before valkey drops privileges; it never appears in the environment.
+    # before valkey drops privileges; it never appears in the environment
+    # (it is visible in the valkey-server argv inside this container only).
     entrypoint:
       - sh
       - -c
       - exec docker-entrypoint.sh valkey-server --requirepass "$$(cat /run/keystone/valkey_password)" --appendonly yes
     volumes:
+      # Sessions and rate-limit counters only; losing it signs you out.
+      - keystone_valkey:/data
       - keystone_secrets:/run/keystone:ro
     healthcheck:
       test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/keystone/valkey_password)\" valkey-cli ping | grep -q PONG"]
@@ -113,3 +116,4 @@ services:
 volumes:
   keystone_secrets:
   keystone_db:
+  keystone_valkey:

@@ -11,9 +11,17 @@
 	encode zstd gzip
 	root * /srv
 
+	# Everything SvelteKit emits under /_app comes from this image's build
+	# (hashed chunks plus version.json); it is never proxied to core.
 	@immutable path /_app/immutable/*
 	handle @immutable {
 		header Cache-Control "public, max-age=31536000, immutable"
+		header X-Content-Type-Options "nosniff"
+		file_server
+	}
+
+	handle /_app/* {
+		header Cache-Control "no-cache"
 		header X-Content-Type-Options "nosniff"
 		file_server
 	}
