@@ -52,6 +52,14 @@
 		if (drawer.open) drawer.close();
 	}
 
+	// Widening past the phone breakpoint closes the drawer.
+	$effect(() => {
+		const mq = matchMedia('(min-width: 768px)');
+		const onchange = () => mq.matches && closeDrawer();
+		mq.addEventListener('change', onchange);
+		return () => mq.removeEventListener('change', onchange);
+	});
+
 	// A navigation closes the phone drawer.
 	$effect(() => {
 		page.url.pathname;
@@ -75,17 +83,17 @@
 	const path = $derived(page.url.pathname);
 </script>
 
-{#snippet menu(collapsed: boolean, onpick?: () => void)}
+{#snippet menu(collapsed: boolean, id: string, onpick?: () => void)}
 	<nav aria-label="Hoofdmenu">
 		{#each NAV as g, gi (gi)}
 			{#if g.title}
 				{#if collapsed}
 					<div class="nav-rule" role="presentation"></div>
 				{:else}
-					<p class="nav-group" id="nav-g-{gi}">{g.title}</p>
+					<p class="nav-group" id="nav-{id}-g-{gi}">{g.title}</p>
 				{/if}
 			{/if}
-			<ul aria-labelledby={g.title && !collapsed ? `nav-g-${gi}` : undefined}>
+			<ul aria-labelledby={g.title && !collapsed ? `nav-${id}-g-${gi}` : undefined}>
 				{#each g.items as item (item.href)}
 					{@const active = isActive(path, item.href)}
 					<li>
@@ -132,7 +140,7 @@
 
 	<aside class="rail">
 		<div class="rail-inner">
-			{@render menu(iconsOnly)}
+			{@render menu(iconsOnly, 'rail')}
 			<button
 				type="button"
 				class="nav-foot"
@@ -164,7 +172,7 @@
 				<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" /></svg>
 			</button>
 		</div>
-		{@render menu(false, closeDrawer)}
+		{@render menu(false, 'drawer', closeDrawer)}
 	</div>
 </dialog>
 
