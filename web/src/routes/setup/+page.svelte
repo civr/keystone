@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, ApiError } from '$lib/api';
+	import { passkeysNeedHttps } from '$lib/publicUrl';
 	import { codesFile, download, formatCode } from '$lib/codes';
 	import { pop, step as slide } from '$lib/motion';
 	import { ceremony, passkeyError, supported } from '$lib/webauthn';
@@ -347,6 +348,13 @@
 									/>
 									<small>Passkeys worden aan dit adres gekoppeld. Gebruik https.</small>
 								</label>
+								{#if passkeysNeedHttps(publicURL)}
+									<p class="notice warn" role="status">
+										Dit adres gebruikt geen https. Browsers bieden passkeys alleen aan via https (of localhost),
+										dus inloggen met een passkey werkt hier niet. Zet Keystone achter een reverse proxy met
+										TLS en vul dat https-adres in.
+									</p>
+								{/if}
 								{@render errorBox()}
 								<button class="btn primary block" disabled={busy || !domain.trim() || !publicURL.trim()}>
 									{@render busyLabel('Volgende')}
