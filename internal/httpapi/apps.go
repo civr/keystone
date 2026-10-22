@@ -15,7 +15,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/audit"
+	"github.com/civr/keystone/internal/crypto"
 )
 
 const (
@@ -34,10 +36,12 @@ var (
 
 // appInput is the editable part of an app tile.
 type appInput struct {
-	Name  string `json:"name"`
-	URL   string `json:"url"`
-	Color string `json:"color"`
-	Icon  string `json:"icon"`
+	Name     string      `json:"name"`
+	URL      string      `json:"url"`
+	Color    string      `json:"color"`
+	Icon     string      `json:"icon"`
+	Protocol string      `json:"protocol"`
+	Config   apps.Config `json:"config"`
 }
 
 // validate trims and checks the input; it returns the offending field and a
@@ -51,6 +55,12 @@ func (a *appInput) validate() (field, msg string) {
 	if err != nil || len(a.URL) > maxAppURLLen || u.Host == "" ||
 		(!strings.EqualFold(u.Scheme, "http") && !strings.EqualFold(u.Scheme, "https")) {
 		return "url", "De URL moet absoluut zijn en met http:// of https:// beginnen."
+	}
+	if a.Protocol == "" {
+		a.Protocol = apps.Link
+	}
+	if f, m := a.Config.Validate(a.Protocol); f != "" {
+		return f, m
 	}
 	if !colorRe.MatchString(a.Color) {
 		return "color", "De kleur moet de vorm #RRGGBB hebben."
@@ -94,21 +104,125 @@ func unsafeSVG(svg string) bool {
 }
 
 type appOut struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	URL       string    `json:"url"`
-	Color     string    `json:"color"`
-	Icon      string    `json:"icon"`
-	Protocol  string    `json:"protocol"`
-	Sort      int       `json:"sort"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	URL       string      `json:"url"`
+	Color     string      `json:"color"`
+	Icon      string      `json:"icon"`
+	Protocol  string      `json:"protocol"`
+	Config    apps.Config `json:"config"`
+	HasSecret bool        `json:"has_secret"`
+	Sort      int         `json:"sort"`
+	CreatedAt time.Time   `json:"created_at"`
 }
 
-const appCols = `id::text, name, url, color, coalesce(icon, ''), protocol, sort, created_at`
+const appCols = `id::text, name, url, color, coalesce(icon, ''), protocol, config, sort, created_at`
 
+// scanApp reads a row and strips secret hashes from the config.
 func scanApp(r pgx.CollectableRow) (appOut, error) {
 	var a appOut
-	return a, r.Scan(&a.ID, &a.Name, &a.URL, &a.Color, &a.Icon, &a.Protocol, &a.Sort, &a.CreatedAt)
+	if err := r.Scan(&a.ID, &a.Name, &a.URL, &a.Color, &a.Icon, &a.Protocol, &a.Config, &a.Sort, &a.CreatedAt); err != nil {
+		return a, err
+	}
+	if o := a.Config.OIDC; o != nil {
+		a.HasSecret, o.SecretHash = o.SecretHash != "", ""
+	}
+	if l := a.Config.LDAP; l != nil {
+		a.HasSecret, l.BindSecretHash = l.BindSecretHash != "", ""
+	}
+	return a, nil
+}
+
+// prepareConfig carries server-owned values (client ID, secret hashes) over
+// from the stored app (prev, zero for a new app), generates a client ID for
+// a new OIDC app, and checks that identifiers are unique across apps.
+func (s *server) prepareConfig(ctx context.Context, w http.ResponseWriter, id string, in *appInput) bool {
+	all, err := apps.Load(ctx, s.d.Pool)
+	if err != nil {
+		errInternal(w, "load apps", err)
+		return false
+	}
+	var prev apps.Config
+	for _, a := range all {
+		if a.ID == id {
+			prev = a.Config
+		}
+	}
+	c := &in.Config
+	if c.OIDC != nil {
+		c.OIDC.ClientID, c.OIDC.SecretHash = uuid.NewString(), ""
+		if prev.OIDC != nil {
+			c.OIDC.ClientID, c.OIDC.SecretHash = prev.OIDC.ClientID, prev.OIDC.SecretHash
+		}
+	}
+	if c.LDAP != nil {
+		c.LDAP.BindSecretHash = ""
+		if prev.LDAP != nil {
+			c.LDAP.BindSecretHash = prev.LDAP.BindSecretHash
+		}
+	}
+	for _, a := range all {
+		if a.ID == id {
+			continue
+		}
+		o := a.Config
+		switch {
+		case c.SAML != nil && o.SAML != nil && o.SAML.EntityID == c.SAML.EntityID:
+			writeInvalid(w, "config.saml.entity_id", "Een andere app gebruikt deze entity ID al.")
+		case c.LDAP != nil && o.LDAP != nil && o.LDAP.Slug == c.LDAP.Slug:
+			writeInvalid(w, "config.ldap.slug", "Een andere app gebruikt deze naam al.")
+		case c.Gate != nil && o.Gate != nil && o.Gate.Host == c.Gate.Host:
+			writeInvalid(w, "config.gate.host", "Een andere app gebruikt deze hostnaam al.")
+		default:
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// appSecret generates a new OIDC client secret or LDAP bind password for an
+// app and returns it once; only its hash is stored.
+func (s *server) appSecret(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, ok := appID(w, r)
+	if !ok {
+		return
+	}
+	a, err := apps.ByID(ctx, s.d.Pool, id)
+	if errors.Is(err, apps.ErrNotFound) {
+		errNotFound(w, r)
+		return
+	}
+	if err != nil {
+		errInternal(w, "load app", err)
+		return
+	}
+	if a.Config.OIDC == nil && a.Config.LDAP == nil {
+		writeInvalid(w, "protocol", "Alleen OIDC- en LDAP-apps hebben een geheim.")
+		return
+	}
+	secret, err := randomToken()
+	if err != nil {
+		errInternal(w, "app secret", err)
+		return
+	}
+	hash, err := crypto.HashSecret(secret)
+	if err != nil {
+		errInternal(w, "app secret", err)
+		return
+	}
+	if a.Config.OIDC != nil {
+		a.Config.OIDC.SecretHash = hash
+	} else {
+		a.Config.LDAP.BindSecretHash = hash
+	}
+	if _, err := s.d.Pool.Exec(ctx, `update apps set config = $2 where id = $1`, id, a.Config); err != nil {
+		errInternal(w, "app secret", err)
+		return
+	}
+	s.d.Audit.Log(ctx, audit.ActorOwner, "app.secret_created", clientIP(ctx), map[string]any{"id": id, "name": a.Name})
+	writeJSON(w, http.StatusOK, map[string]string{"secret": secret})
 }
 
 func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
@@ -140,12 +254,12 @@ func (s *server) readApp(w http.ResponseWriter, r *http.Request) (appInput, bool
 func (s *server) createApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, ok := s.readApp(w, r)
-	if !ok {
+	if !ok || !s.prepareConfig(ctx, w, "", &in) {
 		return
 	}
-	rows, err := s.d.Pool.Query(ctx, `insert into apps (id, name, url, color, icon, sort, created_at)
-		values ($1, $2, $3, $4, nullif($5, ''), (select coalesce(max(sort) + 1, 0) from apps), now())
-		returning `+appCols, uuid.NewString(), in.Name, in.URL, in.Color, in.Icon)
+	rows, err := s.d.Pool.Query(ctx, `insert into apps (id, name, url, color, icon, protocol, config, sort, created_at)
+		values ($1, $2, $3, $4, nullif($5, ''), $6, $7, (select coalesce(max(sort) + 1, 0) from apps), now())
+		returning `+appCols, uuid.NewString(), in.Name, in.URL, in.Color, in.Icon, in.Protocol, in.Config)
 	if err != nil {
 		errInternal(w, "create app", err)
 		return
@@ -175,11 +289,11 @@ func (s *server) updateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in, ok := s.readApp(w, r)
-	if !ok {
+	if !ok || !s.prepareConfig(ctx, w, id, &in) {
 		return
 	}
-	rows, err := s.d.Pool.Query(ctx, `update apps set name = $2, url = $3, color = $4, icon = nullif($5, '')
-		where id = $1 returning `+appCols, id, in.Name, in.URL, in.Color, in.Icon)
+	rows, err := s.d.Pool.Query(ctx, `update apps set name = $2, url = $3, color = $4, icon = nullif($5, ''), protocol = $6, config = $7
+		where id = $1 returning `+appCols, id, in.Name, in.URL, in.Color, in.Icon, in.Protocol, in.Config)
 	if err != nil {
 		errInternal(w, "update app", err)
 		return

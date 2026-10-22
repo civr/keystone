@@ -5,6 +5,7 @@
 		"app.created",
 		"app.deleted",
 		"app.reordered",
+		"app.secret_created",
 		"app.updated",
 		"audit.exported",
 		"emergency.changed",
