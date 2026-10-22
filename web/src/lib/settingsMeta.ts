@@ -37,6 +37,10 @@ export interface Settings {
 		csp_extra: string;
 	};
 	audit: { retention_days: number; syslog_enabled: boolean; syslog_addr: string; syslog_proto: string };
+	tokens: { access_minutes: number; id_minutes: number; refresh_days: number };
+	ldap: { require_tls: boolean; allowed_cidrs: string[]; bind_per_ip_per_minute: number };
+	gate: { fail_per_ip_per_minute: number };
+	vault: { reconfirm_minutes: number; clipboard_clear_seconds: number; allow_reveal: boolean };
 }
 
 export type Kind = 'bool' | 'int' | 'enum' | 'cidrs' | 'text';
@@ -290,6 +294,91 @@ export const settingsMeta: Record<string, FieldMeta> = {
 			{ value: 'tls', label: 'TLS' }
 		],
 		weakens: (o: string, n: string) => o === 'tls' && n !== 'tls'
+	},
+	'tokens.access_minutes': {
+		label: 'Levensduur access-token',
+		help: 'Hoe lang een OIDC-access-token van een app geldig blijft.',
+		kind: 'int',
+		min: 1,
+		max: 1440,
+		unit: 'minuten',
+		weakens: raised
+	},
+	'tokens.id_minutes': {
+		label: 'Levensduur ID-token',
+		help: 'Hoe lang een OIDC-ID-token geldig is.',
+		kind: 'int',
+		min: 1,
+		max: 1440,
+		unit: 'minuten',
+		weakens: raised
+	},
+	'tokens.refresh_days': {
+		label: 'Levensduur refresh-token',
+		help: 'Hoe lang een app je sessie stil mag verlengen. Vervalt altijd met je Keystone-sessie. 0 = geen refresh-tokens.',
+		kind: 'int',
+		min: 0,
+		max: 365,
+		unit: 'dagen',
+		weakens: raised
+	},
+
+	'ldap.require_tls': {
+		label: 'Alleen LDAPS voor apps',
+		help: 'Apps moeten keystone-ldap via LDAPS (poort 636) gebruiken. Uit opent ook onversleuteld LDAP op poort 389.',
+		kind: 'bool',
+		weakens: turnedOff
+	},
+	'ldap.allowed_cidrs': {
+		label: 'Toegestane LDAP-clients',
+		help: 'Alleen deze adressen mogen met keystone-ldap praten. Leeg = iedereen.',
+		kind: 'cidrs',
+		placeholder: '192.168.1.20/32',
+		weakens: allowlistWidened
+	},
+	'ldap.bind_per_ip_per_minute': {
+		label: 'LDAP-binds per IP',
+		help: 'Maximaal aantal inlogpogingen via LDAP per adres per minuut.',
+		kind: 'int',
+		min: 1,
+		max: 1000,
+		unit: 'per minuut',
+		weakens: raised
+	},
+
+	'gate.fail_per_ip_per_minute': {
+		label: 'Geweigerde poortwachter-checks per IP',
+		help: 'Na zoveel geweigerde verzoeken per minuut blokkeert de poortwachter een adres tijdelijk.',
+		kind: 'int',
+		min: 1,
+		max: 10000,
+		unit: 'per minuut',
+		weakens: raised
+	},
+
+	'vault.reconfirm_minutes': {
+		label: 'Herbevestigen na',
+		help: 'Een wachtwoord uit de kluis kopiëren vraagt eerst je passkey als je langer dan dit geleden bevestigde.',
+		kind: 'int',
+		min: 1,
+		max: 1440,
+		unit: 'minuten',
+		weakens: raised
+	},
+	'vault.clipboard_clear_seconds': {
+		label: 'Klembord wissen na',
+		help: 'Een gekopieerd wachtwoord wordt daarna van het klembord gehaald.',
+		kind: 'int',
+		min: 5,
+		max: 600,
+		unit: 'seconden',
+		weakens: raised
+	},
+	'vault.allow_reveal': {
+		label: 'Wachtwoorden tonen',
+		help: 'Laat een wachtwoord uit de kluis ook zichtbaar maken, niet alleen kopiëren.',
+		kind: 'bool',
+		weakens: turnedOn
 	}
 };
 
@@ -357,6 +446,26 @@ export const securityGroups: SettingsGroup[] = [
 		id: 'audit',
 		title: 'Audit',
 		paths: ['audit.retention_days', 'audit.syslog_enabled', 'audit.syslog_addr', 'audit.syslog_proto']
+	},
+	{
+		id: 'tokens',
+		title: 'Tokens (OIDC)',
+		paths: ['tokens.access_minutes', 'tokens.id_minutes', 'tokens.refresh_days']
+	},
+	{
+		id: 'ldap',
+		title: 'LDAP voor apps',
+		paths: ['ldap.require_tls', 'ldap.allowed_cidrs', 'ldap.bind_per_ip_per_minute']
+	},
+	{
+		id: 'poortwachter',
+		title: 'Poortwachter',
+		paths: ['gate.fail_per_ip_per_minute']
+	},
+	{
+		id: 'kluis',
+		title: 'Kluis',
+		paths: ['vault.reconfirm_minutes', 'vault.clipboard_clear_seconds', 'vault.allow_reveal']
 	}
 ];
 

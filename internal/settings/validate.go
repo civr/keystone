@@ -78,6 +78,13 @@ func (s Settings) Validate(requesterIP netip.Addr) error {
 		inRange("brute_force.lockout_threshold", s.BruteForce.LockoutThreshold, 1, 1000),
 		inRange("brute_force.lockout_minutes", s.BruteForce.LockoutMinutes, 1, 1000),
 		oneOf("audit.syslog_proto", s.Audit.SyslogProto, "udp", "tcp", "tls"),
+		inRange("tokens.access_minutes", s.Tokens.AccessMinutes, 1, 1440),
+		inRange("tokens.id_minutes", s.Tokens.IDMinutes, 1, 1440),
+		inRange("tokens.refresh_days", s.Tokens.RefreshDays, 0, 365),
+		inRange("ldap.bind_per_ip_per_minute", s.LDAP.BindPerIPPerMinute, 1, 1000),
+		inRange("gate.fail_per_ip_per_minute", s.Gate.FailPerIPPerMinute, 1, 10000),
+		inRange("vault.reconfirm_minutes", s.Vault.ReconfirmMinutes, 1, 1440),
+		inRange("vault.clipboard_clear_seconds", s.Vault.ClipboardClearSeconds, 5, 600),
 	}
 	for _, err := range checks {
 		if err != nil {
@@ -90,6 +97,9 @@ func (s Settings) Validate(requesterIP netip.Addr) error {
 	}
 	admin, err := parseCIDRs("network.admin_cidrs", s.Network.AdminCIDRs)
 	if err != nil {
+		return err
+	}
+	if _, err := parseCIDRs("ldap.allowed_cidrs", s.LDAP.AllowedCIDRs); err != nil {
 		return err
 	}
 	if _, err := parseCIDRs("network.trusted_proxies", s.Network.TrustedProxies); err != nil {

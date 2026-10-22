@@ -38,5 +38,23 @@
     "syslog_enabled": false,
     "syslog_addr": "",
     "syslog_proto": "udp"
+  },
+  "tokens": {
+    "access_minutes": 10,
+    "id_minutes": 10,
+    "refresh_days": 30
+  },
+  "ldap": {
+    "require_tls": true,
+    "allowed_cidrs": [],
+    "bind_per_ip_per_minute": 10
+  },
+  "gate": {
+    "fail_per_ip_per_minute": 60
+  },
+  "vault": {
+    "reconfirm_minutes": 15,
+    "clipboard_clear_seconds": 30,
+    "allow_reveal": true
   }
 }

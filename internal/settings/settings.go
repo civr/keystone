@@ -11,6 +11,10 @@ type Settings struct {
 	Network    NetworkSettings    `json:"network"`
 	Headers    HeaderSettings     `json:"headers"`
 	Audit      AuditSettings      `json:"audit"`
+	Tokens     TokenSettings      `json:"tokens"`
+	LDAP       LDAPSettings       `json:"ldap"`
+	Gate       GateSettings       `json:"gate"`
+	Vault      VaultSettings      `json:"vault"`
 }
 
 type SessionSettings struct {
@@ -57,6 +61,32 @@ type AuditSettings struct {
 	SyslogProto   string `json:"syslog_proto"`
 }
 
+// TokenSettings are OIDC token lifetimes.
+type TokenSettings struct {
+	AccessMinutes int `json:"access_minutes"`
+	IDMinutes     int `json:"id_minutes"`
+	RefreshDays   int `json:"refresh_days"` // 0 = no refresh tokens
+}
+
+// LDAPSettings govern keystone-ldap.
+type LDAPSettings struct {
+	RequireTLS         bool     `json:"require_tls"`
+	AllowedCIDRs       []string `json:"allowed_cidrs"`
+	BindPerIPPerMinute int      `json:"bind_per_ip_per_minute"`
+}
+
+// GateSettings govern keystone-gate.
+type GateSettings struct {
+	FailPerIPPerMinute int `json:"fail_per_ip_per_minute"`
+}
+
+// VaultSettings govern the credential vault.
+type VaultSettings struct {
+	ReconfirmMinutes      int  `json:"reconfirm_minutes"`
+	ClipboardClearSeconds int  `json:"clipboard_clear_seconds"`
+	AllowReveal           bool `json:"allow_reveal"`
+}
+
 // Defaults returns the factory settings.
 func Defaults() Settings {
 	return Settings{
@@ -66,6 +96,10 @@ func Defaults() Settings {
 		Network:    NetworkSettings{LoginCIDRs: []string{}, AdminCIDRs: []string{}, TrustedProxies: []string{}},
 		Headers:    HeaderSettings{HSTS: true, HSTSIncludeSubdomains: true, HSTSPreload: false, FrameDeny: true, HSTSMaxAge: 31536000},
 		Audit:      AuditSettings{RetentionDays: 365, SyslogEnabled: false, SyslogAddr: "", SyslogProto: "udp"},
+		Tokens:     TokenSettings{AccessMinutes: 10, IDMinutes: 10, RefreshDays: 30},
+		LDAP:       LDAPSettings{RequireTLS: true, AllowedCIDRs: []string{}, BindPerIPPerMinute: 10},
+		Gate:       GateSettings{FailPerIPPerMinute: 60},
+		Vault:      VaultSettings{ReconfirmMinutes: 15, ClipboardClearSeconds: 30, AllowReveal: true},
 	}
 }
 
@@ -79,5 +113,8 @@ func (s *Settings) normalize() {
 	}
 	if s.Network.TrustedProxies == nil {
 		s.Network.TrustedProxies = []string{}
+	}
+	if s.LDAP.AllowedCIDRs == nil {
+		s.LDAP.AllowedCIDRs = []string{}
 	}
 }

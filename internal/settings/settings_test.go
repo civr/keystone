@@ -103,3 +103,31 @@ func TestBounds(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDefaultsNewSections(t *testing.T) {
+	d := Defaults()
+	if d.Tokens != (TokenSettings{AccessMinutes: 10, IDMinutes: 10, RefreshDays: 30}) {
+		t.Fatalf("tokens = %+v", d.Tokens)
+	}
+	if !d.LDAP.RequireTLS || d.LDAP.BindPerIPPerMinute != 10 || d.LDAP.AllowedCIDRs == nil {
+		t.Fatalf("ldap = %+v", d.LDAP)
+	}
+	if d.Gate.FailPerIPPerMinute != 60 {
+		t.Fatalf("gate = %+v", d.Gate)
+	}
+	if d.Vault != (VaultSettings{ReconfirmMinutes: 15, ClipboardClearSeconds: 30, AllowReveal: true}) {
+		t.Fatalf("vault = %+v", d.Vault)
+	}
+}
+
+func TestValidateNewRanges(t *testing.T) {
+	s := Defaults()
+	s.Vault.ClipboardClearSeconds = 4
+	assertField(t, s.Validate(requester), "vault.clipboard_clear_seconds", "")
+	s = Defaults()
+	s.Tokens.RefreshDays = -1
+	assertField(t, s.Validate(requester), "tokens.refresh_days", "")
+	s = Defaults()
+	s.LDAP.AllowedCIDRs = []string{"nope"}
+	assertField(t, s.Validate(requester), "ldap.allowed_cidrs", "")
+}

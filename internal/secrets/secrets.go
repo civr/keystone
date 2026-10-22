@@ -16,7 +16,7 @@ import (
 )
 
 // Files lists the secret file names Ensure manages.
-var Files = []string{"db_password", "valkey_password", "session_key", "data_key"}
+var Files = []string{"db_password", "valkey_password", "session_key", "data_key", "vault_key"}
 
 // Secrets holds the loaded deployment secrets.
 type Secrets struct {
@@ -24,6 +24,7 @@ type Secrets struct {
 	ValkeyPassword string
 	SessionKey     []byte // 32 bytes
 	DataKey        []byte // 32 bytes
+	VaultKey       []byte // 32 bytes; seals vault passwords only
 }
 
 func isPassword(name string) bool { return name == "db_password" || name == "valkey_password" }
@@ -116,6 +117,9 @@ func Load(dir string) (Secrets, error) {
 		return s, err
 	}
 	if s.DataKey, err = readSecret(dir, "data_key"); err != nil {
+		return s, err
+	}
+	if s.VaultKey, err = readSecret(dir, "vault_key"); err != nil {
 		return s, err
 	}
 	return s, nil

@@ -25,6 +25,9 @@ func TestEnsureCreatesAllFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(s.VaultKey) != 32 {
+		t.Errorf("vault key length = %d; want 32", len(s.VaultKey))
+	}
 	if len(s.SessionKey) != 32 || len(s.DataKey) != 32 {
 		t.Errorf("key lengths = %d, %d; want 32", len(s.SessionKey), len(s.DataKey))
 	}

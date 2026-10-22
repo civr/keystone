@@ -63,7 +63,11 @@ describe('settingsMeta coverage', () => {
 			'Brute-force',
 			'Netwerk',
 			'HTTP-headers',
-			'Audit'
+			'Audit',
+			'Tokens (OIDC)',
+			'LDAP voor apps',
+			'Poortwachter',
+			'Kluis'
 		]);
 	});
 });
