@@ -90,7 +90,15 @@ class KeystoneAuthProvider(AuthProvider):
             peer = request.transport.get_extra_info("peername")
             if peer and trusted(peer[0], self.trusted_proxies):
                 username = user_from(request.headers, self.header)
-        return KeystoneLoginFlow(self, username)
+        if username and await self._ha_user(username) is not None:
+            return KeystoneLoginFlow(self, username)
+        # Not a Keystone visit: hand over to the next provider's own flow (the
+        # normal login form). Home Assistant finishes a flow with the provider
+        # the flow belongs to, so that provider issues the credentials.
+        for other in self.hass.auth.auth_providers:
+            if other is not self:
+                return await other.async_login_flow(context)
+        return KeystoneLoginFlow(self, None)
 
     async def async_get_or_create_credentials(self, flow_result: dict[str, str]) -> Credentials:
         username = flow_result["username"]
@@ -121,14 +129,14 @@ class KeystoneAuthProvider(AuthProvider):
 
 
 class KeystoneLoginFlow(LoginFlow):
-    """Finishes at once for a Keystone user; otherwise hands over to the next provider."""
+    """Finishes at once for the Keystone user."""
 
     def __init__(self, provider: KeystoneAuthProvider, username: str | None) -> None:
         super().__init__(provider)
         self._username = username
 
     async def async_step_init(self, user_input: dict[str, str] | None = None) -> FlowResult:
-        if self._username and await self._auth_provider._ha_user(self._username) is not None:  # noqa: SLF001
+        if self._username:
             return await self.async_finish({"username": self._username})
         return self.async_abort(reason="not_keystone")
 
