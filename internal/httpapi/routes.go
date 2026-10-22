@@ -29,6 +29,9 @@ func (s *server) adminRoutes(r chi.Router) {
 	g.Get("/emergency", s.getEmergency)
 	w.Put("/emergency", s.putEmergency)
 
+	g.Get("/keys", s.listKeys)
+	w.Post("/keys/{use}/rotate", s.rotateKey)
+
 	g.Get("/audit", s.listAudit)
 	g.Get("/audit/export", s.exportAudit)
 }

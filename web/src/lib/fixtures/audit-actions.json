@@ -11,6 +11,7 @@
 		"audit.exported",
 		"emergency.changed",
 		"emergency.used",
+		"keys.rotated",
 		"login.failure",
 		"login.locked",
 		"login.not_allowed",

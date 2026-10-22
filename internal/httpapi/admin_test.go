@@ -558,3 +558,35 @@ func TestMeReportsClientIP(t *testing.T) {
 		t.Fatalf("me behind trusted proxy = %d %s", w.Code, w.Body.String())
 	}
 }
+
+func TestRotateKeyEndpoint(t *testing.T) {
+	t.Parallel()
+	l, c := adminClient(t, "192.168.1.20")
+	var before struct {
+		Keys []struct {
+			Use     string `json:"use"`
+			ID      string `json:"id"`
+			Active  bool   `json:"active"`
+			CertPEM string `json:"cert_pem"`
+		} `json:"keys"`
+	}
+	body(t, c.must("GET", "/api/admin/keys", nil, 200).Body, &before)
+	if len(before.Keys) != 3 || !strings.HasPrefix(before.Keys[0].CertPEM, "-----BEGIN CERTIFICATE") {
+		t.Fatalf("keys = %+v", before.Keys)
+	}
+	c.must("POST", "/api/admin/keys/oidc/rotate", nil, 200)
+	c.must("POST", "/api/admin/keys/nope/rotate", nil, 404)
+	var after struct {
+		Keys []struct {
+			Use    string `json:"use"`
+			Active bool   `json:"active"`
+		} `json:"keys"`
+	}
+	body(t, c.must("GET", "/api/admin/keys", nil, 200).Body, &after)
+	if len(after.Keys) != 4 {
+		t.Fatalf("after rotate = %+v", after.Keys)
+	}
+	if l.audits(t, "keys.rotated") != 1 {
+		t.Fatal("no audit")
+	}
+}
