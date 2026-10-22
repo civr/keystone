@@ -17,6 +17,7 @@ import (
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
+	"github.com/civr/keystone/internal/gatetoken"
 	"github.com/civr/keystone/internal/passkey"
 	"github.com/civr/keystone/internal/session"
 	"github.com/civr/keystone/internal/settings"
@@ -800,6 +801,9 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		slog.Error("auth: revoke session", "err", err)
 		errUnavailable(w)
 		return
+	}
+	if err := gatetoken.RevokeSession(ctx, s.d.Valkey, SessionFrom(ctx).ID); err != nil {
+		slog.Warn("auth: revoke gate tokens", "err", err) // they die with the session anyway
 	}
 	setCookie(w, cfg, SessionCookie, "", 0)
 	s.d.Audit.Log(ctx, audit.ActorOwner, "logout", clientIP(ctx), nil)
