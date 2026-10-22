@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api, ApiError } from '$lib/api';
 	import { auditLabel, auditSummary } from '$lib/format';
+	import { toast } from '$lib/toast.svelte';
 
 	interface Entry {
 		id: number;
@@ -62,17 +63,38 @@
 		return out;
 	});
 
+	// Fetched through api (not a plain link) so an expired session goes to
+	// /login and errors show as a toast instead of a broken download.
+	let exporting = $state(false);
+	async function exportLog() {
+		if (exporting) return;
+		exporting = true;
+		try {
+			const blob = await api.blob('/admin/audit/export');
+			const url = URL.createObjectURL(blob);
+			const a = Object.assign(document.createElement('a'), { href: url, download: 'keystone-audit.ndjson' });
+			document.body.append(a);
+			a.click();
+			a.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 1000);
+		} catch (e) {
+			toast(e instanceof ApiError ? e.message : 'De export is mislukt.', 'error');
+		} finally {
+			exporting = false;
+		}
+	}
+
 	const ACTORS: Record<string, string> = { owner: 'jij', anonymous: 'onbekend', cli: 'opdrachtregel', system: 'systeem' };
 	const tone = (a: string) =>
-		/failure|locked|not_allowed|denied/.test(a) ? 'bad' : /emergency|recovery|network_reset/.test(a) ? 'warn' : '';
+		/failure|failed|locked|not_allowed|denied/.test(a) ? 'bad' : /emergency|recovery|network_reset/.test(a) ? 'warn' : '';
 </script>
 
 <div class="pane-head">
 	<h2 class="pane-title">Activiteit</h2>
-	<a class="btn small" href="/api/admin/audit/export" download="keystone-audit.ndjson">
+	<button type="button" class="btn small" onclick={exportLog} disabled={exporting} aria-busy={exporting}>
 		<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9M6 9l4 4 4-4M4 16.5h12" /></svg>
 		Exporteren
-	</a>
+	</button>
 </div>
 <p class="pane-intro">Alles wat er met je account en Keystone gebeurt, nieuwste eerst.</p>
 
