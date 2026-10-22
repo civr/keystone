@@ -76,6 +76,8 @@ func (s *server) router() chi.Router {
 		api.Route("/apps", s.appRoutes)
 	})
 	r.Route("/saml", s.samlRoutes)
+	r.Route("/oidc", s.oidcRoutes)
+	r.With(s.requireSetupDone).Get("/.well-known/openid-configuration", s.oidcDiscovery)
 	r.NotFound(s.serveShell)
 	r.MethodNotAllowed(errMethodNotAllowed)
 	return r

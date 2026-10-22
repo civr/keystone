@@ -149,6 +149,13 @@ func (s *Store) GetSliding(ctx context.Context, id string, cfg settings.Settings
 	return sess, prev, nil
 }
 
+// Peek is Get without sliding: it checks that the session is still valid but
+// does not count as activity. Downstream protocols (OIDC refresh, gate) use it
+// so an app cannot keep the Keystone session alive on its own.
+func (s *Store) Peek(ctx context.Context, id string, cfg settings.Settings, now time.Time) (Session, error) {
+	return s.get(ctx, id, cfg, now)
+}
+
 // get loads id and checks expiry under cfg, revoking an expired session.
 func (s *Store) get(ctx context.Context, id string, cfg settings.Settings, now time.Time) (Session, error) {
 	h, err := s.rdb.HGetAll(ctx, key(id)).Result()
