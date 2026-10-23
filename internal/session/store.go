@@ -268,3 +268,18 @@ func (s *Store) RevokeAll(ctx context.Context) error {
 	del = append(del, sessIndex)
 	return s.rdb.Del(ctx, del...).Err()
 }
+
+// AMR lists the authentication methods behind the session (RFC 8176): "pwd"
+// when the password was checked for this session, "hwk" when a passkey was
+// used. A trusted-device login is passkey only: its full login is older than
+// the session.
+func (s Session) AMR() []string {
+	var out []string
+	if !s.LastFullAuthAt.IsZero() && !s.LastFullAuthAt.Before(s.CreatedAt.Add(-time.Minute)) {
+		out = append(out, "pwd")
+	}
+	if !s.LastPasskeyAt.IsZero() {
+		out = append(out, "hwk")
+	}
+	return out
+}

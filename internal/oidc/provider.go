@@ -266,7 +266,7 @@ func (p *Provider) issue(ctx context.Context, cfg settings.Settings, issuer stri
 	if withID {
 		claims := map[string]any{
 			"auth_time": sess.LastFullAuthAt.Unix(),
-			"amr":       []string{"pwd", "hwk"},
+			"amr":       sess.AMR(),
 		}
 		if g.Nonce != "" {
 			claims["nonce"] = g.Nonce

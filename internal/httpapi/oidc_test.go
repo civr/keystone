@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
@@ -173,6 +175,36 @@ func TestOIDC(t *testing.T) {
 		f.l.h.ServeHTTP(uw, r)
 		if uw.Code != 200 || !strings.Contains(uw.Body.String(), `"preferred_username":"civr"`) {
 			t.Fatalf("userinfo = %d %s", uw.Code, uw.Body.String())
+		}
+	})
+
+	t.Run("AMRFollowsSession", func(t *testing.T) {
+		sess := f.l.session(t, c)
+		saved := sess.LastPasskeyAt
+		sess.LastPasskeyAt = time.Time{} // signed in with the password only
+		if err := f.l.deps.Sessions.Update(context.Background(), sess); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			sess.LastPasskeyAt = saved
+			_ = f.l.deps.Sessions.Update(context.Background(), sess)
+		}()
+		var tr struct {
+			IDToken string `json:"id_token"`
+		}
+		body(t, f.exchange(f.code(t), verifier).Body, &tr)
+		tok, err := jwt.ParseSigned(tr.IDToken, []jose.SignatureAlgorithm{jose.RS256})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var ext struct {
+			AMR []string `json:"amr"`
+		}
+		if err := tok.UnsafeClaimsWithoutVerification(&ext); err != nil {
+			t.Fatal(err)
+		}
+		if slices.Contains(ext.AMR, "hwk") {
+			t.Fatalf("amr = %v for a session without a passkey", ext.AMR)
 		}
 	})
 

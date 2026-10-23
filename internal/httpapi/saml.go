@@ -14,6 +14,7 @@ import (
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/samlidp"
+	"github.com/civr/keystone/internal/session"
 )
 
 // A SAML request that arrives before sign-in waits here while the browser
@@ -107,7 +108,7 @@ func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "saml owner", err)
 		return
 	}
-	f, a, err := s.samlProvider().Respond(ctx, settingsFrom(ctx).PublicURL, r, req, owner, sess.ID, sess.LastFullAuthAt)
+	f, a, err := s.samlProvider().Respond(ctx, settingsFrom(ctx).PublicURL, r, req, owner, samlLogin(sess))
 	switch {
 	case errors.Is(err, samlidp.ErrUnknownSP):
 		samlFail(w, http.StatusBadRequest, "Deze app is niet als SAML-app in Keystone ingesteld.")
@@ -138,13 +139,17 @@ func (s *server) samlIdPInitiated(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sess := SessionFrom(ctx)
-	f, err := s.samlProvider().RespondIdPInitiated(ctx, settingsFrom(ctx).PublicURL, r, a, owner, sess.ID, sess.LastFullAuthAt)
+	f, err := s.samlProvider().RespondIdPInitiated(ctx, settingsFrom(ctx).PublicURL, r, a, owner, samlLogin(sess))
 	if err != nil {
 		errInternal(w, "saml idp-initiated", err)
 		return
 	}
 	s.appAccess(ctx, a, "saml")
 	_ = samlidp.WriteForm(w, f)
+}
+
+func samlLogin(sess *session.Session) samlidp.Login {
+	return samlidp.Login{SessionID: sess.ID, AuthAt: sess.LastFullAuthAt, AMR: sess.AMR()}
 }
 
 // appAccess audits a sign-in into an app.

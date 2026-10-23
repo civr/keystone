@@ -174,7 +174,15 @@ func (p *Provider) Metadata(ctx context.Context, publicURL string) ([]byte, erro
 // ErrUnknownSP means no saml app has the request's issuer as entity ID.
 var ErrUnknownSP = errors.New("samlidp: unknown service provider")
 
-func session(acct apps.Account, sessionID string, authAt time.Time) *saml.Session {
+// Login describes the Keystone sign-in behind a response.
+type Login struct {
+	SessionID string
+	AuthAt    time.Time
+	AMR       []string // RFC 8176 methods, e.g. pwd, hwk
+}
+
+func session(acct apps.Account, l Login) *saml.Session {
+	sessionID, authAt := l.SessionID, l.AuthAt
 	return &saml.Session{
 		ID:             sessionID,
 		CreateTime:     authAt,
@@ -188,8 +196,17 @@ func session(acct apps.Account, sessionID string, authAt time.Time) *saml.Sessio
 			basicAttr("username", acct.Username),
 			basicAttr("email", acct.Email),
 			basicAttr("displayName", acct.DisplayName),
+			multiAttr("amr", l.AMR),
 		},
 	}
+}
+
+func multiAttr(name string, vals []string) saml.Attribute {
+	a := saml.Attribute{Name: name, NameFormat: "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"}
+	for _, v := range vals {
+		a.Values = append(a.Values, saml.AttributeValue{Type: "xs:string", Value: v})
+	}
+	return a
 }
 
 func basicAttr(name, v string) saml.Attribute {
@@ -223,7 +240,7 @@ func (p *Provider) Check(ctx context.Context, publicURL string, r *http.Request,
 // Respond validates an SP-initiated request and returns the signed response
 // for the matching app, plus that app.
 func (p *Provider) Respond(ctx context.Context, publicURL string, r *http.Request, req Request,
-	owner apps.Owner, sessionID string, authAt time.Time) (Form, apps.App, error) {
+	owner apps.Owner, login Login) (Form, apps.App, error) {
 	list, err := apps.Load(ctx, p.Apps)
 	if err != nil {
 		return Form{}, apps.App{}, err
@@ -241,12 +258,12 @@ func (p *Provider) Respond(ctx context.Context, publicURL string, r *http.Reques
 	}
 	a, _ := spProvider{list}.find(ar.Request.Issuer.Value)
 	ar.Now = time.Now()
-	return p.finish(ar, a, owner, sessionID, authAt)
+	return p.finish(ar, a, owner, login)
 }
 
 // RespondIdPInitiated builds an unsolicited response for app a.
 func (p *Provider) RespondIdPInitiated(ctx context.Context, publicURL string, r *http.Request, a apps.App,
-	owner apps.Owner, sessionID string, authAt time.Time) (Form, error) {
+	owner apps.Owner, login Login) (Form, error) {
 	idp, _, err := p.idp(ctx, publicURL, []apps.App{a})
 	if err != nil {
 		return Form{}, err
@@ -258,12 +275,12 @@ func (p *Provider) RespondIdPInitiated(ctx context.Context, publicURL string, r 
 		SPSSODescriptor:         &md.SPSSODescriptors[0],
 		ACSEndpoint:             &md.SPSSODescriptors[0].AssertionConsumerServices[0],
 	}
-	f, _, err := p.finish(ar, a, owner, sessionID, authAt)
+	f, _, err := p.finish(ar, a, owner, login)
 	return f, err
 }
 
-func (p *Provider) finish(ar *saml.IdpAuthnRequest, a apps.App, owner apps.Owner, sessionID string, authAt time.Time) (Form, apps.App, error) {
-	if err := (saml.DefaultAssertionMaker{}).MakeAssertion(ar, session(a.Mapped(owner), sessionID, authAt)); err != nil {
+func (p *Provider) finish(ar *saml.IdpAuthnRequest, a apps.App, owner apps.Owner, login Login) (Form, apps.App, error) {
+	if err := (saml.DefaultAssertionMaker{}).MakeAssertion(ar, session(a.Mapped(owner), login)); err != nil {
 		return Form{}, a, err
 	}
 	f, err := ar.PostBinding()

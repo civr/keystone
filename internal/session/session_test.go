@@ -1,6 +1,7 @@
 package session
 
 import (
+	"slices"
 	"context"
 	"errors"
 	"sync"
@@ -220,5 +221,24 @@ func TestGetSlidingReportsPreviousLastSeen(t *testing.T) {
 	_, prev, err = s.GetSliding(context.Background(), sess.ID, cfg, t0.Add(2*time.Hour))
 	if err != nil || !prev.Equal(t0.Add(time.Hour)) {
 		t.Fatalf("second prev %v err %v", prev, err)
+	}
+}
+
+func TestAMR(t *testing.T) {
+	now := time.Now()
+	cases := []struct {
+		name string
+		s    Session
+		want []string
+	}{
+		{"password only", Session{CreatedAt: now, LastFullAuthAt: now}, []string{"pwd"}},
+		{"password and passkey", Session{CreatedAt: now, LastFullAuthAt: now, LastPasskeyAt: now}, []string{"pwd", "hwk"}},
+		{"trusted device, passkey only", Session{CreatedAt: now, LastFullAuthAt: now.Add(-48 * time.Hour), LastPasskeyAt: now}, []string{"hwk"}},
+		{"recovery code", Session{CreatedAt: now, LastFullAuthAt: now, MustRegisterPasskey: true}, []string{"pwd"}},
+	}
+	for _, c := range cases {
+		if got := c.s.AMR(); !slices.Equal(got, c.want) {
+			t.Errorf("%s: AMR = %v, want %v", c.name, got, c.want)
+		}
 	}
 }

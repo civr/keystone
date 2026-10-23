@@ -2,14 +2,15 @@ package httpapi
 
 import (
 	"context"
-	"errors"
-	"html"
 	"encoding/base64"
 	"encoding/xml"
+	"errors"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -111,6 +112,19 @@ func TestSAML(t *testing.T) {
 		}
 		if as.Subject.NameID.Value != "t.willems" {
 			t.Fatalf("nameid = %q", as.Subject.NameID.Value)
+		}
+		var amr []string
+		for _, st := range as.AttributeStatements {
+			for _, a := range st.Attributes {
+				if a.Name == "amr" {
+					for _, v := range a.Values {
+						amr = append(amr, v.Value)
+					}
+				}
+			}
+		}
+		if !slices.Contains(amr, "hwk") {
+			t.Fatalf("amr attribute = %v, want hwk for a passkey session", amr)
 		}
 		if !strings.Contains(w.Body.String(), `name="RelayState" value="relay-1"`) {
 			t.Fatal("relay state lost")
