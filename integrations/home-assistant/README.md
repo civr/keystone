@@ -21,8 +21,10 @@ dezelfde gebruikersnaam als het *Account in de app* dat je in Keystone voor Home
 4. Herstart Home Assistant.
 
 Opent iemand de inlogpagina via de proxy met de header `X-Keystone-User`, dan meldt de component die
-gebruiker meteen aan. Zonder header (of vanaf een ander adres) verschijnt het gewone inlogscherm, dus de
-HA-app op je telefoon en lokale toegang blijven werken. De component vertrouwt de header alleen van de
+gebruiker meteen aan. Zonder header (of vanaf een ander adres) stopt de Keystone-login; kies dan onder het
+inlogscherm *Home Assistant Local* voor het gewone formulier (met je eigen MFA). De HA-app op je telefoon
+en lokale toegang blijven zo werken, met één extra tik. De component vertrouwt de header alleen van de
 adressen onder `trusted_proxies`; zorg dat je proxy `X-Keystone-*` van bezoekers nooit doorgeeft.
 
-Tests van de hulpfuncties: `uv run --with pytest python -m pytest integrations/home-assistant/tests`.
+Tests (tegen een echte Home Assistant-core), vanuit `integrations/home-assistant`:
+`uv run --python 3.13 --with pytest-homeassistant-custom-component python -m pytest tests`.
