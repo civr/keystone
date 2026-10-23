@@ -277,7 +277,7 @@
 </svelte:head>
 
 {#snippet brand()}
-	<div class="auth-brand"><span class="mark" aria-hidden="true">◆</span>Keystone</div>
+	<div class="auth-brand"><img class="mark" src="/favicon.svg" alt="" width="64" height="64" /><span>Keystone</span></div>
 {/snippet}
 
 {#snippet busyLabel(text: string)}

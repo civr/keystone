@@ -81,8 +81,8 @@
 	{/if}
 
 	<header class="page-head">
-		<h1>{hello}{#if me}<span class="name">, {firstName(me)}</span>{/if}</h1>
 		<p class="sub">{today}</p>
+		<h1>{hello}{#if me}<span class="name">, {firstName(me)}</span>{/if}</h1>
 	</header>
 
 	{#if loadError}
@@ -114,25 +114,28 @@
 </AppShell>
 
 <style>
-	/* Page header on the canvas: 1.5rem/800 title, muted subtitle, no rule. */
+	/* A large title with the date above it, as in Today views. */
 	.page-head {
-		margin: 12px 0 24px;
+		margin: 8px 0 32px;
 	}
 	h1 {
 		margin: 0;
-		font-size: 1.5rem;
-		font-weight: 800;
-		line-height: 1.3;
-		letter-spacing: -0.02em;
+		font-size: 2.125rem;
+		font-weight: 700;
+		line-height: 1.12;
+		letter-spacing: -0.025em;
 		text-wrap: balance;
 	}
 	.name {
 		animation: appear var(--dur-3) var(--ease-out) both;
 	}
 	.sub {
-		margin: 2px 0 0;
+		margin: 0 0 4px;
 		color: var(--color-text-muted);
-		font-size: 0.875rem;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		letter-spacing: 0.01em;
+		text-transform: uppercase;
 	}
 	.sub::first-letter {
 		text-transform: uppercase;
@@ -144,6 +147,7 @@
 		align-items: flex-start;
 		margin: 12px 0 0;
 		font-size: 0.875rem;
+		margin-bottom: 4px;
 	}
 	.banner p {
 		margin: 0;
@@ -170,37 +174,38 @@
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
-		gap: 16px;
+		grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+		gap: 22px 12px;
 		animation: appear var(--dur-3) var(--ease) 180ms both;
 	}
 	.skeleton li {
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
-		padding: 16px;
-		border: 1px solid var(--c-border2);
-		border-radius: var(--radius-md);
-		background: var(--c-bg-card);
-		box-shadow: var(--shadow-sm);
+		align-items: center;
+		gap: 10px;
+		padding: 10px 4px 6px;
 	}
 	.skeleton .icon {
-		width: 44px;
-		height: 44px;
-		margin-bottom: 6px;
-		border-radius: var(--radius-md);
+		width: 76px;
+		height: 76px;
+		border-radius: var(--radius-icon);
 	}
 	.skeleton .line {
-		width: 60%;
-		height: 10px;
+		width: 56px;
+		height: 9px;
+		border-radius: 5px;
 	}
 	.skeleton .short {
-		width: 40%;
+		display: none;
 	}
 	@media (max-width: 520px) {
 		.skeleton {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-			gap: 12px;
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			gap: 18px 4px;
+		}
+		.skeleton .icon {
+			width: 64px;
+			height: 64px;
 		}
 	}
 
@@ -220,8 +225,8 @@
 	}
 	.state-title {
 		color: var(--color-text);
-		font-size: 1rem;
-		font-weight: 700;
+		font-size: 1.0625rem;
+		font-weight: 600;
 	}
 	.surface + :global(.grid),
 	:global(.grid) + .surface {

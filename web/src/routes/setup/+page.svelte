@@ -265,7 +265,7 @@
 
 <main class="auth-page">
 	<div class="auth-card wide">
-		<div class="auth-brand"><span class="mark" aria-hidden="true">◆</span>Keystone</div>
+		<div class="auth-brand"><img class="mark" src="/favicon.svg" alt="" width="64" height="64" /><span>Keystone</span></div>
 		{#if current !== 'loading'}
 			{@const i = index(current)}
 			<nav class="stepper" aria-label="Voortgang">
@@ -577,7 +577,7 @@
 </main>
 
 <style>
-	/* Progress as quiet tinted pills; the current step's name in an accent chip. */
+	/* Progress as page dots; the current one stretches into a capsule. */
 	.stepper {
 		display: flex;
 		flex-direction: column;
@@ -587,26 +587,26 @@
 	}
 	.stepper ol {
 		display: flex;
-		gap: 4px;
-		width: 100%;
+		justify-content: center;
+		gap: 7px;
 		margin: 0;
 		padding: 0;
 		list-style: none;
 	}
 	.stepper li {
-		flex: 1;
-		height: 6px;
+		width: 7px;
+		height: 7px;
 		border-radius: var(--radius-full);
-		background: var(--c-bg-sunken);
+		background: #d1d1d6;
 		transition:
 			background-color var(--dur-3) var(--ease),
-			flex-grow var(--dur-3) var(--ease);
+			width var(--dur-3) var(--ease-out);
 	}
 	.stepper li.done {
-		background: var(--c-selected);
+		background: #8e8e93;
 	}
 	.stepper li.now {
-		flex-grow: 2;
+		width: 22px;
 		background: var(--primary);
 	}
 	.stepper p {
@@ -623,13 +623,13 @@
 	}
 
 	details {
-		border-top: 1px solid var(--c-border2);
+		box-shadow: 0 -0.5px 0 #c6c6c8;
 		padding-top: 12px;
 	}
 	summary {
 		cursor: pointer;
-		font-size: 0.8125rem;
-		font-weight: 600;
+		font-size: 0.9375rem;
+		font-weight: 400;
 		color: var(--primary);
 		width: fit-content;
 		border-radius: var(--radius-xs);
@@ -661,8 +661,7 @@
 		margin: 0;
 		padding: 14px 16px;
 		border-radius: var(--radius-md);
-		background: var(--c-bg-section);
-		border: 1px solid var(--c-border2);
+		background: var(--color-bg);
 		list-style: none;
 		counter-reset: code;
 	}
@@ -691,16 +690,17 @@
 		}
 	}
 
-	/* Done: a round success-tinted icon, like a Nimbus stat icon. */
+	/* Done: a filled green check, as Apple confirms a finished setup. */
 	.done-mark {
 		display: grid;
 		place-items: center;
-		width: 56px;
-		height: 56px;
-		margin: 0 auto 16px;
+		width: 64px;
+		height: 64px;
+		margin: 0 auto 18px;
 		border-radius: 50%;
-		background: var(--color-success-tint);
-		color: var(--color-success-text);
+		background: var(--color-success);
+		color: #fff;
+		box-shadow: 0 8px 20px -6px rgba(52, 199, 89, 0.55);
 	}
 	.done-mark svg {
 		width: 28px;

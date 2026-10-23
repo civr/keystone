@@ -26,13 +26,6 @@
 		file_server
 	}
 
-	# Self-hosted Plus Jakarta Sans (CSP font-src falls under 'self').
-	handle /fonts/* {
-		header Cache-Control "public, max-age=2592000"
-		header X-Content-Type-Options "nosniff"
-		file_server
-	}
-
 	@static path /favicon.svg /favicon.png /favicon.ico /robots.txt
 	handle @static {
 		file_server

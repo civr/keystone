@@ -249,16 +249,16 @@
 		padding: 0;
 		list-style: none;
 	}
-	/* Round tinted icon, as on a Nimbus stat tile. */
+	/* A small grey rounded-square glyph, as in Settings rows. */
 	.glyph {
 		flex: none;
 		display: grid;
 		place-items: center;
-		width: 36px;
-		height: 36px;
-		border-radius: var(--radius-full);
-		background: var(--t-slate-bg);
-		color: var(--t-slate);
+		width: 30px;
+		height: 30px;
+		border-radius: 7px;
+		background: linear-gradient(180deg, #a5abb8, #858994);
+		color: #fff;
 	}
 	.glyph svg,
 	.group-head svg {

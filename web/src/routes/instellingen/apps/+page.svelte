@@ -576,14 +576,14 @@
 		place-items: center;
 		width: 30px;
 		height: 30px;
-		border: 1px solid var(--c-border);
-		border-radius: var(--radius-sm);
-		background: var(--c-bg-card);
+		border: 0;
+		border-radius: 50%;
+		background: rgba(118, 118, 128, 0.12);
 		color: var(--color-text-muted);
 		cursor: pointer;
 	}
 	.step:hover:not(:disabled) {
-		background: var(--c-bg-section);
+		background: rgba(118, 118, 128, 0.2);
 		color: var(--color-text);
 	}
 	.step:disabled {
@@ -591,19 +591,21 @@
 		cursor: not-allowed;
 	}
 
-	/* The app's tile: a tint of its colour, its initial in a dark step of the hue. */
+	/* The app's icon, as on the start page: its colour lit from above, a white initial. */
 	.tile {
 		flex: none;
 		display: grid;
 		place-items: center;
 		width: var(--size);
 		height: var(--size);
-		border-radius: var(--radius-md);
-		background: color-mix(in srgb, var(--tile-color) 14%, white);
-		color: color-mix(in oklch, var(--tile-color) 72%, black);
-		font-size: calc(var(--size) * 0.4);
-		font-weight: 800;
+		border-radius: 22.5%;
+		background: linear-gradient(180deg, color-mix(in oklch, var(--tile-color) 78%, white), var(--tile-color));
+		color: #fff;
+		font-family: var(--font-display);
+		font-size: calc(var(--size) * 0.45);
+		font-weight: 600;
 		letter-spacing: -0.02em;
+		box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
 		overflow: hidden;
 		transition:
 			background-color var(--dur-3) var(--ease),
@@ -618,9 +620,8 @@
 	.empty {
 		display: flex;
 		flex-direction: column;
-		align-items: flex-start;
+		align-items: center;
 		gap: 6px;
-		padding-bottom: 20px;
 		color: var(--color-text-muted);
 	}
 	.empty p {
@@ -628,8 +629,8 @@
 	}
 	.empty-title {
 		color: var(--color-text);
-		font-size: 1rem;
-		font-weight: 700;
+		font-size: 1.0625rem;
+		font-weight: 600;
 	}
 	.empty .btn {
 		margin-top: 10px;
@@ -645,13 +646,12 @@
 		align-items: center;
 		gap: 12px;
 		padding: 12px;
-		border: 1px solid var(--c-border2);
 		border-radius: var(--radius-md);
-		background: var(--c-bg-section);
+		background: var(--color-bg);
 	}
 	.preview-name {
-		font-size: 0.9375rem;
-		font-weight: 700;
+		font-size: 1.0625rem;
+		font-weight: 600;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;

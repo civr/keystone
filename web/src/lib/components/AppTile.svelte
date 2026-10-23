@@ -18,117 +18,151 @@
 	const host = $derived(hostOf(app.url) || app.url);
 </script>
 
-<!-- Nimbus browseable tile (.vdc-card): white, resting on --shadow-sm, lifts 2px on hover. -->
-<a class="tile" class:highlighted class:disabled={!href} href={href ?? undefined} aria-disabled={!href || undefined} onclick={click}>
-	<span class="icon" style:--tile-color={app.color}>
+<!-- An app icon, as on the Home Screen: a rounded square in the app's colour, the name beneath. -->
+<a
+	class="tile"
+	class:highlighted
+	class:disabled={!href}
+	href={href ?? undefined}
+	aria-disabled={!href || undefined}
+	title={host}
+	onclick={click}
+>
+	<span class="icon" class:image={!!icon} style:--tile-color={app.color}>
 		{#if icon}
 			<img src={icon} alt="" draggable="false" decoding="async" />
 		{:else}
 			<span aria-hidden="true">{initial}</span>
 		{/if}
+		{#if app.protocol === 'vault'}
+			<span class="badge" title="Opent met het wachtwoord uit de kluis op je klembord">
+				<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V7a4 4 0 0 1 8 0v2M5 9h10v7H5z" /></svg>
+				<span class="visually-hidden">Kluis</span>
+			</span>
+		{/if}
 	</span>
 	<span class="name">{app.name}</span>
-	<span class="host">{host}</span>
-	{#if app.protocol === 'vault'}<span class="badge" title="Wachtwoord uit de kluis wordt gekopieerd">Kluis</span>{/if}
+	<span class="visually-hidden">{host}</span>
 </a>
 
 <style>
-	.badge {
-		position: absolute;
-		top: 12px;
-		right: 12px;
-		padding: 1px 8px;
-		border-radius: var(--radius-pill, 9999px);
-		background: var(--c-bg-section);
-		color: var(--color-text-muted);
-		font-size: 0.6875rem;
-		font-weight: 600;
-	}
 	.tile {
-		position: relative;
 		display: flex;
 		flex-direction: column;
-		align-items: flex-start;
-		gap: 2px;
-		height: 100%;
-		padding: 16px;
-		border: 1px solid var(--c-border2);
-		border-radius: var(--radius-md);
-		background: var(--c-bg-card);
-		box-shadow: var(--shadow-sm);
+		align-items: center;
+		gap: 8px;
+		padding: 10px 4px 6px;
+		border-radius: var(--radius-lg);
 		color: var(--color-text);
 		text-decoration: none;
-		transition:
-			border-color var(--dur-3) var(--ease),
-			box-shadow var(--dur-3) var(--ease-out),
-			transform var(--dur-3) var(--ease-out);
+		-webkit-touch-callout: none;
+		outline-offset: 2px;
+	}
+	.tile:hover {
+		text-decoration: none;
 	}
 	.icon {
+		position: relative;
 		display: grid;
 		place-items: center;
-		width: 44px;
-		height: 44px;
-		margin-bottom: 12px;
-		border-radius: var(--radius-md);
-		/* A tint of the app's colour, its initial in a dark step of the same hue. */
-		background: color-mix(in srgb, var(--tile-color, #64748b) 14%, white);
-		color: color-mix(in oklch, var(--tile-color, #64748b) 72%, black);
-		font-size: 1.125rem;
-		font-weight: 800;
+		width: 76px;
+		height: 76px;
+		border-radius: var(--radius-icon);
+		/* The app's colour with light falling from above, as Apple's icons. */
+		background: linear-gradient(180deg, color-mix(in oklch, var(--tile-color, #8e8e93) 78%, white), var(--tile-color, #8e8e93));
+		color: #fff;
+		font-family: var(--font-display);
+		font-size: 2.125rem;
+		font-weight: 600;
 		letter-spacing: -0.02em;
-		overflow: hidden;
+		box-shadow:
+			0 1px 2px rgba(0, 0, 0, 0.1),
+			0 4px 12px -4px color-mix(in srgb, var(--tile-color, #8e8e93) 45%, transparent),
+			inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+		transition:
+			transform var(--dur-3) var(--ease-out),
+			box-shadow var(--dur-3) var(--ease-out);
+	}
+	.icon.image {
+		background: #fff;
 	}
 	img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		border-radius: inherit;
 	}
 	.name {
 		max-width: 100%;
-		font-size: 0.9375rem;
-		font-weight: 700;
-		line-height: 1.4;
-		letter-spacing: -0.01em;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		transition: color var(--dur-2) var(--ease);
-	}
-	.host {
-		max-width: 100%;
 		font-size: 0.8125rem;
-		font-weight: 500;
-		line-height: 1.5;
-		color: var(--color-text-faint);
+		line-height: 1.25;
+		text-align: center;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
 		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		overflow-wrap: anywhere;
+	}
+	.badge {
+		position: absolute;
+		right: -6px;
+		bottom: -6px;
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		background: #fff;
+		color: var(--color-text-muted);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+	}
+	.badge svg {
+		width: 14px;
+		height: 14px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
 	}
 	@media (hover: hover) {
-		.tile:hover {
-			border-color: var(--c-border);
-			box-shadow: var(--shadow-hover);
-			transform: translateY(-2px);
+		.tile:hover .icon {
+			transform: translateY(-2px) scale(1.04);
+			box-shadow:
+				0 2px 4px rgba(0, 0, 0, 0.1),
+				0 12px 24px -8px color-mix(in srgb, var(--tile-color, #8e8e93) 55%, transparent),
+				inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
 		}
 	}
-	.tile:hover .name,
-	.tile:focus-visible .name,
+	/* Pressed: the icon sinks a little, at once. */
+	.tile:active .icon {
+		transform: scale(0.94);
+		transition-duration: 80ms;
+	}
+	/* The first search match (Enter opens it) gets the focus-ring look. */
+	.highlighted .icon,
+	.tile:focus-visible .icon {
+		box-shadow:
+			0 0 0 3px var(--color-bg),
+			0 0 0 6px var(--primary);
+	}
+	.tile:focus-visible {
+		outline: none;
+	}
 	.highlighted .name {
 		color: var(--primary);
-	}
-	.tile:focus-visible,
-	.highlighted {
-		border-color: var(--primary);
-	}
-	.highlighted {
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent), var(--shadow-sm);
-	}
-	.tile:active {
-		transform: scale(0.98);
-		transition-duration: var(--dur-1);
+		font-weight: 500;
 	}
 	.disabled {
-		cursor: not-allowed;
-		opacity: 0.55;
+		opacity: 0.4;
+		pointer-events: none;
+	}
+	@media (max-width: 520px) {
+		.icon {
+			width: 64px;
+			height: 64px;
+			font-size: 1.75rem;
+		}
 	}
 </style>

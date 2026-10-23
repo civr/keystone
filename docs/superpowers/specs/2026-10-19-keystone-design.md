@@ -12,7 +12,7 @@ Waarom: Thijs heeft eigen (vibe coded) apps en homelab-diensten, elk met losse a
 
 **Doelen**
 - Eén login (AD + passkey) → toegang tot alle apps.
-- Startpagina in het **Project Nimbus-thema** (zie §6): groet, zoekbalk, app-tegels, wit op een licht canvas.
+- Startpagina in **Apple-stijl** (zie §6): groet, zoekbalk, app-iconen, op een licht canvas.
 - Per app een **accountkoppeling**: Keystone-gebruiker `thijs` → in app 1 `t.willems`, in app 2 `civr`. Keystone stuurt de juiste naam mee.
 - Protocollen naar apps: **SAML 2.0 IdP**, **OIDC provider**, **LDAP-server** (proxy naar AD) en **forward auth** (poortwachter achter reverse proxy).
 - **Kluis** voor app-credentials, alleen voor apps die geen SAML/LDAP/OIDC kunnen.
@@ -61,19 +61,18 @@ Elke app krijgt in Keystone: naam, icoon/kleur, URL, protocol, protocolinstellin
 - Op de tegel: één klik → app openen + wachtwoord naar het klembord (wordt na 30 s gewist). Gebruikersnaam ook kopieerbaar.
 - Tonen/kopiëren van een wachtwoord vereist een sessie jonger dan X minuten, anders eerst een passkey-bevestiging (mijn keuze: 15 min).
 
-## 6. Uiterlijk (Project Nimbus-thema)
+## 6. Uiterlijk (Apple-stijl)
 
-Op verzoek van Thijs (22-10-2026: "kijk naar het thema van project nimbus … dat thema wil ik hebben") vervangt het thema van Project Nimbus de eerder goedgekeurde stijl A (radiaal verloop, glas, veerbeweging, donkere modus). Bron: `proxmox-cloud/DESIGN.md` en `frontend/src/index.css`; tokens staan in `web/src/lib/theme.css`.
+Op verzoek van Thijs (23-10-2026: "ik wil dat het thema is zoals Apple zou ontwerpen") vervangt een Apple-stijl het Project Nimbus-thema van 22-10-2026. Tokens staan in `web/src/lib/theme.css`.
 
-- Eén licht thema, geen donkere modus. Een lichtblauwgrijs canvas (`#f5f7fb`) waar balk, menu en pagina's op staan; witte kaarten met hoeken van 20px, een bijna onzichtbare rand en een heel lichte schaduw. Geen verlopen, geen glas (`backdrop-filter`), geen geneste kaarten.
-- Eén accentkleur, blauw `#0b5cff` (`--primary`), alleen voor de primaire knop, de actieve menuknop, focus en links.
-- Lettertype Plus Jakarta Sans, zelf gehost onder `/fonts/` (CSP `'self'`, werkt zonder internet). Paginatitels 1.5rem/800, kaarttitels 1rem/700, labels 0.75rem/600 in zinsnotatie.
-- App-shell: een balk van 64px op het canvas met links het logoblok "◆ Keystone" (zo breed als het menu, in de menukleur), een witte zoekbalk van 300px met vergrootglas en `Ctrl K`/`⌘K`, en rechts het gebruikersmenu (initialen, vetgedrukte naam). Een wit menu links met "Mijn apps" en de groep "Instellingen"; het actieve item is een gevulde blauwe pil met witte tekst. Het menu klapt in tot iconen; op een telefoon wordt het een lade die je vanuit de balk opent.
-- Startpagina: groet ("Goedemiddag, Thijs") als paginatitel met de datum eronder, daaronder de apps als witte tegels (12px-hoeken) met een getint icoon in de app-kleur, de naam en de host. Bij hover komt een tegel 2px omhoog. Zoeken filtert zoals voorheen (`⌘K`/`Ctrl+K` en `/` focussen, Enter opent de eerste treffer alleen als er een zoekterm is, Esc wist).
-- Inloggen en installatie: één witte kaart van 420px midden op het canvas met het logo bovenaan, Nimbus-velden en een volle primaire knop. De installatiestappen tonen de voortgang als rustige getinte pillen.
-- Instellingen: per groep een witte kaart met rijen gescheiden door een dunne lijn; schakelaars, knoppen, chips en dialogen volgen Nimbus (dialoog: 16px-hoeken, komt 12px omhoog vanaf 98% schaal in 250 ms).
-- Beweging is functioneel en kort (100–250 ms, `--ease` / `--ease-out`), zonder vering of stuiter; `prefers-reduced-motion` zet alles uit.
-- Werkt ook op telefoon.
+- Eén licht thema. Systeemlettertype (SF Pro op Apple-apparaten, Segoe UI op Windows), geen eigen webfont. Grote titels met negatieve tracking, body 15px.
+- Kleuren van Apple: canvas `#f2f2f7` (grouped background), witte kaarten, accent systemBlue `#007aff`, schakelaars groen `#34c759`, rood `#ff3b30`.
+- App-venster als macOS: een doorschijnende zijbalk over de volle hoogte met het app-icoon en "Keystone", en een doorschijnende werkbalk boven de inhoud met een Spotlight-achtig zoekveld en het gebruikersmenu. Op een telefoon wordt de zijbalk een paneel vanuit de werkbalk.
+- Startpagina: de datum klein boven een grote titel ("Goedemiddag, Thijs"), daaronder de apps als app-iconen zoals op het beginscherm (afgerond vierkant in de app-kleur, naam eronder). Zoeken filtert zoals voorheen.
+- Instellingen zoals de Instellingen-app: grote titel, ingesprongen gegroepeerde secties (kop boven een witte kaart, rijen van 44px, scheidingslijnen die bij de tekst beginnen), iOS-schakelaars en segmented controls.
+- Dialogen als sheets: gecentreerd op grote schermen, van onderen op telefoons; meldingen als doorschijnende capsule bovenaan.
+- Beweging kort en zonder vering (Apple's ease en de iOS-sheetcurve); `prefers-reduced-motion`, `prefers-reduced-transparency` en `prefers-contrast` worden gevolgd.
+- Inloggen en installatie zoals Apple ID: groot app-icoon, grote titel, witte kaart met velden van 46px; installatiestappen als paginapuntjes.
 
 **Instellingen-onderdelen:** AD-verbinding (met testknop), Apps (toevoegen/bewerken, met per protocol een begeleid formulier en kopieerbare metadata-URL's), Accountkoppelingen (per app), Kluis, Beveiliging (passkeys, herstelcodes, sessies/apparaten), Activiteit (recente logins).
 

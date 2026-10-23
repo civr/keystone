@@ -13,7 +13,7 @@
 			class="toast"
 			class:error={t.kind === 'error'}
 			role={t.kind === 'error' ? 'alert' : 'status'}
-			in:fly={{ x: still ? 0 : 14, duration: still ? 0 : 220, easing: easeOut }}
+			in:fly={{ y: still ? 0 : -16, duration: still ? 0 : 320, easing: easeOut }}
 			out:fade={{ duration: still ? 0 : 150 }}
 			animate:flip={{ duration: still ? 0 : 200, easing: easeOut }}
 		>
@@ -27,16 +27,18 @@
 </div>
 
 <style>
+	/* A frosted capsule that drops in at the top centre, like iOS banners. */
 	.stack {
 		position: fixed;
-		right: max(16px, env(safe-area-inset-right));
-		bottom: max(16px, env(safe-area-inset-bottom));
+		top: max(12px, env(safe-area-inset-top));
+		left: 50%;
+		transform: translateX(-50%);
 		z-index: var(--z-toast);
 		display: flex;
 		flex-direction: column;
-		align-items: flex-end;
+		align-items: center;
 		gap: 8px;
-		width: min(380px, calc(100vw - 32px));
+		width: min(420px, calc(100vw - 24px));
 		pointer-events: none;
 	}
 	.toast {
@@ -44,15 +46,24 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		width: 100%;
-		padding: 10px 8px 10px 14px;
-		border: 1px solid var(--c-border2);
-		border-radius: var(--radius-md);
-		background: var(--c-bg-card);
-		box-shadow: var(--shadow-md);
-		font-size: 0.8125rem;
+		max-width: 100%;
+		min-height: 44px;
+		padding: 8px 8px 8px 16px;
+		border-radius: var(--radius-pill);
+		background: rgba(255, 255, 255, 0.86);
+		-webkit-backdrop-filter: var(--material-blur);
+		backdrop-filter: var(--material-blur);
+		box-shadow:
+			0 0 0 0.5px rgba(0, 0, 0, 0.08),
+			0 8px 28px rgba(0, 0, 0, 0.14);
+		font-size: 0.875rem;
 		font-weight: 500;
-		line-height: 1.45;
+		line-height: 1.35;
+	}
+	@media (prefers-reduced-transparency: reduce) {
+		.toast {
+			background: #fff;
+		}
 	}
 	.dot {
 		flex: none;
@@ -72,32 +83,23 @@
 		flex: none;
 		display: grid;
 		place-items: center;
-		width: 28px;
-		height: 28px;
+		width: 26px;
+		height: 26px;
 		border: 0;
-		border-radius: var(--radius-sm);
-		background: transparent;
-		color: var(--color-text-faint);
+		border-radius: 50%;
+		background: rgba(118, 118, 128, 0.12);
+		color: #8e8e93;
 		cursor: pointer;
-		transition: background-color var(--dur-2) var(--ease);
+		transition: background-color var(--dur-1) var(--ease);
 	}
 	button:hover {
-		background: var(--c-bg-section);
-		color: var(--color-text);
+		background: rgba(118, 118, 128, 0.2);
 	}
 	svg {
-		width: 12px;
-		height: 12px;
+		width: 9px;
+		height: 9px;
 		stroke: currentColor;
-		stroke-width: 2;
+		stroke-width: 2.4;
 		stroke-linecap: round;
-	}
-	@media (max-width: 599px) {
-		.stack {
-			left: 50%;
-			right: auto;
-			transform: translateX(-50%);
-			align-items: stretch;
-		}
 	}
 </style>

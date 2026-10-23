@@ -68,31 +68,28 @@
 </label>
 
 <style>
-	/* Nimbus .topbar-search: a white 12px-cornered box with a magnifier and the shortcut key. */
+	/* A Spotlight-style field: a grey capsule-ish fill, no stroke, a soft ring on focus. */
 	.search {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		width: 300px;
+		gap: 7px;
+		width: 380px;
 		max-width: 100%;
-		height: 42px;
-		padding: 0 6px 0 14px;
-		border: 1px solid var(--topbar-field-stroke);
-		border-radius: var(--radius-md);
+		height: 36px;
+		padding: 0 5px 0 11px;
+		border-radius: var(--radius-control);
 		background: var(--topbar-field);
 		color: var(--topbar-ink-2);
 		cursor: text;
 		transition:
-			border-color var(--dur-2) var(--ease),
+			background-color var(--dur-2) var(--ease),
 			box-shadow var(--dur-2) var(--ease);
 	}
-	.search:hover {
-		border-color: var(--topbar-stroke);
-		box-shadow: var(--shadow-sm);
-	}
 	.search:focus-within {
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+		background: #fff;
+		box-shadow:
+			0 0 0 3.5px rgba(0, 122, 255, 0.25),
+			0 0 0 1px var(--primary);
 	}
 	.lens {
 		flex: none;
@@ -100,7 +97,7 @@
 		height: 16px;
 		fill: none;
 		stroke: currentColor;
-		stroke-width: 1.8;
+		stroke-width: 1.9;
 		stroke-linecap: round;
 	}
 	input {
@@ -112,8 +109,7 @@
 		outline: 0;
 		background: transparent;
 		color: var(--topbar-ink);
-		font-size: 0.8125rem;
-		font-weight: 500;
+		font-size: 0.9375rem;
 	}
 	input::placeholder {
 		color: var(--topbar-ink-2);
@@ -124,12 +120,13 @@
 	}
 	kbd {
 		flex: none;
-		margin-right: 2px;
-		padding: 2px 7px;
-		border-radius: var(--radius-xs);
-		background: var(--topbar-hover);
+		margin-right: 3px;
+		padding: 1px 6px;
+		border-radius: 5px;
+		background: rgba(0, 0, 0, 0.06);
 		color: var(--topbar-ink-2);
-		font: 600 0.6875rem/1.45 var(--font);
+		font: 500 0.75rem/1.5 var(--font);
+		letter-spacing: 0.02em;
 	}
 	@media (hover: none) {
 		kbd {
@@ -140,28 +137,31 @@
 		flex: none;
 		display: grid;
 		place-items: center;
-		width: 28px;
-		height: 28px;
+		width: 22px;
+		height: 22px;
+		margin-right: 2px;
 		border: 0;
-		border-radius: var(--radius-sm);
-		background: transparent;
-		color: var(--topbar-ink-2);
+		border-radius: 50%;
+		background: #aeaeb2;
+		color: #fff;
 		cursor: pointer;
 	}
 	.clear:hover {
-		background: var(--topbar-hover);
-		color: var(--topbar-ink);
+		background: #8e8e93;
 	}
 	.clear svg {
-		width: 12px;
-		height: 12px;
+		width: 9px;
+		height: 9px;
 		stroke: currentColor;
-		stroke-width: 2;
+		stroke-width: 2.4;
 		stroke-linecap: round;
 	}
 	@media (pointer: coarse) {
 		input {
 			font-size: 16px;
+		}
+		.search {
+			height: 40px;
 		}
 	}
 </style>

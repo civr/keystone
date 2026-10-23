@@ -118,28 +118,12 @@
 {/snippet}
 
 <div class="shell" class:icons={iconsOnly}>
-	<header class="topbar">
-		<button type="button" class="topbar-btn menu-btn" aria-label="Menu openen" aria-expanded={drawerOpen} onclick={openDrawer}>
-			<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg>
-		</button>
-		<a class="brand" href="/" aria-label="Keystone, mijn apps">
-			<span class="brand-mark" aria-hidden="true">◆</span>
-			<span class="brand-name">Keystone</span>
-		</a>
-		<div class="bar">
-			<div class="search">
-				<TopbarSearch bind:value={query} onsubmit={search} />
-			</div>
-			{#if me}
-				<UserMenu name={me.display_name?.trim() || firstName(me)} username={me.username} onlogout={logout} />
-			{:else}
-				<div class="user-ghost" aria-hidden="true"><span class="ghost"></span></div>
-			{/if}
-		</div>
-	</header>
-
 	<aside class="rail">
 		<div class="rail-inner">
+			<a class="brand" href="/" aria-label="Keystone, mijn apps">
+				<img class="brand-mark" src="/favicon.svg" alt="" width="28" height="28" />
+				<span class="brand-name">Keystone</span>
+			</a>
 			{@render menu(iconsOnly, 'rail')}
 			<button
 				type="button"
@@ -149,23 +133,39 @@
 				onclick={toggleNav}
 			>
 				<svg viewBox="0 0 20 20" aria-hidden="true">
-					<path d={iconsOnly ? 'M8 5l5 5-5 5' : 'M12 5l-5 5 5 5'} />
+					<path d="M3.5 4.5h13v11h-13zM8 4.5v11" />
 				</svg>
-				{#if !iconsOnly}<span>Inklappen</span>{/if}
+				{#if !iconsOnly}<span>Zijbalk verbergen</span>{/if}
 			</button>
 		</div>
 	</aside>
 
-	<main class="content">
-		<div class="inner">{@render children()}</div>
-	</main>
+	<div class="main">
+		<header class="topbar">
+			<button type="button" class="topbar-btn menu-btn" aria-label="Menu openen" aria-expanded={drawerOpen} onclick={openDrawer}>
+				<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg>
+			</button>
+			<div class="search">
+				<TopbarSearch bind:value={query} onsubmit={search} />
+			</div>
+			{#if me}
+				<UserMenu name={me.display_name?.trim() || firstName(me)} username={me.username} onlogout={logout} />
+			{:else}
+				<div class="user-ghost" aria-hidden="true"><span class="ghost"></span></div>
+			{/if}
+		</header>
+
+		<main class="content">
+			<div class="inner">{@render children()}</div>
+		</main>
+	</div>
 </div>
 
 <dialog class="drawer" bind:this={drawer} aria-label="Menu" onclose={() => (drawerOpen = false)} onclick={(e) => e.target === drawer && closeDrawer()}>
 	<div class="drawer-panel">
 		<div class="drawer-head">
 			<span class="brand">
-				<span class="brand-mark" aria-hidden="true">◆</span>
+				<img class="brand-mark" src="/favicon.svg" alt="" width="28" height="28" />
 				<span class="brand-name">Keystone</span>
 			</span>
 			<button type="button" class="topbar-btn" aria-label="Menu sluiten" onclick={closeDrawer}>
@@ -177,90 +177,56 @@
 </dialog>
 
 <style>
+	/* A macOS window: a translucent sidebar the full height on the left, and
+	   a translucent toolbar over the content that scrolls beneath it. */
 	.shell {
 		--menu-w: var(--nav-w);
+		--bar-h: 52px;
 		display: grid;
 		grid-template-columns: var(--menu-w) minmax(0, 1fr);
-		grid-template-rows: 64px auto;
 		min-height: 100dvh;
 		background: var(--color-bg);
 	}
 	.shell.icons {
 		--menu-w: var(--nav-w-icons);
 	}
+	.main {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+	}
 
-	/* ── Bar: 64px on the canvas; the logo block is painted in the menu colour
-	   at the menu's width, so the white column runs from the top. ── */
+	/* ── Toolbar ── */
 	.topbar {
-		grid-column: 1 / -1;
-		display: grid;
-		grid-template-columns: var(--menu-w) minmax(0, 1fr);
-		height: 64px;
-		background: var(--topbar-bg);
-		color: var(--topbar-ink);
 		position: sticky;
 		top: 0;
 		z-index: var(--z-sticky);
-	}
-	.brand {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		height: 64px;
-		padding: 0 24px;
-		background: var(--nav-bg);
-		color: var(--nav-ink);
-		text-decoration: none;
-		overflow: hidden;
-	}
-	.brand:hover {
-		color: var(--nav-ink);
-	}
-	.brand-mark {
-		display: grid;
-		place-items: center;
-		flex: none;
-		width: 32px;
-		height: 32px;
-		border-radius: var(--radius-md);
-		background: var(--primary);
-		color: #fff;
-		font-size: 0.9375rem;
-		line-height: 1;
-	}
-	.brand-name {
-		font-size: 1.125rem;
-		font-weight: 800;
-		letter-spacing: -0.02em;
-		white-space: nowrap;
-	}
-	.icons .brand {
-		justify-content: center;
-		padding: 0;
-	}
-	.icons .brand-name {
-		display: none;
-	}
-	.bar {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
-		min-width: 0;
-		padding: 0 20px 0 24px;
+		gap: 12px;
+		height: var(--bar-h);
+		padding: 0 16px 0 24px;
+		background: var(--topbar-bg);
+		-webkit-backdrop-filter: var(--material-blur);
+		backdrop-filter: var(--material-blur);
+		box-shadow: inset 0 -0.5px 0 var(--topbar-stroke);
+		color: var(--topbar-ink);
 	}
 	.search {
+		flex: 1;
 		min-width: 0;
+		display: flex;
+		justify-content: center;
 	}
 	.user-ghost {
 		display: grid;
 		place-items: center;
-		width: 48px;
-		height: 48px;
+		width: 40px;
+		height: 40px;
 	}
 	.user-ghost .ghost {
-		width: 36px;
-		height: 36px;
+		width: 30px;
+		height: 30px;
 		border-radius: 50%;
 	}
 
@@ -268,27 +234,28 @@
 		display: grid;
 		place-items: center;
 		flex: none;
-		width: 40px;
-		height: 40px;
+		width: 36px;
+		height: 36px;
 		border: 0;
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-sm);
 		background: transparent;
 		color: var(--topbar-ink-2);
 		cursor: pointer;
-		transition:
-			background-color var(--dur-2) var(--ease),
-			color var(--dur-2) var(--ease);
+		transition: background-color var(--dur-2) var(--ease);
 	}
 	.topbar-btn:hover {
 		background: var(--topbar-hover);
 		color: var(--topbar-ink);
+	}
+	.topbar-btn:active {
+		background: var(--press);
 	}
 	.topbar-btn svg {
 		width: 20px;
 		height: 20px;
 		fill: none;
 		stroke: currentColor;
-		stroke-width: 1.8;
+		stroke-width: 1.7;
 		stroke-linecap: round;
 	}
 	@media (pointer: coarse) {
@@ -301,21 +268,61 @@
 		display: none;
 	}
 
-	/* ── Menu: a white column with no rule on its edge ── */
+	/* ── Sidebar: a source list on a frosted material ── */
 	.rail {
 		background: var(--nav-bg);
+		-webkit-backdrop-filter: var(--material-blur);
+		backdrop-filter: var(--material-blur);
+		box-shadow: inset -0.5px 0 0 rgba(0, 0, 0, 0.1);
 		color: var(--nav-ink);
 	}
 	.rail-inner {
 		display: flex;
 		flex-direction: column;
-		justify-content: space-between;
 		position: sticky;
-		top: 64px;
-		height: calc(100dvh - 64px);
+		top: 0;
+		height: 100dvh;
 		overflow-y: auto;
 		overflow-x: hidden;
-		padding: 4px 0 0;
+		padding: 0 0 8px;
+	}
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		height: var(--bar-h);
+		padding: 0 18px;
+		color: var(--nav-ink);
+		text-decoration: none;
+		overflow: hidden;
+		flex: none;
+	}
+	.brand:hover {
+		text-decoration: none;
+	}
+	.brand-mark {
+		flex: none;
+		width: 28px;
+		height: 28px;
+		border-radius: 22.5%;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+	}
+	.brand-name {
+		font-family: var(--font-display);
+		font-size: 1.0625rem;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		white-space: nowrap;
+	}
+	.icons .brand {
+		justify-content: center;
+		padding: 0;
+	}
+	.icons .brand-name {
+		display: none;
+	}
+	nav {
+		flex: 1;
 	}
 	nav ul {
 		margin: 0;
@@ -324,52 +331,56 @@
 	}
 	.nav-group {
 		margin: 0;
-		padding: 16px 26px 4px;
+		padding: 18px 20px 4px;
 		font-size: 0.75rem;
 		font-weight: 600;
-		line-height: 1.45;
+		line-height: 1.4;
 		color: var(--nav-ink-2);
 	}
 	.nav-rule {
-		height: 1px;
-		margin: 12px 20px;
-		background: var(--c-border2);
+		height: 0.5px;
+		margin: 12px 18px;
+		background: rgba(0, 0, 0, 0.12);
 	}
-	/* Pills inset 12px; active = solid accent pill, white ink, 600, soft glow. */
+	/* Rows inset 10px; the selected row fills with the accent, as in Finder. */
 	.nav-link {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		margin: 2px 12px;
-		padding: 8px 14px;
-		border-radius: var(--radius-md);
-		color: var(--nav-ink-2);
+		gap: 9px;
+		margin: 1px 10px;
+		padding: 0 10px;
+		height: 32px;
+		border-radius: var(--radius-sm);
+		color: var(--nav-ink);
 		font-size: 0.875rem;
-		font-weight: 500;
-		line-height: 1.45;
+		font-weight: 400;
 		text-decoration: none;
 		white-space: nowrap;
-		transition:
-			background-color var(--dur-2) var(--ease),
-			color var(--dur-2) var(--ease),
-			box-shadow var(--dur-2) var(--ease);
+		transition: background-color var(--dur-1) var(--ease);
 	}
 	.nav-link:hover {
 		background: var(--nav-hover);
-		color: var(--nav-ink);
+		text-decoration: none;
+	}
+	.nav-link:active {
+		background: var(--press);
+	}
+	.nav-link svg {
+		color: var(--primary);
 	}
 	.nav-link.active,
 	.nav-link.active:hover {
 		background: var(--nav-active);
 		color: var(--nav-active-ink);
-		font-weight: 600;
-		box-shadow: var(--nav-active-shadow);
+	}
+	.nav-link.active svg {
+		color: inherit;
 	}
 	.nav-link.icon-only {
 		justify-content: center;
 		gap: 0;
-		height: 40px;
-		margin: 3px 16px;
+		height: 36px;
+		margin: 2px 12px;
 		padding: 0;
 	}
 	.nav-link svg,
@@ -386,19 +397,17 @@
 	.nav-foot {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		margin: 8px 12px 12px;
-		padding: 8px 14px;
+		gap: 9px;
+		margin: 8px 10px 4px;
+		padding: 0 10px;
+		height: 32px;
 		border: 0;
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-sm);
 		background: transparent;
 		color: var(--nav-ink-2);
 		font-size: 0.8125rem;
-		font-weight: 500;
 		cursor: pointer;
-		transition:
-			background-color var(--dur-2) var(--ease),
-			color var(--dur-2) var(--ease);
+		transition: background-color var(--dur-1) var(--ease);
 	}
 	.nav-foot:hover {
 		background: var(--nav-hover);
@@ -406,44 +415,31 @@
 	}
 	.icons .nav-foot {
 		justify-content: center;
-		margin: 8px 16px 12px;
+		margin: 8px 12px 4px;
 		padding: 0;
-		height: 40px;
 	}
 
 	.content {
 		min-width: 0;
-		padding: 8px 32px 64px;
+		padding: 28px 40px 72px;
 	}
 	.inner {
-		max-width: 1120px;
+		max-width: 1080px;
+		margin: 0 auto;
 	}
 
-	/* ── Phone and small tablet: the menu becomes a drawer from the bar ── */
+	/* ── Phone and small tablet: the sidebar becomes a sheet from the bar ── */
 	@media (max-width: 767px) {
 		.shell,
 		.shell.icons {
 			grid-template-columns: minmax(0, 1fr);
 		}
 		.topbar {
-			display: flex;
-			align-items: center;
-			gap: 4px;
-			padding: 0 8px 0 max(8px, env(safe-area-inset-left));
+			gap: 6px;
+			padding: 0 max(10px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
 		}
 		.menu-btn {
 			display: grid;
-		}
-		.topbar > .brand {
-			display: none;
-		}
-		.bar {
-			flex: 1;
-			gap: 6px;
-			padding: 0;
-		}
-		.search {
-			flex: 1;
 		}
 		.search :global(.search) {
 			width: 100%;
@@ -452,7 +448,7 @@
 			display: none;
 		}
 		.content {
-			padding: 8px max(16px, env(safe-area-inset-right)) 56px max(16px, env(safe-area-inset-left));
+			padding: 20px max(16px, env(safe-area-inset-right)) 56px max(16px, env(safe-area-inset-left));
 		}
 	}
 
@@ -471,15 +467,18 @@
 		background: var(--scrim);
 	}
 	.drawer[open]::backdrop {
-		animation: overlay-in var(--dur-3) var(--ease-out) both;
+		animation: overlay-in var(--dur-3) var(--ease) both;
 	}
 	.drawer-panel {
 		height: 100%;
 		overflow-y: auto;
 		padding: 0 0 max(16px, env(safe-area-inset-bottom));
-		background: var(--nav-bg);
+		background: rgba(246, 246, 248, 0.94);
+		-webkit-backdrop-filter: var(--material-blur);
+		backdrop-filter: var(--material-blur);
 		box-shadow: var(--shadow-lg);
 	}
+	/* Enters from the left and leaves the same way. */
 	.drawer[open] .drawer-panel {
 		animation: drawer-in var(--dur-4) var(--ease-out) both;
 	}
@@ -487,11 +486,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		height: 64px;
-		padding: 0 8px 0 0;
-	}
-	.drawer-head .brand {
-		padding: 0 20px;
+		height: var(--bar-h);
+		padding: 0 6px 0 0;
 	}
 	@keyframes overlay-in {
 		from {
@@ -500,8 +496,7 @@
 	}
 	@keyframes drawer-in {
 		from {
-			transform: translateX(-16px);
-			opacity: 0;
+			transform: translateX(-100%);
 		}
 	}
 </style>

@@ -1,13 +1,14 @@
 import type { TransitionConfig } from 'svelte/transition';
 
 /*
- * Motion vocabulary (Project Nimbus, DESIGN.md §5): functional only — state
- * change, feedback, loading, reveal. Two curves, four durations, no springs,
- * no bounce. Mirrors --ease / --ease-out / --dur-1..4 in theme.css.
+ * Motion vocabulary, Apple-style: short, eased, never bouncing (nothing here
+ * is thrown by a gesture). Apple's ease for state changes, the iOS sheet
+ * curve for anything arriving. Mirrors --ease / --ease-out / --dur-1..4 in
+ * theme.css.
  */
 
 /** --dur-1..4 in ms. */
-export const DUR = [100, 150, 200, 250] as const;
+export const DUR = [100, 180, 240, 320] as const;
 
 /** cubic-bezier(x1, y1, x2, y2) as an easing function on [0, 1]. */
 export function bezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number {
@@ -47,9 +48,9 @@ export function bezier(x1: number, y1: number, x2: number, y2: number): (t: numb
 }
 
 /** --ease: state changes. */
-export const ease = bezier(0.33, 0, 0.67, 1);
+export const ease = bezier(0.25, 0.1, 0.25, 1);
 /** --ease-out (decelerate): anything arriving. */
-export const easeOut = bezier(0.1, 0.9, 0.2, 1);
+export const easeOut = bezier(0.32, 0.72, 0, 1);
 
 export function reducedMotion(): boolean {
 	return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;

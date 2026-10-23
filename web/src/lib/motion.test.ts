@@ -22,12 +22,14 @@ describe('bezier', () => {
 		}
 	});
 
-	it('--ease is symmetric: halfway in time is halfway in value', () => {
-		expect(ease(0.5)).toBeCloseTo(0.5, 4);
+	it("--ease is Apple's ease: ahead of linear at the halfway point", () => {
+		expect(ease(0.5)).toBeCloseTo(bezier(0.25, 0.1, 0.25, 1)(0.5), 6);
+		expect(ease(0.5)).toBeGreaterThan(0.75);
 	});
 
-	it('--ease-out decelerates: most of the way there early', () => {
-		expect(easeOut(0.25)).toBeGreaterThan(0.75);
+	it('--ease-out is the iOS sheet curve: most of the way there early', () => {
+		expect(easeOut(0.25)).toBeCloseTo(bezier(0.32, 0.72, 0, 1)(0.25), 6);
+		expect(easeOut(0.25)).toBeGreaterThan(0.6);
 	});
 
 	it('linear control points give a straight line', () => {
@@ -42,6 +44,6 @@ describe('motion vocabulary', () => {
 	});
 
 	it('durations follow --dur-1..4', () => {
-		expect(motion.DUR).toEqual([100, 150, 200, 250]);
+		expect(motion.DUR).toEqual([100, 180, 240, 320]);
 	});
 });

@@ -22,8 +22,7 @@
 	}
 </script>
 
-<!-- Nimbus modal: 16px corner on the dialog depth; backdrop fades in 200 ms,
-     the panel rises 12px from 98% scale over 250 ms on the decelerate curve. -->
+<!-- A sheet: centred on wide screens, rising from the bottom edge on phones. -->
 <dialog bind:this={dialog} aria-labelledby={titleId} onclose={() => (open = false)} onclick={onBackdrop}>
 	<div class="panel">
 		<header>
@@ -37,6 +36,8 @@
 </dialog>
 
 <style>
+	/* Desktop: a centred sheet that grows out of the page. Phone: a sheet that
+	   rises from the bottom edge and leaves the same way. */
 	dialog {
 		padding: 0;
 		border: 0;
@@ -44,7 +45,7 @@
 		color: inherit;
 		max-width: none;
 		max-height: none;
-		width: min(520px, 100vw - 32px);
+		width: min(540px, 100vw - 32px);
 		overflow: visible;
 	}
 	dialog::backdrop {
@@ -54,62 +55,83 @@
 		display: flex;
 		flex-direction: column;
 		max-height: min(86dvh, 760px);
-		border: 1px solid var(--c-border2);
-		border-radius: var(--radius-lg);
+		border-radius: var(--radius-sheet);
 		background: var(--c-bg-card);
-		box-shadow: var(--shadow-lg);
+		box-shadow:
+			0 0 0 0.5px rgba(0, 0, 0, 0.08),
+			var(--shadow-lg);
 	}
 	dialog[open]::backdrop {
-		animation: overlay-in var(--dur-3) var(--ease-out) both;
+		animation: overlay-in var(--dur-3) var(--ease) both;
 	}
 	dialog[open] .panel {
-		animation: modal-in var(--dur-4) var(--ease-out) both;
+		animation: sheet-in var(--dur-4) var(--ease-out) both;
 	}
 	header {
+		position: relative;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		padding: 18px 14px 6px 24px;
+		justify-content: center;
+		min-height: 56px;
+		padding: 14px 52px 6px;
 	}
 	h2 {
 		margin: 0;
-		font-size: 1.125rem;
-		font-weight: 700;
+		font-size: 1.0625rem;
+		font-weight: 600;
 		line-height: 1.3;
-		letter-spacing: -0.01em;
+		letter-spacing: -0.015em;
+		text-align: center;
 	}
 	.body {
-		padding: 8px 24px 24px;
+		padding: 10px 24px 24px;
 		overflow: auto;
 	}
+	/* iOS close button: a grey disc with a small cross. */
 	.close {
-		flex: none;
+		position: absolute;
+		top: 14px;
+		right: 14px;
 		display: grid;
 		place-items: center;
-		width: 32px;
-		height: 32px;
+		width: 30px;
+		height: 30px;
 		border: 0;
-		border-radius: var(--radius-sm);
-		background: transparent;
-		color: var(--color-text-faint);
+		border-radius: 50%;
+		background: rgba(118, 118, 128, 0.12);
+		color: #8e8e93;
 		cursor: pointer;
-		transition: background-color var(--dur-2) var(--ease);
+		transition: background-color var(--dur-1) var(--ease);
 	}
 	.close:hover {
-		background: var(--c-bg-section);
-		color: var(--color-text);
+		background: rgba(118, 118, 128, 0.2);
+		color: var(--color-text-muted);
+	}
+	.close:active {
+		background: rgba(118, 118, 128, 0.28);
 	}
 	.close svg {
-		width: 12px;
-		height: 12px;
+		width: 11px;
+		height: 11px;
 		stroke: currentColor;
-		stroke-width: 2;
+		stroke-width: 2.4;
 		stroke-linecap: round;
 	}
 	@media (max-width: 599px) {
+		dialog {
+			width: 100vw;
+			margin: auto 0 0;
+		}
+		.panel {
+			max-height: 92dvh;
+			border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+			padding-bottom: env(safe-area-inset-bottom);
+		}
+		dialog[open] .panel {
+			animation-name: sheet-up;
+		}
 		header {
-			padding: 16px 10px 4px 18px;
+			padding: 14px 52px 4px;
 		}
 		.body {
 			padding: 8px 18px 20px;
@@ -120,10 +142,15 @@
 			opacity: 0;
 		}
 	}
-	@keyframes modal-in {
+	@keyframes sheet-in {
 		from {
 			opacity: 0;
-			transform: translateY(12px) scale(0.98);
+			transform: scale(0.96);
+		}
+	}
+	@keyframes sheet-up {
+		from {
+			transform: translateY(100%);
 		}
 	}
 </style>

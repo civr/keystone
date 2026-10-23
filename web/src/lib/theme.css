@@ -1,129 +1,117 @@
 /*
- * Keystone design tokens — the Project Nimbus theme (DESIGN.md of Nimbus).
+ * Keystone design tokens — Apple-style, light.
  *
- * One light theme: a pale blue-grey canvas that the bar, the menu and the
- * pages all sit on, with white cards floating on it — 20px corners, hardly any
- * edge, a whisper of shadow. A vivid blue accent used solid only where it
- * matters (the active menu pill, the primary button). Plus Jakarta Sans,
- * self-hosted. No gradients, no glass, no dark mode, no springs.
+ * The system font (SF Pro on Apple devices, Segoe UI on Windows), Apple's
+ * system colours, a grouped-grey canvas with white inset-grouped cards,
+ * translucent chrome that content scrolls under, app tiles as rounded-square
+ * icons, and short, eased motion that never bounces unless something was
+ * thrown. Values follow Apple's Human Interface Guidelines for iOS/macOS,
+ * translated to the web.
  *
- * The Keystone token names that components already use (--text, --accent,
- * --hairline, --radius-m, …) are kept and remapped onto the Nimbus values.
+ * Token names that components use (--primary, --c-border, --radius-md, …)
+ * are kept and mapped onto the Apple values.
  */
-
-/* ── Plus Jakarta Sans, same-origin (CSP 'self'); one variable file per subset. */
-@font-face {
-	font-family: 'Plus Jakarta Sans';
-	font-style: normal;
-	font-weight: 400 800;
-	font-display: swap;
-	src: url('/fonts/plus-jakarta-sans-latin.woff2') format('woff2');
-	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-	font-family: 'Plus Jakarta Sans';
-	font-style: normal;
-	font-weight: 400 800;
-	font-display: swap;
-	src: url('/fonts/plus-jakarta-sans-latin-ext.woff2') format('woff2');
-	unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
-		U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
 
 :root {
 	color-scheme: light;
 
-	/* ── Type ── */
-	--font: 'Plus Jakarta Sans', 'Inter Variable', Inter, 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont,
+	/* ── Type: the platform's own face first ── */
+	--font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro', 'Segoe UI Variable Text', 'Segoe UI', system-ui,
 		Roboto, 'Helvetica Neue', Arial, sans-serif;
-	--font-mono: ui-monospace, 'Cascadia Code', SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+	--font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro', 'Segoe UI Variable Display', 'Segoe UI',
+		system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, 'Cascadia Code', Consolas, 'Liberation Mono', monospace;
 
-	/* ── Accent ── */
-	--primary: #0b5cff;
-	--primary-dark: #0a4ad6;
-	--primary-light: #4d8bff;
-	--primary-pressed: color-mix(in oklch, var(--primary-dark) 82%, black);
+	/* ── Accent: systemBlue ── */
+	--primary: #007aff;
+	--primary-dark: #0066d6;
+	--primary-light: #409cff;
+	--primary-pressed: #0055b3;
 
-	/* ── Neutrals (slate) ── */
-	--color-bg: #f5f7fb; /* the canvas */
+	/* ── Labels, fills and separators (iOS light) ── */
+	--color-bg: #f2f2f7; /* systemGroupedBackground */
 	--color-surface: #ffffff;
-	--color-border: #d9dfe8; /* strong stroke: fields */
-	--color-text: #0f172a;
-	--color-text-muted: #475569;
-	--color-text-faint: #5f6f86; /* clears 4.5:1 on white, canvas, section and sunken fills */
-	--c-700: #334155;
-	--c-400: #94a3b8;
-	--c-border: #e5e9f0;
-	--c-border2: #edf0f5;
-	--c-border3: #f2f4f8;
+	--color-border: #d1d1d6; /* systemGray4: field strokes */
+	--color-text: #1d1d1f; /* label */
+	--color-text-muted: #6e6e73; /* secondaryLabel, 4.6:1 on white */
+	--color-text-faint: #6e6e73; /* small text stays readable: same as secondary */
+	--c-700: #3a3a3c;
+	--c-400: #aeaeb2; /* systemGray2: disabled ink */
+	--c-border: #e5e5ea; /* systemGray5 */
+	--c-border2: #ececf0; /* separators inside cards */
+	--c-border3: #f2f2f7;
 	--c-bg-card: #ffffff;
-	--c-bg-section: #f8fafc;
-	--c-bg-sunken: #eef1f6;
-	--c-hover: #f8fafc;
-	--c-bg-page: #f5f7fb;
+	--c-bg-section: #f9f9fb;
+	--c-bg-sunken: rgba(118, 118, 128, 0.12); /* tertiarySystemFill: search fields, segmented tracks */
+	--c-hover: rgba(0, 0, 0, 0.04);
+	--c-bg-page: #f2f2f7;
 
-	/* ── Status: fill / text / tint ── */
-	--color-success: #16a34a;
-	--color-success-text: #15803d;
-	--color-success-tint: #f0fdf4;
-	--color-warning: #ca5010;
-	--color-warning-text: #b45309;
-	--color-warning-tint: #fffbeb;
-	--color-danger: #dc2626;
-	--color-danger-text: #b91c1c;
-	--color-danger-tint: #fef2f2;
-	--color-info-tint: color-mix(in oklch, var(--primary) 8%, white);
+	/* ── Status: system colours, with darker ink for text ── */
+	--color-success: #34c759;
+	--color-success-text: #248a3d;
+	--color-success-tint: #eaf8ee;
+	--color-warning: #ff9500;
+	--color-warning-text: #b35900;
+	--color-warning-tint: #fff4e5;
+	--color-danger: #ff3b30;
+	--color-danger-text: #d70015;
+	--color-danger-tint: #ffeceb;
+	--color-info-tint: #eaf3ff;
 
-	/* ── Selection / active tints, mixed from the accent ── */
-	--c-selected: color-mix(in oklch, var(--primary) 18%, white);
-	--c-selected-mid: color-mix(in oklch, var(--primary) 12%, white);
-	--c-selected-light: color-mix(in oklch, var(--primary) 7%, white);
+	/* ── Selection tints from the accent ── */
+	--c-selected: #d6e8ff;
+	--c-selected-mid: #e3efff;
+	--c-selected-light: #eff6ff;
 
-	/* ── Label tints (text / surface) ── */
-	--t-slate: #475569;
-	--t-slate-bg: #f1f5f9;
+	--t-slate: #3a3a3c;
+	--t-slate-bg: rgba(118, 118, 128, 0.12);
 
-	/* ── Chrome: bar on the canvas, white menu ── */
-	--topbar-bg: var(--c-bg-page);
-	--topbar-ink: #0f172a;
-	--topbar-ink-2: #475569;
-	--topbar-hover: rgba(15, 23, 42, 0.05);
-	--topbar-stroke: rgba(15, 23, 42, 0.08);
-	--topbar-field: #ffffff;
-	--topbar-field-stroke: rgba(15, 23, 42, 0.07);
-	--nav-bg: #ffffff;
-	--nav-ink: #0f172a;
-	--nav-ink-2: #475569;
-	--nav-hover: rgba(15, 23, 42, 0.05);
+	/* ── Chrome: translucent materials over the canvas ── */
+	--material-bar: rgba(255, 255, 255, 0.72);
+	--material-side: rgba(246, 246, 248, 0.82);
+	--material-blur: saturate(180%) blur(20px);
+	--topbar-bg: var(--material-bar);
+	--topbar-ink: #1d1d1f;
+	--topbar-ink-2: #6e6e73;
+	--topbar-hover: rgba(0, 0, 0, 0.05);
+	--topbar-stroke: rgba(0, 0, 0, 0.1);
+	--topbar-field: rgba(118, 118, 128, 0.12);
+	--topbar-field-stroke: transparent;
+	--nav-bg: var(--material-side);
+	--nav-ink: #1d1d1f;
+	--nav-ink-2: #6e6e73;
+	--nav-hover: rgba(0, 0, 0, 0.05);
 	--nav-active: var(--primary);
 	--nav-active-ink: #ffffff;
-	--nav-active-shadow: 0 8px 18px -8px color-mix(in srgb, var(--primary) 70%, transparent);
-	--nav-w: 240px;
-	--nav-w-icons: 72px;
+	--nav-active-shadow: none;
+	--nav-w: 232px;
+	--nav-w-icons: 64px;
 
-	/* ── Radii ── */
+	/* ── Radii: continuous-looking corners, sized to the object ── */
 	--radius-xs: 6px;
 	--radius-sm: 8px;
-	--radius-control: 10px; /* buttons, inputs */
-	--radius-md: 12px; /* tiles, menu items */
-	--radius-lg: 16px; /* menus, dialogs */
-	--radius-card: 20px; /* cards */
+	--radius-control: 10px; /* inputs */
+	--radius-md: 12px; /* menu items, small cards */
+	--radius-lg: 14px; /* menus, alerts */
+	--radius-card: 12px; /* inset grouped sections, as in Settings */
+	--radius-sheet: 16px;
+	--radius-icon: 22.5%; /* app icon squircle */
 	--radius-full: 9999px;
+	--radius-pill: 9999px;
 
-	/* ── Depth: barely there, tinted navy ── */
-	--shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.03);
-	--shadow-hover: 0 10px 24px -8px rgba(16, 24, 40, 0.12), 0 1px 3px rgba(16, 24, 40, 0.04);
-	--shadow-md: 0 16px 36px -10px rgba(16, 24, 40, 0.16), 0 2px 6px rgba(16, 24, 40, 0.05);
-	--shadow-lg: 0 32px 64px -16px rgba(16, 24, 40, 0.24), 0 4px 12px rgba(16, 24, 40, 0.06);
+	/* ── Depth: soft, neutral, larger surfaces cast longer shadows ── */
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+	--shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
+	--shadow-md: 0 10px 30px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+	--shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
 
-	/* ── Motion: two curves, four durations ── */
-	--ease: cubic-bezier(0.33, 0, 0.67, 1);
-	--ease-out: cubic-bezier(0.1, 0.9, 0.2, 1);
+	/* ── Motion: Apple's ease, and the iOS sheet curve for arrivals ── */
+	--ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+	--ease-out: cubic-bezier(0.32, 0.72, 0, 1);
 	--dur-1: 100ms;
-	--dur-2: 150ms;
-	--dur-3: 200ms;
-	--dur-4: 250ms;
+	--dur-2: 180ms;
+	--dur-3: 240ms;
+	--dur-4: 320ms;
 
 	/* ── Z-index ── */
 	--z-sticky: 10;
@@ -134,7 +122,7 @@
 	--z-toast: 400;
 	--z-skip-link: 500;
 
-	/* ── Keystone names, remapped onto Nimbus ── */
+	/* ── Keystone names ── */
 	--text: var(--color-text);
 	--text-2: var(--color-text-muted);
 	--text-3: var(--color-text-faint);
@@ -142,13 +130,13 @@
 	--accent-text: #ffffff;
 	--hairline: var(--c-border);
 	--hover: var(--c-hover);
-	--press: var(--c-bg-sunken);
+	--press: rgba(0, 0, 0, 0.08);
 	--danger: var(--color-danger-text);
 	--warn-bg: var(--color-warning-tint);
-	--warn-border: color-mix(in srgb, var(--color-warning) 32%, transparent);
+	--warn-border: rgba(255, 149, 0, 0.3);
 	--warn-text: var(--color-warning-text);
 	--skeleton: var(--c-border2);
-	--scrim: rgba(15, 23, 42, 0.32);
+	--scrim: rgba(0, 0, 0, 0.28);
 	--radius-s: var(--radius-control);
 	--radius-m: var(--radius-md);
 	--radius-l: var(--radius-card);
@@ -167,54 +155,49 @@ html {
 	-webkit-text-size-adjust: 100%;
 	text-size-adjust: 100%;
 }
-/* A wide face: the base steps down on phones so dense rows keep their room. */
-@media (max-width: 640px) {
-	html {
-		font-size: 95%;
-	}
-}
-@media (max-width: 380px) {
-	html {
-		font-size: 90%;
-	}
-}
 
 body {
 	margin: 0;
 	min-height: 100dvh;
 	font-family: var(--font);
-	font-size: 0.875rem;
+	font-size: 0.9375rem; /* 15px: Apple's compact body for dense UI */
 	font-weight: 400;
-	line-height: 1.55;
+	line-height: 1.47;
+	letter-spacing: -0.01em;
 	color: var(--color-text);
 	background-color: var(--color-bg);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	-webkit-tap-highlight-color: transparent;
+	font-optical-sizing: auto;
 }
 
 ::selection {
-	background: color-mix(in srgb, var(--primary) 16%, white);
-	color: var(--primary-pressed);
+	background: rgba(0, 122, 255, 0.2);
 }
 
+/* Large text: display face, tight leading, negative tracking. */
 h1,
 h2,
 h3,
 h4 {
 	color: var(--color-text);
-	font-weight: 700;
-	letter-spacing: -0.01em;
+	font-family: var(--font-display);
+	font-weight: 600;
+	letter-spacing: -0.015em;
 }
 h1 {
-	letter-spacing: -0.02em;
+	font-weight: 700;
+	letter-spacing: -0.022em;
+	line-height: 1.1;
 }
 
 a {
 	color: var(--primary);
+	text-decoration: none;
 }
 a:hover {
-	color: var(--primary-dark);
+	text-decoration: underline;
 }
 
 button,
@@ -232,18 +215,19 @@ pre,
 .mono {
 	font-family: var(--font-mono);
 	font-feature-settings: 'liga' 0;
+	letter-spacing: 0;
 }
 .tabular {
 	font-variant-numeric: tabular-nums;
 }
 
-/* Keyboard focus: 2px accent at 2px offset, following the element's corner. */
+/* Keyboard focus: Apple's soft accent ring. */
 :focus {
 	outline: none;
 }
 :focus-visible {
-	outline: 2px solid var(--primary);
-	outline-offset: 2px;
+	outline: 3px solid rgba(0, 122, 255, 0.5);
+	outline-offset: 1px;
 }
 
 .visually-hidden {
@@ -255,37 +239,42 @@ pre,
 	white-space: nowrap;
 }
 
-/* ── Buttons: flat, 36px, 10px corner, 600 ── */
+/* ── Buttons: capsules; feedback on press, not on release ── */
 .btn {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 7px;
+	gap: 6px;
 	height: 36px;
-	padding: 0 16px;
-	border: 1px solid transparent;
-	border-radius: var(--radius-control);
+	padding: 0 18px;
+	border: 0;
+	border-radius: var(--radius-pill);
 	font-family: inherit;
-	font-size: 0.8125rem;
-	font-weight: 600;
+	font-size: 0.9375rem;
+	font-weight: 500;
 	line-height: 1;
-	letter-spacing: 0;
+	letter-spacing: -0.01em;
 	text-decoration: none;
 	white-space: nowrap;
 	cursor: pointer;
 	user-select: none;
 	transition:
 		background-color var(--dur-2) var(--ease),
-		border-color var(--dur-2) var(--ease),
 		color var(--dur-2) var(--ease),
+		opacity var(--dur-2) var(--ease),
 		transform var(--dur-1) var(--ease);
 }
+.btn:hover {
+	text-decoration: none;
+}
 .btn:disabled {
-	cursor: not-allowed;
+	cursor: default;
 	pointer-events: none;
+	opacity: 0.4;
 }
 .btn:active:not(:disabled) {
-	transform: scale(0.98);
+	transform: scale(0.97);
+	transition-duration: 60ms;
 }
 .btn svg {
 	width: 16px;
@@ -300,173 +289,147 @@ pre,
 
 .btn-primary {
 	background: var(--primary);
-	border-color: var(--primary);
 	color: #fff;
 }
 .btn-primary:hover:not(:disabled) {
 	background: var(--primary-dark);
-	border-color: var(--primary-dark);
 	color: #fff;
 }
 .btn-primary:active:not(:disabled) {
 	background: var(--primary-pressed);
-	border-color: var(--primary-pressed);
 }
 
-/* Danger fills with the 700 red: white on #dc2626 is under 4.5:1. */
 .btn-danger {
-	background: var(--color-danger-text);
-	border-color: var(--color-danger-text);
+	background: var(--color-danger);
 	color: #fff;
 }
 .btn-danger:hover:not(:disabled) {
-	background: #991b1b;
-	border-color: #991b1b;
+	background: #e0352b;
 	color: #fff;
 }
 .btn-danger:active:not(:disabled) {
-	background: #7f1d1d;
-	border-color: #7f1d1d;
-}
-.btn-primary:disabled,
-.btn-danger:disabled {
-	background: var(--c-bg-sunken);
-	border-color: var(--c-bg-sunken);
-	color: var(--c-400);
+	background: #c42e25;
 }
 
+/* Gray tinted capsule, as Apple's secondary buttons. */
 .btn-secondary {
-	background: var(--c-bg-card);
-	border-color: var(--c-border);
-	color: var(--color-text);
+	background: rgba(118, 118, 128, 0.12);
+	color: var(--primary);
 }
 .btn-secondary:hover:not(:disabled) {
-	background: var(--c-bg-section);
-	border-color: var(--color-border);
-	color: var(--color-text);
+	background: rgba(118, 118, 128, 0.18);
+	color: var(--primary);
 }
 .btn-secondary:active:not(:disabled) {
-	background: var(--c-bg-sunken);
+	background: rgba(118, 118, 128, 0.24);
 }
-.btn-secondary:disabled {
-	background: var(--c-bg-card);
-	border-color: var(--c-border2);
-	color: var(--c-400);
-}
-/* A secondary button whose action removes or signs out: red ink, same face. */
-.btn-secondary.danger-ink {
-	color: var(--color-danger-text);
-}
+.btn-secondary.danger-ink,
 .btn-secondary.danger-ink:hover:not(:disabled) {
-	background: var(--color-danger-tint);
-	border-color: color-mix(in srgb, var(--color-danger) 32%, transparent);
 	color: var(--color-danger-text);
 }
 
 .btn-flat {
 	background: transparent;
 	color: var(--primary);
+	padding: 0 10px;
 }
 .btn-flat:hover:not(:disabled) {
-	background: var(--c-selected-light);
+	background: var(--c-hover);
 	color: var(--primary);
 }
 .btn-flat:active:not(:disabled) {
-	background: var(--c-selected-mid);
-}
-.btn-flat:disabled {
-	color: var(--c-400);
+	background: var(--press);
 }
 
 .btn-sm {
 	height: 30px;
-	padding: 0 12px;
-	font-size: 0.75rem;
-	border-radius: var(--radius-sm);
+	padding: 0 14px;
+	font-size: 0.8125rem;
 }
 .btn.block {
 	width: 100%;
+	height: 44px;
+	font-size: 1.0625rem;
 }
 @media (pointer: coarse) {
-	.btn,
+	.btn {
+		min-height: 44px;
+	}
 	.btn-sm {
 		min-height: 36px;
 	}
 }
 
-/* Text link for a secondary path. */
+/* Plain text link for a secondary path. */
 .link {
-	padding: 4px 6px;
+	padding: 2px 4px;
 	border: 0;
 	border-radius: var(--radius-xs);
 	background: none;
 	color: var(--primary);
-	font-size: 0.8125rem;
-	font-weight: 600;
+	font-size: inherit;
+	font-weight: 400;
 	cursor: pointer;
 }
 .link:hover {
-	color: var(--primary-dark);
 	text-decoration: underline;
 }
 
-/* ── Fields: white box, light stroke, accent edge + soft ring on focus ── */
+/* ── Fields ── */
 .input {
 	width: 100%;
-	height: 36px;
+	height: 40px;
 	padding: 0 12px;
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-control);
-	background: var(--c-bg-card);
+	background: #fff;
 	color: var(--color-text);
-	font-size: 0.875rem;
+	font-size: 0.9375rem;
 	transition:
 		border-color var(--dur-2) var(--ease),
 		box-shadow var(--dur-2) var(--ease);
 }
 .input::placeholder {
-	color: var(--color-text-faint);
+	color: #a1a1a6;
 	opacity: 1;
-}
-.input:hover:not(:disabled):not(:focus) {
-	border-color: var(--c-400);
 }
 .input:focus,
 .input:focus-visible {
 	outline: none;
 	border-color: var(--primary);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+	box-shadow: 0 0 0 3.5px rgba(0, 122, 255, 0.25);
 }
 .input[aria-invalid='true'] {
-	border-color: var(--color-danger-text);
+	border-color: var(--color-danger);
 }
 .input[aria-invalid='true']:focus {
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 16%, transparent);
+	box-shadow: 0 0 0 3.5px rgba(255, 59, 48, 0.2);
 }
 .input:disabled {
-	background: var(--c-bg-sunken);
+	background: var(--c-bg-section);
 	color: var(--c-400);
 }
 textarea.input {
 	height: auto;
 	min-height: 88px;
-	padding: 8px 12px;
+	padding: 9px 12px;
 	font: 0.8125rem/1.5 var(--font-mono);
 	resize: vertical;
 }
 select.input {
 	appearance: none;
 	padding-right: 34px;
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6 8l4 4 4-4' fill='none' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6.5 8l3.5 3.5L13.5 8' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 	background-repeat: no-repeat;
 	background-position: right 10px center;
 	background-size: 16px;
 }
 .input.code {
-	font: 600 0.9375rem/1 var(--font-mono);
-	letter-spacing: 0.08em;
+	font: 500 1.25rem/1 var(--font-mono);
+	letter-spacing: 0.12em;
 	text-align: center;
 	text-transform: uppercase;
+	height: 52px;
 }
 .input.mono {
 	font-family: var(--font-mono);
@@ -484,7 +447,7 @@ select.input {
 	}
 }
 
-/* Label above control: 0.75rem / 600, ink, sentence case. */
+/* Label above control: quiet, sentence case. */
 .field {
 	display: flex;
 	flex-direction: column;
@@ -493,187 +456,174 @@ select.input {
 }
 .field > span,
 .field-label {
-	font-size: 0.75rem;
-	font-weight: 600;
-	line-height: 1.45;
-	color: var(--color-text);
+	font-size: 0.8125rem;
+	font-weight: 500;
+	line-height: 1.4;
+	color: var(--color-text-muted);
 }
 .field small {
-	color: var(--color-text-faint);
-	font-size: 0.75rem;
-	line-height: 1.45;
+	color: var(--color-text-muted);
+	font-size: 0.8125rem;
+	line-height: 1.4;
 }
 .field-error,
 .field small.field-error {
 	margin: 0;
 	color: var(--color-danger-text);
-	font-size: 0.75rem;
-	font-weight: 500;
-	line-height: 1.45;
+	font-size: 0.8125rem;
+	line-height: 1.4;
 }
 
 .check {
 	display: flex;
 	align-items: flex-start;
 	gap: 10px;
-	font-size: 0.875rem;
-	line-height: 1.45;
+	font-size: 0.9375rem;
+	line-height: 1.4;
 	cursor: pointer;
 }
 .check input {
 	flex: none;
-	width: 16px;
-	height: 16px;
-	margin: 2px 0 0;
+	width: 18px;
+	height: 18px;
+	margin: 1px 0 0;
 	accent-color: var(--primary);
 }
 .check small {
 	display: block;
-	color: var(--color-text-faint);
-	font-size: 0.75rem;
+	color: var(--color-text-muted);
+	font-size: 0.8125rem;
 }
 
-/* ── Toggle (Nimbus): 40×22 track, 16px thumb, accent when on ── */
+/* ── Switch: the iOS toggle, green when on ── */
 .switch {
 	appearance: none;
 	position: relative;
 	flex: none;
-	width: 40px;
-	height: 22px;
+	width: 51px;
+	height: 31px;
 	margin: 0;
-	border-radius: 11px;
-	background: var(--c-border);
+	border-radius: 16px;
+	background: rgba(120, 120, 128, 0.16);
 	cursor: pointer;
 	transition: background-color var(--dur-3) var(--ease);
 }
 .switch::before {
 	content: '';
 	position: absolute;
-	top: 3px;
-	left: 3px;
-	width: 16px;
-	height: 16px;
+	top: 2px;
+	left: 2px;
+	width: 27px;
+	height: 27px;
 	border-radius: 50%;
 	background: #fff;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-	transition: transform var(--dur-2) var(--ease);
-}
-.switch:hover:not(:disabled):not(:checked) {
-	background: var(--color-border);
+	box-shadow:
+		0 3px 8px rgba(0, 0, 0, 0.15),
+		0 3px 1px rgba(0, 0, 0, 0.06);
+	transition: transform var(--dur-3) var(--ease-out);
 }
 .switch:checked {
-	background: var(--primary);
+	background: var(--color-success);
 }
 .switch:checked::before {
-	transform: translateX(18px);
+	transform: translateX(20px);
 }
 .switch:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
+	opacity: 0.4;
+	cursor: default;
 }
 
-/* ── Chips: tinted pills, no border. Status chips in small capitals. ── */
+/* ── Chips: small tinted capsules ── */
 .chip {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	padding: 2px 10px;
+	padding: 2px 9px;
 	border-radius: var(--radius-full);
 	font-size: 0.75rem;
-	font-weight: 600;
+	font-weight: 500;
 	line-height: 1.45;
 	background: var(--t-slate-bg);
 	color: var(--c-700);
 	white-space: nowrap;
 	vertical-align: 1px;
-}
-.chip.good,
-.chip.warn,
-.chip.bad {
-	font-size: 0.6875rem;
-	font-weight: 700;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
+	letter-spacing: 0;
 }
 .chip.good {
 	color: var(--color-success-text);
-	background: #dcfce7;
+	background: var(--color-success-tint);
 }
 .chip.warn {
-	color: #92400e;
-	background: #fef3c7;
+	color: var(--color-warning-text);
+	background: var(--color-warning-tint);
 }
 .chip.bad {
 	color: var(--color-danger-text);
-	background: #fee2e2;
+	background: var(--color-danger-tint);
 }
 .chip.accent {
 	color: var(--primary-dark);
 	background: var(--c-selected-mid);
 }
 
-/* ── Notes: tinted, rounded, no relief ── */
+/* ── Notes: tinted, rounded, no stroke ── */
 .notice,
 .error {
 	margin: 0;
-	padding: 10px 14px;
+	padding: 11px 14px;
 	border-radius: var(--radius-md);
-	font-size: 0.8125rem;
-	line-height: 1.5;
+	font-size: 0.875rem;
+	line-height: 1.45;
 	text-wrap: pretty;
 	overflow-wrap: anywhere;
 }
 .notice {
 	background: var(--color-info-tint);
 	color: var(--color-text);
-	border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
 }
 .notice.ok {
 	background: var(--color-success-tint);
-	border-color: color-mix(in srgb, var(--color-success) 32%, transparent);
 }
 .notice.warn {
 	background: var(--color-warning-tint);
-	border-color: var(--warn-border);
 }
 .error {
 	background: var(--color-danger-tint);
 	color: var(--color-danger-text);
-	border: 1px solid color-mix(in srgb, var(--color-danger) 28%, transparent);
 }
 
-/* ── Card: white, 20px corner, near-invisible edge, the lightest depth ── */
+/* ── Card: an inset grouped section ── */
 .surface {
 	background: var(--c-bg-card);
-	border: 1px solid var(--c-border2);
 	border-radius: var(--radius-card);
 	box-shadow: var(--shadow-sm);
 }
 
-/* Avatar: initials in a tinted circle. */
+/* Avatar: initials on a grey gradient disc, as Contacts does. */
 .avatar {
 	display: grid;
 	place-items: center;
 	flex: none;
-	width: 36px;
-	height: 36px;
+	width: 32px;
+	height: 32px;
 	border-radius: var(--radius-full);
-	background: var(--c-selected);
-	color: var(--primary-dark);
+	background: linear-gradient(180deg, #a5abb8, #858994);
+	color: #fff;
 	font-size: 0.8125rem;
-	font-weight: 700;
+	font-weight: 600;
 	letter-spacing: 0;
 }
 
-/* Small inline spinner, only for an action in progress inside a button. */
+/* Activity indicator inside a button. */
 .spinner {
 	flex: none;
-	width: 14px;
-	height: 14px;
+	width: 15px;
+	height: 15px;
 	border-radius: 50%;
 	border: 2px solid currentColor;
 	border-right-color: transparent;
-	animation: spin 800ms linear infinite;
+	opacity: 0.8;
+	animation: spin 900ms linear infinite;
 }
 @keyframes spin {
 	to {
@@ -681,29 +631,31 @@ select.input {
 	}
 }
 
-/* Ghost loading: grey shapes where content will be. */
 .ghost {
 	display: block;
 	border-radius: var(--radius-xs);
 	background: var(--c-border2);
 }
 
+/* Thin overlay-style scrollbars. */
 ::-webkit-scrollbar {
-	width: 8px;
-	height: 8px;
+	width: 10px;
+	height: 10px;
 }
 ::-webkit-scrollbar-track {
 	background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-	background: var(--color-border);
-	border-radius: 4px;
+	background: rgba(0, 0, 0, 0.2);
+	border: 3px solid transparent;
+	background-clip: content-box;
+	border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-	background: var(--c-400);
+	background-color: rgba(0, 0, 0, 0.35);
 }
 
-/* ── Reduced motion collapses every animation and transition ── */
+/* ── Accessibility preferences ── */
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,
@@ -712,5 +664,21 @@ select.input {
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
+	}
+}
+/* Frosted chrome becomes solid when transparency is reduced. */
+@media (prefers-reduced-transparency: reduce) {
+	:root {
+		--material-bar: #ffffff;
+		--material-side: #f6f6f8;
+		--material-blur: none;
+	}
+}
+@media (prefers-contrast: more) {
+	:root {
+		--color-text-muted: #3a3a3c;
+		--color-text-faint: #3a3a3c;
+		--c-border: #8e8e93;
+		--c-border2: #aeaeb2;
 	}
 }
