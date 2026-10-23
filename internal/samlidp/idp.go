@@ -199,6 +199,27 @@ func basicAttr(name, v string) saml.Attribute {
 	}
 }
 
+// Check validates req (known SP, ACS, issue time) without answering it, so a
+// request can be refused before it waits for the user to sign in.
+func (p *Provider) Check(ctx context.Context, publicURL string, r *http.Request, req Request) error {
+	list, err := apps.Load(ctx, p.Apps)
+	if err != nil {
+		return err
+	}
+	idp, _, err := p.idp(ctx, publicURL, list)
+	if err != nil {
+		return err
+	}
+	ar := &saml.IdpAuthnRequest{IDP: idp, HTTPRequest: r, RequestBuffer: req.XML, RelayState: req.RelayState, Now: req.At}
+	if err := ar.Validate(); err != nil {
+		if strings.Contains(err.Error(), "unknown service provider") {
+			return ErrUnknownSP
+		}
+		return err
+	}
+	return nil
+}
+
 // Respond validates an SP-initiated request and returns the signed response
 // for the matching app, plus that app.
 func (p *Provider) Respond(ctx context.Context, publicURL string, r *http.Request, req Request,

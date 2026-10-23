@@ -77,6 +77,16 @@ func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	sess := SessionFrom(ctx)
 	if sess == nil || sess.MustRegisterPasskey {
+		// Only a valid request from a configured app may wait in Valkey, and
+		// only a few per address: the endpoint takes unauthenticated posts.
+		if !s.allow(w, ctx, "saml-stash", clientIP(ctx).String(), 20) {
+			return
+		}
+		if err := s.samlProvider().Check(ctx, settingsFrom(ctx).PublicURL, r, req); err != nil {
+			slog.Info("saml: request refused before sign-in", "err", err)
+			samlFail(w, http.StatusBadRequest, "Dit SAML-verzoek komt niet van een app die in Keystone is ingesteld.")
+			return
+		}
 		tok, err := randomToken()
 		if err != nil {
 			errInternal(w, "saml stash", err)

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"html"
 	"encoding/base64"
@@ -155,6 +156,38 @@ func TestSAML(t *testing.T) {
 		l.h.ServeHTTP(w, r) // cross-site POST: Lax cookie absent → login detour
 		if w.Code != http.StatusFound || !strings.Contains(w.Header().Get("Location"), "resume") {
 			t.Fatalf("got %d %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("UnknownSPNotStashed", func(t *testing.T) {
+		other := *sp
+		other.EntityID = "https://evil.example/metadata"
+		path, _ := redirectRequest(t, &other)
+		anon := newClient(t, l.env, "192.168.1.24")
+		if w := anon.do("GET", path, nil); w.Code != 400 {
+			t.Fatalf("unknown SP without session = %d %s", w.Code, w.Header().Get("Location"))
+		}
+		keys, _ := l.deps.Valkey.Keys(context.Background(), "samlreq:*").Result()
+		for _, k := range keys {
+			raw, _ := l.deps.Valkey.Get(context.Background(), k).Result()
+			if strings.Contains(raw, base64.StdEncoding.EncodeToString([]byte("evil.example"))[:8]) {
+				t.Fatal("request of an unknown SP was stashed")
+			}
+		}
+	})
+
+	t.Run("StashRateLimited", func(t *testing.T) {
+		anon := newClient(t, l.env, "192.168.1.25")
+		limited := false
+		for range 40 {
+			path, _ := redirectRequest(t, sp)
+			if w := anon.do("GET", path, nil); w.Code == 429 {
+				limited = true
+				break
+			}
+		}
+		if !limited {
+			t.Fatal("no rate limit on stashing SAML requests")
 		}
 	})
 
