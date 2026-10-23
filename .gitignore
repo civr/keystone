@@ -6,3 +6,8 @@ node_modules/
 /bin/
 *.local
 .env
+/keystone-core
+/keystone-ldap
+/keystone-gate
+__pycache__/
+*.pyc
