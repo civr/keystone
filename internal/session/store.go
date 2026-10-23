@@ -55,6 +55,9 @@ type Session struct {
 	UserAgent           string
 	MustRegisterPasskey bool
 	Emergency           bool
+	// NoPasskey: created while no passkey existed (setup went on without
+	// https), so a recent password sign-in stands in for step-up.
+	NoPasskey bool
 }
 
 // Store keeps sessions in Valkey.

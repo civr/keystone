@@ -90,6 +90,7 @@ const ACTIONS: Record<string, string> = {
 	'setup.owner': 'Installatie: eigenaar gekozen',
 	'setup.owner_failed': 'Installatie: eigenaar niet herkend',
 	'setup.passkey': 'Installatie: passkey geregistreerd',
+	'setup.passkey_skipped': 'Installatie: passkey overgeslagen',
 	'setup.emergency': 'Installatie: nood-account ingesteld',
 	'setup.completed': 'Installatie voltooid'
 };

@@ -143,6 +143,14 @@ func (s *server) passkeyAddFinish(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "passkey_failed", "De passkey kon niet worden geregistreerd. Probeer het opnieuw.")
 		return
 	}
+	// The first passkey of a session made without one: from now on only
+	// passkeys confirm sensitive actions in it.
+	if sess := *SessionFrom(ctx); sess.NoPasskey {
+		sess.NoPasskey, sess.LastPasskeyAt = false, time.Now()
+		if err := s.d.Sessions.Update(ctx, sess); err != nil {
+			slog.Error("passkey: update session", "err", err)
+		}
+	}
 	s.d.Audit.Log(ctx, audit.ActorOwner, "passkey.registered", clientIP(ctx), map[string]any{"name": name})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

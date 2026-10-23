@@ -84,7 +84,7 @@ export const settingsMeta: Record<string, FieldMeta> = {
 		label: 'Publiek adres',
 		help: 'Het adres waarop Keystone bereikbaar is. Passkeys zijn aan deze hostnaam gekoppeld.',
 		kind: 'text',
-		placeholder: 'https://keystone.home.lan'
+		placeholder: 'https://auth.home.lan'
 	},
 
 	'session.duration_hours': {

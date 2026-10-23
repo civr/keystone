@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -40,7 +41,12 @@ const (
 type setupProgress struct {
 	done, domain, ad, owner, emergency bool
 	passkeys                           int
+	// passkeyLater: the owner chose to go on without a passkey (no https
+	// yet); login.passkey_required is then off until one is added.
+	passkeyLater bool
 }
+
+func (p setupProgress) passkeyDone() bool { return p.passkeys > 0 || p.passkeyLater }
 
 // next is the step the wizard should show for an unlocked browser.
 func (p setupProgress) next() string {
@@ -53,7 +59,7 @@ func (p setupProgress) next() string {
 		return "ad"
 	case !p.owner:
 		return "owner"
-	case p.passkeys == 0:
+	case !p.passkeyDone():
 		return "passkey"
 	case !p.emergency:
 		return "emergency"
@@ -63,7 +69,7 @@ func (p setupProgress) next() string {
 }
 
 func (s *server) setupProgress(ctx context.Context, cfg settings.Settings) (setupProgress, error) {
-	p := setupProgress{domain: cfg.Domain != "" && cfg.PublicURL != ""}
+	p := setupProgress{domain: cfg.Domain != "" && cfg.PublicURL != "", passkeyLater: !cfg.Login.PasskeyRequired}
 	err := s.d.Pool.QueryRow(ctx, `select
 		coalesce((select completed_at is not null from setup_state where id = 1), false),
 		exists(select 1 from ad_config where id = 1),
@@ -110,7 +116,7 @@ var (
 	condOwner   = beforePasskey(func(p setupProgress) bool { return p.domain && p.ad })
 	condADTest  = func(p setupProgress) string { return ifThen(!p.domain, msgPrevious) }
 	condPasskey = func(p setupProgress) string { return ifThen(!(p.domain && p.ad && p.owner), msgPrevious) }
-	condAfterPK = func(p setupProgress) string { return ifThen(p.passkeys == 0, msgPrevious) }
+	condAfterPK = func(p setupProgress) string { return ifThen(!p.passkeyDone(), msgPrevious) }
 )
 
 func ifThen(c bool, msg string) string {
@@ -174,6 +180,7 @@ func (s *server) setupRoutes(r chi.Router) {
 	r.Post("/passkey/begin", s.setupStep(condPasskey, s.setupPasskeyBegin))
 	r.Post("/passkey/finish", s.setupStep(condPasskey, s.setupPasskeyFinish))
 	r.Post("/emergency", s.setupStep(condAfterPK, s.setupEmergency))
+	r.Post("/passkey/skip", s.setupStep(condPasskey, s.setupPasskeySkip))
 	r.Post("/finish", s.setupStep(condAfterPK, s.setupFinish))
 }
 
@@ -553,6 +560,26 @@ func (s *server) setupEmergency(w http.ResponseWriter, r *http.Request, _ string
 
 var errAlreadyDone = errors.New("setup already completed")
 
+// setupPasskeySkip goes on without a passkey: browsers only offer passkeys
+// on https (or localhost), and the reverse proxy may not exist yet. Logins
+// then use the AD password alone until a passkey is added in Instellingen.
+func (s *server) setupPasskeySkip(w http.ResponseWriter, r *http.Request, _ string) {
+	ctx := r.Context()
+	cfg := settingsFrom(ctx)
+	cfg.Login.PasskeyRequired = false
+	if _, err := s.d.Settings.Put(ctx, cfg, netip.Addr{}); err != nil {
+		errInternal(w, "skip passkey", err)
+		return
+	}
+	s.d.Audit.Log(ctx, audit.ActorAnonymous, "setup.passkey_skipped", clientIP(ctx), nil)
+	p, err := s.setupProgress(ctx, cfg)
+	if err != nil {
+		errInternal(w, "setup progress", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"step": p.next()})
+}
+
 func (s *server) setupFinish(w http.ResponseWriter, r *http.Request, token string) {
 	ctx := r.Context()
 	cfg := settingsFrom(ctx)
@@ -573,9 +600,16 @@ func (s *server) setupFinish(w http.ResponseWriter, r *http.Request, token strin
 	// Create the session first so a failure there never leaves a completed
 	// setup whose recovery codes were not shown; revoke it if commit fails.
 	now := time.Now()
-	sess, err := s.d.Sessions.Create(ctx, session.Session{
-		LastFullAuthAt: now, LastPasskeyAt: now, IP: ip.String(), UserAgent: r.UserAgent(),
-	}, cfg)
+	var passkeys int
+	if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&passkeys); err != nil {
+		errInternal(w, "count passkeys", err)
+		return
+	}
+	sess := session.Session{LastFullAuthAt: now, IP: ip.String(), UserAgent: r.UserAgent(), NoPasskey: passkeys == 0}
+	if passkeys > 0 {
+		sess.LastPasskeyAt = now
+	}
+	sess, err := s.d.Sessions.Create(ctx, sess, cfg)
 	if err != nil {
 		slog.Error("setup: create session", "err", err)
 		errUnavailable(w)

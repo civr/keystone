@@ -100,6 +100,8 @@ export interface Me {
 	emergency: boolean;
 	must_register_passkey: boolean;
 	needs_stepup: boolean;
+	/** No passkey registered yet (setup went on without https). */
+	passkey_missing?: boolean;
 	/** The client address as Keystone resolved it (after trusted proxies). */
 	client_ip: string;
 }

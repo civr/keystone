@@ -66,6 +66,19 @@
 			</p>
 		</div>
 	{/if}
+	{#if me?.passkey_missing}
+		<div class="notice warn banner" role="status">
+			<svg viewBox="0 0 20 20" aria-hidden="true">
+				<path d="M10 3.2 17.6 16.5H2.4z" />
+				<path d="M10 8.3v3.6M10 14.2v.01" />
+			</svg>
+			<p>
+				<strong>Nog geen passkey.</strong>
+				Je logt nu in met alleen je AD-wachtwoord. Open Keystone via https en voeg een passkey toe onder
+				<a class="link" href="/instellingen/apparaten">Instellingen</a>.
+			</p>
+		</div>
+	{/if}
 
 	<header class="page-head">
 		<h1>{hello}{#if me}<span class="name">, {firstName(me)}</span>{/if}</h1>

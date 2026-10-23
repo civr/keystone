@@ -32,6 +32,7 @@
 		"setup.owner",
 		"setup.owner_failed",
 		"setup.passkey",
+		"setup.passkey_skipped",
 		"setup.unlock_failed",
 		"setup.unlocked",
 		"stepup",

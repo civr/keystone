@@ -96,9 +96,15 @@ func requireStepUp(next http.Handler) http.Handler {
 	}))
 }
 
+// needsStepUp reports whether a sensitive action needs a fresh confirmation:
+// a recent passkey, or — for a session created while no passkey existed — a
+// recent password sign-in.
 func needsStepUp(sess session.Session, cfg settings.Settings, now time.Time) bool {
-	return sess.LastPasskeyAt.IsZero() ||
-		now.Sub(sess.LastPasskeyAt) > time.Duration(cfg.Login.StepUpMinutes)*time.Minute
+	last := sess.LastPasskeyAt
+	if sess.NoPasskey && sess.LastFullAuthAt.After(last) {
+		last = sess.LastFullAuthAt
+	}
+	return last.IsZero() || now.Sub(last) > time.Duration(cfg.Login.StepUpMinutes)*time.Minute
 }
 
 // mustRegisterGate blocks every API call of a session created with a
@@ -401,7 +407,12 @@ func (s *server) authPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
-	if !s.createSession(w, r, cfg, session.Session{LastFullAuthAt: now}) {
+	var passkeys int
+	if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&passkeys); err != nil {
+		errInternal(w, "count passkeys", err)
+		return
+	}
+	if !s.createSession(w, r, cfg, session.Session{LastFullAuthAt: now, NoPasskey: passkeys == 0}) {
 		return
 	}
 	s.markDevice(w, r, cfg, now)
@@ -818,7 +829,13 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sess := SessionFrom(ctx)
+	var passkeys int
+	if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&passkeys); err != nil {
+		errInternal(w, "count passkeys", err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
+		"passkey_missing": passkeys == 0,
 		"username": o.Username, "display_name": o.DisplayName, "given_name": o.GivenName, "email": o.Email,
 		"emergency": sess.Emergency, "must_register_passkey": sess.MustRegisterPasskey,
 		"needs_stepup": needsStepUp(*sess, settingsFrom(ctx), time.Now()),

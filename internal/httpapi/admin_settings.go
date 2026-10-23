@@ -39,6 +39,17 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 		writeInvalid(w, "public_url", "Het publieke adres is verplicht.")
 		return
 	}
+	if next.Login.PasskeyRequired {
+		var passkeys int
+		if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&passkeys); err != nil {
+			errInternal(w, "count passkeys", err)
+			return
+		}
+		if passkeys == 0 {
+			writeInvalid(w, "login.passkey_required", "Voeg eerst een passkey toe (dat kan alleen via https); anders kun je niet meer inloggen.")
+			return
+		}
+	}
 	cur := settingsFrom(ctx)
 	if originOf(cur.PublicURL) != originOf(next.PublicURL) && r.URL.Query().Get("confirm") != "1" {
 		writeJSON(w, http.StatusConflict, map[string]string{

@@ -148,16 +148,17 @@
 	}
 
 	// --- domain ---
+	// The public address starts as the address in use now, so setup goes on
+	// without a reverse proxy; it can be changed later under Instellingen.
 	function prefillDomain() {
 		const h = location.hostname;
-		const isIP = /^[\d.]+$/.test(h) || h.includes(':') || !h.includes('.');
-		if (isIP) return;
 		publicURL = location.origin;
 		publicTouched = true;
-		domain = h.split('.').slice(1).join('.');
+		const isIP = /^[\d.]+$/.test(h) || h.includes(':') || !h.includes('.');
+		if (!isIP) domain = h.split('.').slice(1).join('.');
 	}
 	function onDomainInput() {
-		if (!publicTouched) publicURL = domain.trim() ? `https://keystone.${domain.trim().toLowerCase()}` : '';
+		if (!publicTouched && !publicURL.trim()) publicURL = location.origin;
 	}
 	async function saveDomain(e: SubmitEvent) {
 		e.preventDefault();
@@ -227,6 +228,10 @@
 
 	// --- emergency + finish ---
 	const emValid = $derived([...emPassword].length >= 16 && emPassword === emConfirm);
+	async function skipPasskey() {
+		if ((await run(() => api.send('POST', '/setup/passkey/skip'))) !== undefined) go('emergency');
+	}
+
 	async function saveEmergency(e: SubmitEvent) {
 		e.preventDefault();
 		const ok = await run(() => api.send('POST', '/setup/emergency', { password: emPassword }));
@@ -341,19 +346,22 @@
 										class="input"
 										type="url"
 										inputmode="url"
-										placeholder="https://keystone.home.lan"
+										placeholder="https://auth.home.lan"
 										autocapitalize="none"
 										spellcheck="false"
 										bind:value={publicURL}
 										oninput={() => (publicTouched = true)}
 									/>
-									<small>Passkeys worden aan dit adres gekoppeld. Gebruik https.</small>
+									<small>
+										Kies zelf de naam, bijvoorbeeld https://auth.home.lan. Nog geen reverse proxy? Laat het huidige
+										adres staan; je wijzigt het later onder Instellingen › Algemeen.
+									</small>
 								</label>
 								{#if passkeysNeedHttps(publicURL)}
 									<p class="notice warn" role="status">
 										Dit adres gebruikt geen https. Browsers bieden passkeys alleen aan via https (of localhost),
-										dus inloggen met een passkey werkt hier niet. Zet Keystone achter een reverse proxy met
-										TLS en vul dat https-adres in.
+										dus je slaat de passkey-stap straks over en logt eerst in met je AD-wachtwoord. Zet Keystone
+										later achter een reverse proxy met TLS en voeg dan een passkey toe.
 									</p>
 								{/if}
 								{@render errorBox()}
@@ -475,11 +483,22 @@
 						</p>
 						<div class="form">
 							{#if !supported()}
-								<p class="error">Deze browser ondersteunt geen passkeys. Open de installatie in een recente browser.</p>
+								<p class="notice warn" role="status">
+									{window.isSecureContext
+										? 'Deze browser ondersteunt geen passkeys.'
+										: 'Passkeys werken alleen via https (of localhost), en dit adres is http.'}
+									Ga verder zonder passkey: je logt dan in met je AD-wachtwoord en voegt later via https een passkey toe
+									onder Instellingen › Beveiliging.
+								</p>
 							{/if}
 							{@render errorBox()}
-							<button type="button" class="btn btn-primary block" onclick={createPasskey} disabled={busy || !supported()}>
-								{@render busyLabel('Passkey maken')}
+							{#if supported()}
+								<button type="button" class="btn btn-primary block" onclick={createPasskey} disabled={busy}>
+									{@render busyLabel('Passkey maken')}
+								</button>
+							{/if}
+							<button type="button" class="btn {supported() ? 'btn-secondary' : 'btn-primary'} block" onclick={skipPasskey} disabled={busy}>
+								Later, verder zonder passkey
 							</button>
 						</div>
 					{:else if current === 'emergency'}
