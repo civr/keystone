@@ -5,16 +5,13 @@
 	import '$lib/settings.css';
 	import Sheet from './Sheet.svelte';
 
-	let visible = $state(false);
-
-	$effect(() => {
-		if (!shown.open) visible = false;
-	});
-
-	async function copy(text: string, what: string) {
+	async function copy(text: string, what: string, clearAfter?: number) {
 		try {
 			await copyText(text);
-			toast(`${what} copied`);
+			if (clearAfter) {
+				setTimeout(() => copyText('').catch(() => {}), clearAfter * 1000);
+				toast(`${what} copied; cleared in ${clearAfter} s`);
+			} else toast(`${what} copied`);
 		} catch {
 			toast(`${what} could not be copied. Select it and copy it yourself.`, 'error');
 		}
@@ -42,10 +39,9 @@
 			<div class="srow">
 				<div class="text">
 					<span class="help">Password</span>
-					<span class="label value mono">{visible ? item.password : '•'.repeat(Math.min(item.password.length, 16))}</span>
+					<span class="label value" aria-label="Hidden">••••••••••••</span>
 				</div>
-				<button type="button" class="btn btn-flat btn-sm" onclick={() => (visible = !visible)}>{visible ? 'Hide' : 'Show'}</button>
-				<button type="button" class="btn btn-secondary btn-sm" onclick={() => copy(item.password, 'Password')}>Copy</button>
+				<button type="button" class="btn btn-secondary btn-sm" onclick={() => copy(item.password, 'Password', item.clearAfter)}>Copy</button>
 			</div>
 		</div>
 		{#if item.href}

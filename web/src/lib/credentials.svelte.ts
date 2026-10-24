@@ -5,6 +5,8 @@ export interface Shown {
 	password: string;
 	/** Where "Open" goes; null for none. */
 	href: string | null;
+	/** Seconds after which a copied password is wiped from the clipboard. */
+	clearAfter?: number;
 }
 
 export const shown = $state<{ open: boolean; item: Shown | null }>({ open: false, item: null });

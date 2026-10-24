@@ -108,7 +108,7 @@
 							title={collapsed ? item.label : undefined}
 							onclick={onpick}
 						>
-							<span class="glyph" aria-hidden="true">
+							<span class="glyph" style:--tint={item.tint} aria-hidden="true">
 								<svg viewBox="0 0 20 20"><path d={item.icon} /></svg>
 							</span>
 							{#if !collapsed}<span>{item.label}</span>{/if}
@@ -362,23 +362,27 @@
 	.nav-link:active {
 		background: var(--press);
 	}
-	/* A plain line icon in the row's ink, quieter than the label. */
+	/* Each item has a small coloured tile with a white symbol, as in System Settings. */
 	.glyph {
 		display: grid;
 		place-items: center;
 		flex: none;
-		width: 20px;
-		height: 20px;
-		color: var(--nav-ink-2);
+		width: 22px;
+		height: 22px;
+		border-radius: 6px;
+		background: var(--tint);
+		color: #fff;
+	}
+	.nav-link .glyph svg {
+		width: 14px;
+		height: 14px;
+		stroke-width: 2;
 	}
 	.nav-link.active,
 	.nav-link.active:hover {
 		background: var(--nav-active);
 		color: var(--nav-active-ink);
 		font-weight: 500;
-	}
-	.nav-link.active .glyph {
-		color: inherit;
 	}
 	.nav-link.icon-only {
 		justify-content: center;

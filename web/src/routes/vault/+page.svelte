@@ -35,14 +35,15 @@
 	let detailOpen = $state(false);
 	let current = $state<VaultItem | null>(null);
 	let secret = $state<{ password: string; note: string } | null>(null);
-	let showPassword = $state(false);
 	let revealing = $state(false);
 
+	// The password is loaded when the item opens, so Copy works inside its own
+	// click (on plain http too). It is never shown.
 	function openItem(it: VaultItem) {
 		current = it;
 		secret = null;
-		showPassword = false;
 		detailOpen = true;
+		if (it.has_password || it.has_note) reveal();
 	}
 
 	async function reveal(): Promise<{ password: string; note: string } | null> {
@@ -70,14 +71,8 @@
 		}
 	}
 
-	async function copyPassword() {
-		const s = await reveal();
-		if (s) copy(s.password, 'Password');
-	}
-
-	async function togglePassword() {
-		if (!showPassword && !(await reveal())) return;
-		showPassword = !showPassword;
+	function copyPassword() {
+		if (secret) copy(secret.password, 'Password');
 	}
 
 	// ── Edit ──
@@ -97,12 +92,11 @@
 		editOpen = true;
 	}
 
-	async function startEdit() {
+	function startEdit() {
 		if (!current) return;
-		const s = await reveal();
-		if (!s) return;
 		editing = current;
-		form = { title: current.title, url: current.url, username: current.username, password: s.password, note: s.note };
+		// The password is not filled in: empty keeps the stored one.
+		form = { title: current.title, url: current.url, username: current.username, password: '', note: secret?.note ?? '' };
 		errors = {};
 		confirmDelete = false;
 		detailOpen = false;
@@ -116,9 +110,11 @@
 		if (!form.title.trim()) return void (errors.title = 'Give the item a name.');
 		saving = true;
 		try {
+			const body: Record<string, string> = { title: form.title, url: form.url, username: form.username, note: form.note };
+			if (!editing || form.password) body.password = form.password;
 			const saved = editing
-				? await api.send<VaultItem>('PUT', `/vault/${editing.id}`, form)
-				: await api.send<VaultItem>('POST', '/vault', form);
+				? await api.send<VaultItem>('PUT', `/vault/${editing.id}`, body)
+				: await api.send<VaultItem>('POST', '/vault', body);
 			toast(editing ? 'Saved' : `${saved.title} added`);
 			editOpen = false;
 			await load();
@@ -215,11 +211,12 @@
 			<div class="srow">
 				<div class="text">
 					<span class="help">Password</span>
-					<span class="label value mono">{it.has_password ? (showPassword && secret ? secret.password : '••••••••••••') : '—'}</span>
+					<span class="label value">{it.has_password ? '••••••••••••' : '—'}</span>
 				</div>
 				{#if it.has_password}
-					<button type="button" class="btn btn-flat btn-sm" onclick={togglePassword} disabled={revealing}>{showPassword ? 'Hide' : 'Show'}</button>
-					<button type="button" class="btn btn-secondary btn-sm" onclick={copyPassword} disabled={revealing}>Copy</button>
+					<button type="button" class="btn btn-secondary btn-sm" onclick={copyPassword} disabled={!secret}>
+						{#if revealing}<span class="spinner" aria-hidden="true"></span>{/if}Copy
+					</button>
 				{/if}
 			</div>
 			{#if it.url}
@@ -233,16 +230,12 @@
 			{#if it.has_note}
 				<div class="srow stack">
 					<div class="text"><span class="help">Note</span></div>
-					{#if secret}
-						<p class="note">{secret.note}</p>
-					{:else}
-						<button type="button" class="btn btn-flat btn-sm show-note" onclick={reveal} disabled={revealing}>Show note</button>
-					{/if}
+					{#if secret}<p class="note">{secret.note}</p>{:else}<p class="note help">…</p>{/if}
 				</div>
 			{/if}
 		</div>
 		<div class="sheet-actions">
-			<button type="button" class="btn btn-secondary" onclick={startEdit} disabled={revealing}>Edit</button>
+			<button type="button" class="btn btn-secondary" onclick={startEdit}>Edit</button>
 		</div>
 	{/if}
 </Sheet>
@@ -267,9 +260,17 @@
 		<div class="field">
 			<label class="field-label" for="vault-password">Password</label>
 			<div class="pw-row">
-				<input id="vault-password" class="input mono" bind:value={form.password} autocomplete="new-password" spellcheck="false" />
+				<input
+					id="vault-password"
+					class="input"
+					type="password"
+					bind:value={form.password}
+					autocomplete="new-password"
+					placeholder={editing ? 'Leave empty to keep it' : ''}
+				/>
 				<button type="button" class="btn btn-secondary btn-sm" onclick={() => (form.password = strongPassword())}>Generate</button>
 			</div>
+			{#if form.password && !errors.password}<small>{form.password === '' ? '' : 'Saved encrypted. It is never shown, only copied.'}</small>{/if}
 			{#if errors.password}<small class="field-error" role="alert">{errors.password}</small>{/if}
 		</div>
 		<label class="field">
@@ -343,10 +344,6 @@
 		margin: 0;
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
-	}
-	.show-note {
-		align-self: flex-start;
-		padding: 0;
 	}
 	.pw-row {
 		display: flex;

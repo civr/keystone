@@ -124,7 +124,7 @@
 	</label>
 	<label class="field">
 		<span>Password</span>
-		<input class="input" type="password" autocomplete="new-password" placeholder={vault.hasPassword ? '•••••••• (opgeslagen)' : ''} bind:value={vault.password} />
+		<input class="input" type="password" autocomplete="new-password" placeholder={vault.hasPassword ? '•••••••• (stored)' : ''} bind:value={vault.password} />
 		<small>{vault.hasPassword ? 'Leave empty to keep the stored password.' : 'Kept encrypted with the vault key, outside the database.'}</small>
 	</label>
 {/if}

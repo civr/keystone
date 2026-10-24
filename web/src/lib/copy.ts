@@ -16,8 +16,3 @@ export async function copyText(text: string): Promise<void> {
 	area.remove();
 	if (!ok) throw new Error('copy failed');
 }
-
-/** Whether a password can be copied without a click of its own. */
-export function canCopyDirectly(): boolean {
-	return window.isSecureContext && !!navigator.clipboard;
-}
