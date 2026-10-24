@@ -106,7 +106,7 @@ func (s *server) vaultPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := settingsFrom(ctx)
-	if time.Since(SessionFrom(ctx).LastPasskeyAt) > time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute {
+	if !confirmedWithin(*SessionFrom(ctx), time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
 		writeError(w, http.StatusForbidden, "stepup_required", "Bevestig dit eerst met je passkey.")
 		return
 	}

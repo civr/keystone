@@ -54,6 +54,7 @@ func (s *server) authRoutes(r chi.Router) {
 	r.Post("/emergency", s.authEmergency)
 	r.With(requireSession).Post("/stepup/begin", s.stepUpBegin)
 	r.With(requireSession).Post("/stepup/finish", s.stepUpFinish)
+	r.With(requireSession).Post("/stepup/password", s.stepUpPassword)
 	r.With(requireSession).Post("/logout", s.logout)
 }
 
@@ -96,15 +97,19 @@ func requireStepUp(next http.Handler) http.Handler {
 	}))
 }
 
-// needsStepUp reports whether a sensitive action needs a fresh confirmation:
-// a recent passkey, or — for a session created while no passkey existed — a
-// recent password sign-in.
+// needsStepUp reports whether a sensitive action needs a fresh confirmation.
 func needsStepUp(sess session.Session, cfg settings.Settings, now time.Time) bool {
+	return !confirmedWithin(sess, time.Duration(cfg.Login.StepUpMinutes)*time.Minute, now)
+}
+
+// confirmedWithin reports whether sess was confirmed in the last d: by a
+// passkey, or — while no passkey exists — by the password.
+func confirmedWithin(sess session.Session, d time.Duration, now time.Time) bool {
 	last := sess.LastPasskeyAt
 	if sess.NoPasskey && sess.LastFullAuthAt.After(last) {
 		last = sess.LastFullAuthAt
 	}
-	return last.IsZero() || now.Sub(last) > time.Duration(cfg.Login.StepUpMinutes)*time.Minute
+	return !last.IsZero() && now.Sub(last) <= d
 }
 
 // mustRegisterGate blocks every API call of a session created with a
@@ -831,6 +836,85 @@ func (s *server) stepUpFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	s.d.Audit.Log(ctx, audit.ActorOwner, "stepup", ip, nil)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// stepUpPassword confirms a sensitive action with the owner's password while
+// no passkey exists (Keystone used over http, or set up without one). Once a
+// passkey exists, only the passkey confirms.
+func (s *server) stepUpPassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cfg := settingsFrom(ctx)
+	ip := clientIP(ctx)
+	sess := *SessionFrom(ctx)
+	var req struct {
+		Password string `json:"password"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	var passkeys int
+	if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&passkeys); err != nil {
+		errInternal(w, "count passkeys", err)
+		return
+	}
+	if passkeys > 0 {
+		writeError(w, http.StatusForbidden, "passkey_required", "Bevestig dit met je passkey.")
+		return
+	}
+	owner, err := s.loadOwner(ctx)
+	if err != nil {
+		errInternal(w, "load owner", err)
+		return
+	}
+	if !s.allow(w, ctx, "login-ip", ip.String(), cfg.BruteForce.LoginPerIPPerMinute) ||
+		!s.allow(w, ctx, "login-account", owner.Username, cfg.BruteForce.LoginPerAccountPerMinute) ||
+		!s.notLocked(w, ctx, owner.Username, ip) {
+		return
+	}
+	ok, err := s.ownerPassword(ctx, owner.Username, req.Password)
+	switch {
+	case errors.Is(err, ad.ErrUnavailable):
+		s.adUnavailable(w, ctx)
+		return
+	case err != nil:
+		errInternal(w, "check password", err)
+		return
+	case !ok:
+		s.loginFailed(w, ctx, cfg, owner.Username, "stepup", ip)
+		return
+	}
+	sess.NoPasskey, sess.LastFullAuthAt = true, time.Now()
+	if err := s.d.Sessions.Update(ctx, sess); err != nil {
+		slog.Error("auth: update session", "err", err)
+		errUnavailable(w)
+		return
+	}
+	s.d.Audit.Log(ctx, audit.ActorOwner, "stepup", ip, map[string]any{"method": "password"})
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// ownerPassword checks password against the owner's Keystone password, or
+// against AD when the owner has none.
+func (s *server) ownerPassword(ctx context.Context, username, password string) (bool, error) {
+	var localHash string
+	err := s.d.Pool.QueryRow(ctx, `select coalesce(password_hash, '') from owner where id = 1`).Scan(&localHash)
+	if err != nil {
+		return false, err
+	}
+	if localHash != "" {
+		return crypto.VerifySecret(localHash, password), nil
+	}
+	dir := s.directory()
+	if dir == nil {
+		return false, ad.ErrUnavailable
+	}
+	actx, cancel := s.adContext(ctx)
+	defer cancel()
+	_, err = dir.Authenticate(actx, username, password)
+	if errors.Is(err, ad.ErrInvalidCredentials) || errors.Is(err, ad.ErrNotFound) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {

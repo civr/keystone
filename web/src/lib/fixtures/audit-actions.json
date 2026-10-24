@@ -38,6 +38,9 @@
 		"setup.unlock_failed",
 		"setup.unlocked",
 		"stepup",
+		"vault.item_created",
+		"vault.item_deleted",
+		"vault.item_updated",
 		"vault.revealed",
 		"vault.updated"
 	],

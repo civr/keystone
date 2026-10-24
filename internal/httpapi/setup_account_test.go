@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 // The short setup: setup code, then a Keystone account; everything else
@@ -156,4 +157,35 @@ func TestSetupAccountClosedAfterSetup(t *testing.T) {
 	if passkeys == 0 || owner != "thijs" {
 		t.Fatalf("passkeys=%d owner=%q after a closed account step", passkeys, owner)
 	}
+}
+
+// Without a passkey, a sensitive action is confirmed with the password; the
+// vault's own reconfirm window follows the same rule.
+func TestStepUpWithPassword(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	c := newClient(t, s.env, "192.168.1.10")
+	s.unlock(c)
+	c.must("POST", "/api/setup/account", map[string]string{"username": "thijs", "password": "long enough secret"}, 200)
+	ctx := context.Background()
+	cfg, err := s.deps.Settings.Get(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, err := s.deps.Sessions.Get(ctx, c.cookies[SessionCookie], cfg, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess.LastFullAuthAt = time.Now().Add(-time.Hour)
+	if err := s.deps.Sessions.Update(ctx, sess); err != nil {
+		t.Fatal(err)
+	}
+	if w := c.do("PUT", "/api/admin/branding", map[string]string{"name": "Huis", "accent": "#007aff", "background": "#ffffff"}); w.Code != 403 || errCode(t, w) != "stepup_required" {
+		t.Fatalf("stale session = %d %s", w.Code, w.Body.String())
+	}
+	if w := c.do("POST", "/api/auth/stepup/password", map[string]string{"password": "wrong password!!"}); w.Code != 401 {
+		t.Fatalf("wrong password = %d %s", w.Code, w.Body.String())
+	}
+	c.must("POST", "/api/auth/stepup/password", map[string]string{"password": "long enough secret"}, 200)
+	c.must("PUT", "/api/admin/branding", map[string]string{"name": "Huis", "accent": "#007aff", "background": "#ffffff"}, 200)
 }

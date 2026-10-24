@@ -76,6 +76,7 @@ func (s *server) router() chi.Router {
 		api.With(requireSession).Get("/me", s.me)
 		api.Route("/admin", s.adminRoutes)
 		api.Route("/apps", s.appRoutes)
+		api.Route("/vault", s.vaultRoutes)
 		api.With(s.requireSetupDone, requireSessionOrLogin).Get("/gate/start", s.gateStart)
 	})
 	r.Route("/saml", s.samlRoutes)
