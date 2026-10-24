@@ -472,7 +472,7 @@ func (s *server) setupOwner(w http.ResponseWriter, r *http.Request, _ string) {
 
 func (s *server) setupPasskeyBegin(w http.ResponseWriter, r *http.Request, token string) {
 	ctx := r.Context()
-	svc, err := s.passkeyService(settingsFrom(ctx))
+	svc, err := s.passkeyService(r, settingsFrom(ctx))
 	if err != nil {
 		errInternal(w, "passkey service", err)
 		return
@@ -513,7 +513,7 @@ func (s *server) setupPasskeyFinish(w http.ResponseWriter, r *http.Request, toke
 		return
 	}
 	_ = s.d.Valkey.HDel(ctx, setupKey(token), "wa").Err()
-	svc, err := s.passkeyService(settingsFrom(ctx))
+	svc, err := s.passkeyService(r, settingsFrom(ctx))
 	if err != nil {
 		errInternal(w, "passkey service", err)
 		return

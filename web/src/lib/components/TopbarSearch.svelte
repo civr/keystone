@@ -87,9 +87,7 @@
 	}
 	.search:focus-within {
 		background: #fff;
-		box-shadow:
-			0 0 0 3.5px rgba(0, 122, 255, 0.25),
-			0 0 0 1px var(--primary);
+		box-shadow: 0 0 0 1px var(--primary);
 	}
 	.lens {
 		flex: none;

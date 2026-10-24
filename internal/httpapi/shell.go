@@ -63,6 +63,6 @@ func (s *server) serveShell(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
 	if r.Method == http.MethodGet {
-		_, _ = w.Write(s.shell)
+		_, _ = w.Write(s.shellFor(r))
 	}
 }

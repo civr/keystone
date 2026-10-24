@@ -6,6 +6,7 @@
 	import { safeNext } from '$lib/nav';
 	import { api, ApiError, type Me } from '$lib/api';
 	import { formatCode } from '$lib/codes';
+	import { brand as site, logoSrc, pageTitle } from '$lib/brand.svelte';
 	import { step } from '$lib/motion';
 	import {
 		authenticate,
@@ -263,7 +264,7 @@
 	}
 
 	const titles: Record<Mode, string> = {
-		loading: 'Keystone',
+		loading: site.name,
 		password: 'Inloggen',
 		emergency: 'Nood-account',
 		passkey: 'Bevestig met je passkey',
@@ -273,11 +274,11 @@
 </script>
 
 <svelte:head>
-	<title>Inloggen · Keystone</title>
+	<title>{pageTitle('Inloggen')}</title>
 </svelte:head>
 
 {#snippet brand()}
-	<div class="auth-brand"><img class="mark" src="/favicon.svg" alt="" width="64" height="64" /><span>Keystone</span></div>
+	<div class="auth-brand"><img class="mark" src={logoSrc()} alt="" width="64" height="64" /><span>{site.name}</span></div>
 {/snippet}
 
 {#snippet busyLabel(text: string)}

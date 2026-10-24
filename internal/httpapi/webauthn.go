@@ -26,9 +26,16 @@ var (
 	errNoPublicURL = errors.New("public_url is not configured")
 )
 
-// passkeyService builds the WebAuthn service from the current settings
-// (Ruling R4): rpID is the host of public_url, the origin is public_url's origin.
-func (s *server) passkeyService(cfg settings.Settings) (*passkey.Service, error) {
+// passkeyService builds the WebAuthn service for r. A page opened over https
+// (an Origin on the request's own Host or on public_url) is its own relying
+// party, so passkeys work on the address in use — e.g. a domain behind a
+// reverse proxy while public_url is still the IP setup ran on. Otherwise
+// rpID is the host of public_url and the origin public_url's origin.
+// A passkey stays bound to the host it was made on; the browser enforces that.
+func (s *server) passkeyService(r *http.Request, cfg settings.Settings) (*passkey.Service, error) {
+	if o, err := url.Parse(r.Header.Get("Origin")); err == nil && o.Scheme == "https" && o.Host != "" && originAllowed(r, cfg.PublicURL) {
+		return passkey.NewService(s.d.Pool, o.Hostname(), "https://"+o.Host, cfg.Login.UserVerification)
+	}
 	u, err := url.Parse(cfg.PublicURL)
 	if err != nil || u.Host == "" {
 		return nil, errNoPublicURL

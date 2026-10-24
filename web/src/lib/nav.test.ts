@@ -18,9 +18,13 @@ describe('isActive', () => {
 describe('NAV', () => {
 	it('has Mijn apps first, then the Instellingen group in order', () => {
 		expect(NAV.map((g) => g.title)).toEqual([null, 'Instellingen']);
-		expect(NAV[0].items.map((i) => [i.label, i.href])).toEqual([['Mijn apps', '/']]);
+		expect(NAV[0].items.map((i) => [i.label, i.href])).toEqual([
+			['Mijn apps', '/'],
+			['Kluis', '/kluis']
+		]);
 		expect(NAV[1].items.map((i) => [i.label, i.href])).toEqual([
 			['Algemeen', '/instellingen'],
+			['Huisstijl', '/instellingen/huisstijl'],
 			['Active Directory', '/instellingen/ad'],
 			['Apps', '/instellingen/apps'],
 			['Beveiliging', '/instellingen/beveiliging'],

@@ -12,6 +12,9 @@ func (s *server) adminRoutes(r chi.Router) {
 	g.Get("/settings", s.getSettings)
 	w.Put("/settings", s.putSettings)
 
+	g.Get("/branding", s.getBranding)
+	w.Put("/branding", s.putBranding)
+
 	g.Get("/ad", s.getAD)
 	w.Put("/ad", s.putAD)
 	w.Post("/ad/test", s.testAD)

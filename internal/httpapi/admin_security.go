@@ -109,7 +109,7 @@ func (s *server) listPasskeys(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) passkeyAddBegin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	svc, err := s.passkeyService(settingsFrom(ctx))
+	svc, err := s.passkeyService(r, settingsFrom(ctx))
 	if err != nil {
 		errInternal(w, "passkey service", err)
 		return
@@ -132,7 +132,7 @@ func (s *server) passkeyAddFinish(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	svc, err := s.passkeyService(settingsFrom(ctx))
+	svc, err := s.passkeyService(r, settingsFrom(ctx))
 	if err != nil {
 		errInternal(w, "passkey service", err)
 		return

@@ -75,11 +75,11 @@
 		font-size: 1.75rem;
 		font-weight: 500;
 		letter-spacing: -0.02em;
-		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 		transition: transform var(--dur-1) var(--ease);
 	}
 	.icon.image {
 		background: #fff;
+		box-shadow: inset 0 0 0 1px var(--c-border);
 	}
 	img {
 		width: 100%;
@@ -110,7 +110,7 @@
 		border-radius: 50%;
 		background: #fff;
 		color: var(--color-text-muted);
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+		box-shadow: 0 0 0 1px var(--c-border);
 	}
 	.badge svg {
 		width: 14px;
@@ -121,7 +121,7 @@
 		stroke-linecap: round;
 		stroke-linejoin: round;
 	}
-	/* Pressed: the icon darkens a touch, as in Launchpad. */
+	/* Pressed: the icon darkens a touch. */
 	.tile:active .icon {
 		filter: brightness(0.85);
 	}

@@ -10,6 +10,7 @@
 	import { NAV, isActive } from '$lib/nav';
 	import { reducedMotion } from '$lib/motion';
 	import AppShell from '$lib/components/AppShell.svelte';
+	import { pageTitle } from '$lib/brand.svelte';
 
 	let { children } = $props();
 
@@ -24,7 +25,7 @@
 </script>
 
 <svelte:head>
-	<title>{current.label} · Instellingen · Keystone</title>
+	<title>{pageTitle(current.label, 'Instellingen')}</title>
 </svelte:head>
 
 <AppShell {me}>

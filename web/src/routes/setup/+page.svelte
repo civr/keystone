@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { api, ApiError } from '$lib/api';
 	import { formatCode } from '$lib/codes';
+	import { brand, logoSrc, pageTitle } from '$lib/brand.svelte';
 	import { step as slide } from '$lib/motion';
 
 	/*
@@ -96,7 +97,7 @@
 </script>
 
 <svelte:head>
-	<title>Installatie · Keystone</title>
+	<title>{pageTitle('Installatie')}</title>
 </svelte:head>
 
 {#snippet busyLabel(text: string)}
@@ -109,7 +110,7 @@
 
 <main class="auth-page">
 	<div class="auth-card">
-		<div class="auth-brand"><img class="mark" src="/favicon.svg" alt="" width="64" height="64" /><span>Keystone</span></div>
+		<div class="auth-brand"><img class="mark" src={logoSrc()} alt="" width="64" height="64" /><span>{brand.name}</span></div>
 
 		<div class="auth-stage">
 			{#key current}

@@ -22,7 +22,7 @@ import (
 	"github.com/civr/keystone/internal/testutil"
 )
 
-const testShell = `<!doctype html><html><head><script>console.log("a")</script><script src="/x.js"></script></head>` +
+const testShell = `<!doctype html><html><head><title>Keystone</title><link rel="icon" href="/favicon.svg" type="image/svg+xml" /><script>console.log("a")</script><script src="/x.js"></script></head>` +
 	`<body><script type="module">import("/app.js")</script></body></html>`
 
 type env struct {

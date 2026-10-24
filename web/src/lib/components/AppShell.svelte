@@ -6,6 +6,7 @@
 	import { firstName } from '$lib/greeting';
 	import { NAV, isActive, searchHref } from '$lib/nav';
 	import { toast } from '$lib/toast.svelte';
+	import { brand, logoSrc } from '$lib/brand.svelte';
 	import TopbarSearch from './TopbarSearch.svelte';
 	import UserMenu from './UserMenu.svelte';
 
@@ -107,7 +108,7 @@
 							title={collapsed ? item.label : undefined}
 							onclick={onpick}
 						>
-							<span class="glyph" style:--tint={item.tint} aria-hidden="true">
+							<span class="glyph" aria-hidden="true">
 								<svg viewBox="0 0 20 20"><path d={item.icon} /></svg>
 							</span>
 							{#if !collapsed}<span>{item.label}</span>{/if}
@@ -122,9 +123,9 @@
 <div class="shell" class:icons={iconsOnly}>
 	<aside class="rail">
 		<div class="rail-inner">
-			<a class="brand" href="/" aria-label="Keystone, mijn apps">
-				<img class="brand-mark" src="/favicon.svg" alt="" width="28" height="28" />
-				<span class="brand-name">Keystone</span>
+			<a class="brand" href="/" aria-label="{brand.name}, mijn apps">
+				<img class="brand-mark" src={logoSrc()} alt="" width="28" height="28" />
+				<span class="brand-name">{brand.name}</span>
 			</a>
 			{@render menu(iconsOnly, 'rail')}
 			<button
@@ -167,8 +168,8 @@
 	<div class="drawer-panel">
 		<div class="drawer-head">
 			<span class="brand">
-				<img class="brand-mark" src="/favicon.svg" alt="" width="28" height="28" />
-				<span class="brand-name">Keystone</span>
+				<img class="brand-mark" src={logoSrc()} alt="" width="28" height="28" />
+				<span class="brand-name">{brand.name}</span>
 			</span>
 			<button type="button" class="topbar-btn" aria-label="Menu sluiten" onclick={closeDrawer}>
 				<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" /></svg>
@@ -179,8 +180,8 @@
 </dialog>
 
 <style>
-	/* A macOS window: a translucent sidebar the full height on the left, and
-	   a translucent toolbar over the content that scrolls beneath it. */
+	/* A white sidebar the full height on the left and a white bar on top,
+	   each edged by a hairline; the content sits on the canvas. */
 	.shell {
 		--menu-w: var(--nav-w);
 		--bar-h: 52px;
@@ -209,9 +210,7 @@
 		height: var(--bar-h);
 		padding: 0 16px 0 24px;
 		background: var(--topbar-bg);
-		-webkit-backdrop-filter: var(--material-blur);
-		backdrop-filter: var(--material-blur);
-		box-shadow: inset 0 -0.5px 0 var(--topbar-stroke);
+		border-bottom: 1px solid var(--topbar-stroke);
 		color: var(--topbar-ink);
 	}
 	.search {
@@ -270,12 +269,10 @@
 		display: none;
 	}
 
-	/* ── Sidebar: a source list on a frosted material ── */
+	/* ── Sidebar ── */
 	.rail {
 		background: var(--nav-bg);
-		-webkit-backdrop-filter: var(--material-blur);
-		backdrop-filter: var(--material-blur);
-		box-shadow: inset -0.5px 0 0 rgba(0, 0, 0, 0.1);
+		border-right: 1px solid var(--c-border);
 		color: var(--nav-ink);
 	}
 	.rail-inner {
@@ -306,8 +303,7 @@
 		flex: none;
 		width: 28px;
 		height: 28px;
-		border-radius: 22.5%;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+		object-fit: contain;
 	}
 	.brand-name {
 		font-family: var(--font-display);
@@ -340,11 +336,11 @@
 		color: var(--nav-ink-2);
 	}
 	.nav-rule {
-		height: 0.5px;
+		height: 1px;
 		margin: 12px 18px;
-		background: rgba(0, 0, 0, 0.12);
+		background: var(--c-border);
 	}
-	/* Rows inset 10px; the selected row fills with the accent, as in Finder. */
+	/* Rows inset 10px; the selected row is tinted with the accent. */
 	.nav-link {
 		display: flex;
 		align-items: center;
@@ -352,7 +348,7 @@
 		margin: 1px 10px;
 		padding: 0 10px;
 		height: 30px;
-		border-radius: 7px;
+		border-radius: var(--radius-sm);
 		color: var(--nav-ink);
 		font-size: 0.875rem;
 		font-weight: 400;
@@ -367,26 +363,23 @@
 	.nav-link:active {
 		background: var(--press);
 	}
-	/* Each item has a small coloured tile with a white symbol, as in System Settings. */
+	/* A plain line icon in the row's ink, quieter than the label. */
 	.glyph {
 		display: grid;
 		place-items: center;
 		flex: none;
-		width: 22px;
-		height: 22px;
-		border-radius: 6px;
-		background: var(--tint);
-		color: #fff;
-	}
-	.nav-link .glyph svg {
-		width: 14px;
-		height: 14px;
-		stroke-width: 2;
+		width: 20px;
+		height: 20px;
+		color: var(--nav-ink-2);
 	}
 	.nav-link.active,
 	.nav-link.active:hover {
 		background: var(--nav-active);
 		color: var(--nav-active-ink);
+		font-weight: 500;
+	}
+	.nav-link.active .glyph {
+		color: inherit;
 	}
 	.nav-link.icon-only {
 		justify-content: center;
@@ -485,10 +478,8 @@
 		height: 100%;
 		overflow-y: auto;
 		padding: 0 0 max(16px, env(safe-area-inset-bottom));
-		background: rgba(246, 246, 248, 0.94);
-		-webkit-backdrop-filter: var(--material-blur);
-		backdrop-filter: var(--material-blur);
-		box-shadow: var(--shadow-lg);
+		background: #fff;
+		border-right: 1px solid var(--c-border);
 	}
 	/* Enters from the left and leaves the same way. */
 	.drawer[open] .drawer-panel {

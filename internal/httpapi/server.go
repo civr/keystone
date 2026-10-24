@@ -13,6 +13,7 @@ import (
 
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/audit"
+	"github.com/civr/keystone/internal/branding"
 	"github.com/civr/keystone/internal/keys"
 	"github.com/civr/keystone/internal/secrets"
 	"github.com/civr/keystone/internal/session"
@@ -41,10 +42,11 @@ type Deps struct {
 }
 
 type server struct {
-	d     Deps
-	keys  *keys.Store
-	shell []byte
-	csp   string // policy for shell, without settings headers.csp_extra
+	d        Deps
+	keys     *keys.Store
+	branding *branding.Store
+	shell    []byte
+	csp      string // policy for shell, without settings headers.csp_extra
 }
 
 func newServer(d Deps) *server {
@@ -56,7 +58,7 @@ func newServer(d Deps) *server {
 	if k == nil {
 		k = keys.New(d.Pool, d.Secrets.DataKey)
 	}
-	return &server{d: d, keys: k, shell: shell, csp: CSP(shell, "")}
+	return &server{d: d, keys: k, branding: branding.NewStore(d.Pool), shell: shell, csp: CSP(shell, "")}
 }
 
 // New returns the core HTTP handler.

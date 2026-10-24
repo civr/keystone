@@ -65,6 +65,7 @@ const ACTIONS: Record<string, string> = {
 	'emergency.used': 'Nood-account gebruikt',
 	'emergency.changed': 'Nood-account gewijzigd',
 	'settings.changed': 'Instellingen gewijzigd',
+	'branding.changed': 'Huisstijl gewijzigd',
 	'settings.network_reset': 'Netwerkbeperkingen gewist',
 	'ad.changed': 'Active Directory gewijzigd',
 	'session.revoked': 'Sessie afgemeld',

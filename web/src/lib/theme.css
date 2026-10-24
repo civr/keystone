@@ -1,15 +1,11 @@
 /*
- * Keystone design tokens — Apple-style, light.
+ * Keystone design tokens — flat and light.
  *
- * The system font (SF Pro on Apple devices, Segoe UI on Windows), Apple's
- * system colours, a grouped-grey canvas with white inset-grouped cards,
- * translucent chrome that content scrolls under, app tiles as rounded-square
- * icons, and short, eased motion that never bounces unless something was
- * thrown. Values follow Apple's Human Interface Guidelines for iOS/macOS,
- * translated to the web.
- *
- * Token names that components use (--primary, --c-border, --radius-md, …)
- * are kept and mapped onto the Apple values.
+ * The system font, a grey canvas with white boxes edged by a 1px hairline,
+ * solid chrome, small corner radii, no shadows and no blur. Everything that
+ * is coloured derives from two tokens the huisstijl sets (Instellingen ›
+ * Huisstijl; keystone-core writes them into the page): --primary, the accent,
+ * and --color-bg, the canvas.
  */
 
 :root {
@@ -22,14 +18,15 @@
 		system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif;
 	--font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, 'Cascadia Code', Consolas, 'Liberation Mono', monospace;
 
-	/* ── Accent: systemBlue ── */
+	/* ── Accent (huisstijl) and its shades ── */
 	--primary: #007aff;
-	--primary-dark: #0066d6;
-	--primary-light: #409cff;
-	--primary-pressed: #0055b3;
+	--primary-dark: color-mix(in srgb, var(--primary) 86%, #000);
+	--primary-light: color-mix(in srgb, var(--primary) 75%, #fff);
+	--primary-pressed: color-mix(in srgb, var(--primary) 74%, #000);
+	--focus-ring: color-mix(in srgb, var(--primary) 45%, transparent);
 
 	/* ── Labels, fills and separators (iOS light) ── */
-	--color-bg: #f5f5f7; /* Apple's web grey */
+	--color-bg: #f5f5f7; /* canvas (huisstijl) */
 	--color-surface: #ffffff;
 	--color-border: #d1d1d6; /* systemGray4: field strokes */
 	--color-text: #1d1d1f; /* label */
@@ -44,7 +41,7 @@
 	--c-bg-section: #f9f9fb;
 	--c-bg-sunken: rgba(118, 118, 128, 0.12); /* tertiarySystemFill: search fields, segmented tracks */
 	--c-hover: rgba(0, 0, 0, 0.04);
-	--c-bg-page: #f5f5f7;
+	--c-bg-page: var(--color-bg);
 
 	/* ── Status: system colours, with darker ink for text ── */
 	--color-success: #34c759;
@@ -59,51 +56,51 @@
 	--color-info-tint: #eaf3ff;
 
 	/* ── Selection tints from the accent ── */
-	--c-selected: #d6e8ff;
-	--c-selected-mid: #e3efff;
-	--c-selected-light: #eff6ff;
+	--c-selected: color-mix(in srgb, var(--primary) 18%, #fff);
+	--c-selected-mid: color-mix(in srgb, var(--primary) 11%, #fff);
+	--c-selected-light: color-mix(in srgb, var(--primary) 6%, #fff);
 
 	--t-slate: #3a3a3c;
 	--t-slate-bg: rgba(118, 118, 128, 0.12);
 
-	/* ── Chrome: translucent materials over the canvas ── */
-	--material-bar: rgba(255, 255, 255, 0.72);
-	--material-side: rgba(246, 246, 248, 0.82);
-	--material-blur: saturate(180%) blur(20px);
+	/* ── Chrome: solid white bars ── */
+	--material-bar: #ffffff;
+	--material-side: #ffffff;
+	--material-blur: none;
 	--topbar-bg: var(--material-bar);
 	--topbar-ink: #1d1d1f;
 	--topbar-ink-2: #6e6e73;
 	--topbar-hover: rgba(0, 0, 0, 0.05);
-	--topbar-stroke: rgba(0, 0, 0, 0.1);
+	--topbar-stroke: var(--c-border);
 	--topbar-field: rgba(118, 118, 128, 0.12);
 	--topbar-field-stroke: transparent;
 	--nav-bg: var(--material-side);
 	--nav-ink: #1d1d1f;
 	--nav-ink-2: #6e6e73;
 	--nav-hover: rgba(0, 0, 0, 0.05);
-	--nav-active: var(--primary);
-	--nav-active-ink: #ffffff;
+	--nav-active: var(--c-selected-mid);
+	--nav-active-ink: var(--primary-dark);
 	--nav-active-shadow: none;
 	--nav-w: 232px;
 	--nav-w-icons: 64px;
 
-	/* ── Radii: continuous-looking corners, sized to the object ── */
-	--radius-xs: 6px;
-	--radius-sm: 8px;
-	--radius-control: 10px; /* inputs */
-	--radius-md: 12px; /* menu items, small cards */
-	--radius-lg: 14px; /* menus, alerts */
-	--radius-card: 12px; /* inset grouped sections, as in Settings */
-	--radius-sheet: 16px;
-	--radius-icon: 22.5%; /* app icon squircle */
+	/* ── Radii: small and few ── */
+	--radius-xs: 4px;
+	--radius-sm: 6px;
+	--radius-control: 6px; /* inputs, buttons */
+	--radius-md: 8px; /* menus, notes */
+	--radius-lg: 8px;
+	--radius-card: 8px; /* boxes */
+	--radius-sheet: 10px;
+	--radius-icon: 18%; /* app tiles */
 	--radius-full: 9999px;
 	--radius-pill: 9999px;
 
-	/* ── Depth: soft, neutral, larger surfaces cast longer shadows ── */
-	--shadow-sm: none; /* surfaces are separated by a hairline, not a shadow */
-	--shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
-	--shadow-md: 0 10px 30px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
-	--shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
+	/* ── Depth: none; anything raised is edged by a hairline ── */
+	--shadow-sm: none;
+	--shadow-hover: 0 0 0 1px var(--c-border);
+	--shadow-md: 0 0 0 1px var(--c-border);
+	--shadow-lg: 0 0 0 1px var(--c-border);
 
 	/* ── Motion: Apple's ease, and the iOS sheet curve for arrivals ── */
 	--ease: cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -173,7 +170,7 @@ body {
 }
 
 ::selection {
-	background: rgba(0, 122, 255, 0.2);
+	background: color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 /* Large text: display face, tight leading, negative tracking. */
@@ -221,13 +218,13 @@ pre,
 	font-variant-numeric: tabular-nums;
 }
 
-/* Keyboard focus: Apple's soft accent ring. */
+/* Keyboard focus: a ring in the accent. */
 :focus {
 	outline: none;
 }
 :focus-visible {
-	outline: 3px solid rgba(0, 122, 255, 0.5);
-	outline-offset: 1px;
+	outline: 2px solid var(--focus-ring);
+	outline-offset: 2px;
 }
 
 .visually-hidden {
@@ -239,7 +236,7 @@ pre,
 	white-space: nowrap;
 }
 
-/* ── Buttons: capsules; feedback on press, not on release ── */
+/* ── Buttons: flat rectangles with small corners ── */
 .btn {
 	display: inline-flex;
 	align-items: center;
@@ -248,7 +245,7 @@ pre,
 	height: 36px;
 	padding: 0 18px;
 	border: 0;
-	border-radius: var(--radius-pill);
+	border-radius: var(--radius-control);
 	font-family: inherit;
 	font-size: 0.9375rem;
 	font-weight: 500;
@@ -261,8 +258,7 @@ pre,
 	transition:
 		background-color var(--dur-2) var(--ease),
 		color var(--dur-2) var(--ease),
-		opacity var(--dur-2) var(--ease),
-		transform var(--dur-1) var(--ease);
+		opacity var(--dur-2) var(--ease);
 }
 .btn:hover {
 	text-decoration: none;
@@ -271,10 +267,6 @@ pre,
 	cursor: default;
 	pointer-events: none;
 	opacity: 0.4;
-}
-.btn:active:not(:disabled) {
-	transform: scale(0.97);
-	transition-duration: 60ms;
 }
 .btn svg {
 	width: 16px;
@@ -311,17 +303,18 @@ pre,
 	background: #c42e25;
 }
 
-/* Gray tinted capsule, as Apple's secondary buttons. */
+/* White with a hairline edge. */
 .btn-secondary {
-	background: rgba(118, 118, 128, 0.12);
-	color: var(--primary);
+	background: #fff;
+	box-shadow: inset 0 0 0 1px var(--color-border);
+	color: var(--color-text);
 }
 .btn-secondary:hover:not(:disabled) {
-	background: rgba(118, 118, 128, 0.18);
-	color: var(--primary);
+	background: var(--c-bg-section);
+	color: var(--color-text);
 }
 .btn-secondary:active:not(:disabled) {
-	background: rgba(118, 118, 128, 0.24);
+	background: var(--c-border);
 }
 .btn-secondary.danger-ink,
 .btn-secondary.danger-ink:hover:not(:disabled) {
@@ -397,13 +390,13 @@ pre,
 .input:focus-visible {
 	outline: none;
 	border-color: var(--primary);
-	box-shadow: 0 0 0 3.5px rgba(0, 122, 255, 0.25);
+	box-shadow: 0 0 0 1px var(--primary);
 }
 .input[aria-invalid='true'] {
 	border-color: var(--color-danger);
 }
 .input[aria-invalid='true']:focus {
-	box-shadow: 0 0 0 3.5px rgba(255, 59, 48, 0.2);
+	box-shadow: 0 0 0 1px var(--color-danger);
 }
 .input:disabled {
 	background: var(--c-bg-section);
@@ -495,7 +488,7 @@ select.input {
 	font-size: 0.8125rem;
 }
 
-/* ── Switch: the iOS toggle, green when on ── */
+/* ── Switch: a toggle in the accent when on ── */
 .switch {
 	appearance: none;
 	position: relative;
@@ -517,13 +510,11 @@ select.input {
 	height: 27px;
 	border-radius: 50%;
 	background: #fff;
-	box-shadow:
-		0 3px 8px rgba(0, 0, 0, 0.15),
-		0 3px 1px rgba(0, 0, 0, 0.06);
+	box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.16);
 	transition: transform var(--dur-3) var(--ease-out);
 }
 .switch:checked {
-	background: var(--color-success);
+	background: var(--primary);
 }
 .switch:checked::before {
 	transform: translateX(20px);
@@ -533,13 +524,13 @@ select.input {
 	cursor: default;
 }
 
-/* ── Chips: small tinted capsules ── */
+/* ── Chips: small tinted labels ── */
 .chip {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	padding: 2px 9px;
-	border-radius: var(--radius-full);
+	padding: 2px 8px;
+	border-radius: var(--radius-xs);
 	font-size: 0.75rem;
 	font-weight: 500;
 	line-height: 1.45;
@@ -566,7 +557,7 @@ select.input {
 	background: var(--c-selected-mid);
 }
 
-/* ── Notes: tinted, rounded, no stroke ── */
+/* ── Notes: tinted, no stroke ── */
 .notice,
 .error {
 	margin: 0;

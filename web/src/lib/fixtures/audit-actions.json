@@ -9,6 +9,7 @@
 		"app.secret_created",
 		"app.updated",
 		"audit.exported",
+		"branding.changed",
 		"emergency.changed",
 		"emergency.used",
 		"keys.rotated",

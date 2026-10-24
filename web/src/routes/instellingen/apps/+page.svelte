@@ -615,14 +615,13 @@
 		place-items: center;
 		width: var(--size);
 		height: var(--size);
-		border-radius: 22.5%;
+		border-radius: var(--radius-icon);
 		background: var(--tile-color);
 		color: #fff;
 		font-family: var(--font-display);
 		font-size: calc(var(--size) * 0.45);
 		font-weight: 600;
 		letter-spacing: -0.02em;
-		box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
 		overflow: hidden;
 		transition:
 			background-color var(--dur-3) var(--ease),

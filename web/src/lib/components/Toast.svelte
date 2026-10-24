@@ -49,21 +49,12 @@
 		max-width: 100%;
 		min-height: 44px;
 		padding: 8px 8px 8px 16px;
-		border-radius: var(--radius-pill);
-		background: rgba(255, 255, 255, 0.86);
-		-webkit-backdrop-filter: var(--material-blur);
-		backdrop-filter: var(--material-blur);
-		box-shadow:
-			0 0 0 0.5px rgba(0, 0, 0, 0.08),
-			0 8px 28px rgba(0, 0, 0, 0.14);
+		border: 1px solid var(--c-border);
+		border-radius: var(--radius-md);
+		background: #fff;
 		font-size: 0.875rem;
 		font-weight: 500;
 		line-height: 1.35;
-	}
-	@media (prefers-reduced-transparency: reduce) {
-		.toast {
-			background: #fff;
-		}
 	}
 	.dot {
 		flex: none;

@@ -56,10 +56,8 @@
 		flex-direction: column;
 		max-height: min(86dvh, 760px);
 		border-radius: var(--radius-sheet);
+		border: 1px solid var(--c-border);
 		background: var(--c-bg-card);
-		box-shadow:
-			0 0 0 0.5px rgba(0, 0, 0, 0.08),
-			var(--shadow-lg);
 	}
 	dialog[open]::backdrop {
 		animation: overlay-in var(--dur-3) var(--ease) both;

@@ -17,7 +17,7 @@
 	width: min(440px, 100%);
 	padding: 36px 36px 32px;
 	border: 1px solid var(--c-border);
-	border-radius: 14px;
+	border-radius: var(--radius-card);
 	background: var(--c-bg-card);
 	animation: auth-settle var(--dur-4) var(--ease-out) both;
 }
@@ -37,11 +37,10 @@
 @keyframes auth-settle {
 	from {
 		opacity: 0;
-		transform: scale(0.98);
 	}
 }
 
-/* The app icon above the name. */
+/* The logo above the name; any shape fits the 64px box. */
 .auth-brand {
 	display: flex;
 	flex-direction: column;
@@ -55,7 +54,7 @@
 .auth-brand .mark {
 	width: 64px;
 	height: 64px;
-	border-radius: 22.5%;
+	object-fit: contain;
 }
 
 /* Steps overlap during a transition instead of stacking. */
@@ -96,8 +95,8 @@
 	margin-top: 22px;
 }
 .auth-card .input {
-	height: 46px;
-	border-radius: 12px;
+	height: 44px;
+	border-radius: var(--radius-control);
 	font-size: 1.0625rem;
 }
 .auth-card .input.code {

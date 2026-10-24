@@ -3,6 +3,7 @@
 	import { api, ApiError, type Me } from '$lib/api';
 	import { filterApps, safeHref, type App } from '$lib/apps';
 	import AppShell from '$lib/components/AppShell.svelte';
+	import { brand } from '$lib/brand.svelte';
 	import AppGrid from '$lib/components/AppGrid.svelte';
 
 	let me = $state<Me | null>(null);
@@ -41,7 +42,7 @@
 </script>
 
 <svelte:head>
-	<title>Keystone</title>
+	<title>{brand.name}</title>
 </svelte:head>
 
 <AppShell {me} bind:query onsearch={openFirst}>

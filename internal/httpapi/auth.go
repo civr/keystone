@@ -451,7 +451,7 @@ func (s *server) passwordAccepted(w http.ResponseWriter, r *http.Request, cfg se
 func (s *server) authPasskeyBegin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cfg := settingsFrom(ctx)
-	svc, err := s.passkeyService(cfg)
+	svc, err := s.passkeyService(r, cfg)
 	if err != nil {
 		errInternal(w, "passkey service", err)
 		return
@@ -540,7 +540,7 @@ func (s *server) authPasskeyFinish(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cfg := settingsFrom(ctx)
 	ip := clientIP(ctx)
-	svc, err := s.passkeyService(cfg)
+	svc, err := s.passkeyService(r, cfg)
 	if err != nil {
 		errInternal(w, "passkey service", err)
 		return
@@ -785,7 +785,7 @@ func (s *server) authEmergency(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) stepUpBegin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	svc, err := s.passkeyService(settingsFrom(ctx))
+	svc, err := s.passkeyService(r, settingsFrom(ctx))
 	if err != nil {
 		errInternal(w, "passkey service", err)
 		return
@@ -811,7 +811,7 @@ func (s *server) stepUpFinish(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	svc, err := s.passkeyService(settingsFrom(ctx))
+	svc, err := s.passkeyService(r, settingsFrom(ctx))
 	if err != nil {
 		errInternal(w, "passkey service", err)
 		return
