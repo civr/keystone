@@ -1,0 +1,29 @@
+# Build the images from this checkout instead of pulling them from GHCR:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# Only needed when you change the code; the first build takes a few minutes.
+services:
+  init:
+    build:
+      context: .
+      dockerfile: docker/init.Dockerfile
+  core:
+    build:
+      context: .
+      dockerfile: docker/core.Dockerfile
+      args:
+        # core and web must be built with the same value (asset names).
+        KEYSTONE_VERSION: ${KEYSTONE_VERSION:-dev}
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        KEYSTONE_VERSION: ${KEYSTONE_VERSION:-dev}
+  ldap:
+    build:
+      context: .
+      dockerfile: docker/ldap.Dockerfile
+  gate:
+    build:
+      context: .
+      dockerfile: docker/gate.Dockerfile

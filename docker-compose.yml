@@ -3,9 +3,6 @@ name: keystone
 services:
   init:
     image: ghcr.io/civr/keystone-init:latest
-    build:
-      context: .
-      dockerfile: docker/init.Dockerfile
     user: "65532:65532"
     restart: "no"
     read_only: true
@@ -59,12 +56,6 @@ services:
 
   core:
     image: ghcr.io/civr/keystone-core:latest
-    build:
-      context: .
-      dockerfile: docker/core.Dockerfile
-      args:
-        # core and web must be built with the same value (asset names).
-        KEYSTONE_VERSION: ${KEYSTONE_VERSION:-dev}
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp]
@@ -93,12 +84,6 @@ services:
 
   web:
     image: ghcr.io/civr/keystone-web:latest
-    build:
-      context: .
-      dockerfile: docker/web.Dockerfile
-      args:
-        # core and web must be built with the same value (asset names).
-        KEYSTONE_VERSION: ${KEYSTONE_VERSION:-dev}
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp, /data, /config]
@@ -118,9 +103,6 @@ services:
   # it yourself if you need it.
   ldap:
     image: ghcr.io/civr/keystone-ldap:latest
-    build:
-      context: .
-      dockerfile: docker/ldap.Dockerfile
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp]
@@ -147,9 +129,6 @@ services:
   # proxy should reach it; see README › Poortwachter.
   gate:
     image: ghcr.io/civr/keystone-gate:latest
-    build:
-      context: .
-      dockerfile: docker/gate.Dockerfile
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp]

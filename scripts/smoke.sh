@@ -18,7 +18,7 @@ trap cleanup EXIT
 
 fail() { echo "SMOKE FAIL: $*" >&2; exit 1; }
 
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 
 echo "waiting for $BASE/api/healthz ..."
 ok=""

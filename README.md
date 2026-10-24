@@ -6,16 +6,15 @@ Zelf te hosten identity provider (SSO) voor je organisatie, met Active Directory
 
 ```sh
 git clone <repo-url> keystone && cd keystone
-docker compose up -d
+docker compose pull && docker compose up -d
 docker compose logs core | grep "setup code"
 ```
 
 Open daarna `http://<host>:8080` en doorloop de installatiewizard met de setup code uit de logs.
 Een andere poort kies je met `KEYSTONE_PORT=9000 docker compose up -d`.
 
-De images komen standaard van `ghcr.io/civr/keystone-*`. Is de repository privé, log dan eerst in met
-`docker login ghcr.io` (of maak de packages publiek). Zonder registry werkt `docker compose up -d --build`
-ook: dan worden alle images lokaal gebouwd.
+De images komen kant-en-klaar van `ghcr.io/civr/keystone-*`; de server compileert niets. Zelf bouwen
+(alleen nodig als je de code wijzigt) gaat met het extra bestand `docker-compose.build.yml`, zie Ontwikkelen.
 
 Bij de eerste start genereert de `init`-container de geheimen (database- en valkey-wachtwoord, sessie-,
 data- en kluissleutel) in het volume `keystone_secrets`. Bestaande geheimen worden nooit overschreven.
@@ -166,9 +165,7 @@ git pull
 docker compose pull && docker compose up -d
 ```
 
-De images worden bij elke push naar `main` op GitHub gebouwd; de server hoeft dan niets te compileren.
-Bouw je zelf (`docker compose up -d --build`), dan bewaart BuildKit de Go- en npm-cache tussen builds, zodat
-alleen de eerste build lang duurt.
+De images worden bij elke push naar `main` op GitHub gebouwd; de server downloadt ze alleen.
 
 ## Buitengesloten? Netwerkbeperkingen herstellen
 
@@ -197,6 +194,12 @@ raak je het kwijt, dan log je opnieuw in.
 
 `make test`, `make web-test` en `bash scripts/smoke.sh` (volledige compose-rooktest, ruimt zichzelf op).
 
-Bouw je de images zelf, gebruik dan voor `core` en `web` dezelfde `KEYSTONE_VERSION` (build-arg, standaard
-`dev`; `docker compose build` regelt dat). `core` bevat de startpagina die naar de bestanden in `web` verwijst;
+Zelf bouwen in plaats van downloaden:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+BuildKit bewaart de Go- en npm-cache tussen builds; alleen de eerste build duurt lang. Gebruik voor `core` en
+`web` dezelfde `KEYSTONE_VERSION` (build-arg, standaard `dev`; dit bestand regelt dat). `core` bevat de startpagina die naar de bestanden in `web` verwijst;
 met verschillende waarden blijft de pagina leeg.
