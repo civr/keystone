@@ -25,6 +25,7 @@
 		"session.revoked",
 		"settings.changed",
 		"settings.network_reset",
+		"setup.account",
 		"setup.ad",
 		"setup.completed",
 		"setup.domain",

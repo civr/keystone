@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"io/fs"
 	"testing"
 
 	"github.com/civr/keystone/internal/testutil"
@@ -32,8 +33,12 @@ func TestMigrateTwiceIsNoop(t *testing.T) {
 	if err := pool.QueryRow(ctx, `select count(*) from schema_migrations`).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 3 {
-		t.Fatalf("schema_migrations rows = %d, want 3", n)
+	files, err := fs.Glob(migrationFS, "migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != len(files) {
+		t.Fatalf("schema_migrations rows = %d, want one per migration file (%d)", n, len(files))
 	}
 }
 

@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -117,6 +119,7 @@ var (
 	condADTest  = func(p setupProgress) string { return ifThen(!p.domain, msgPrevious) }
 	condPasskey = func(p setupProgress) string { return ifThen(!(p.domain && p.ad && p.owner), msgPrevious) }
 	condAfterPK = func(p setupProgress) string { return ifThen(!p.passkeyDone(), msgPrevious) }
+	condAccount = func(p setupProgress) string { return ifThen(p.passkeys > 0, msgFrozen) }
 )
 
 func ifThen(c bool, msg string) string {
@@ -181,6 +184,7 @@ func (s *server) setupRoutes(r chi.Router) {
 	r.Post("/passkey/finish", s.setupStep(condPasskey, s.setupPasskeyFinish))
 	r.Post("/emergency", s.setupStep(condAfterPK, s.setupEmergency))
 	r.Post("/passkey/skip", s.setupStep(condPasskey, s.setupPasskeySkip))
+	r.Post("/account", s.setupStep(condAccount, s.setupAccount))
 	r.Post("/finish", s.setupStep(condAfterPK, s.setupFinish))
 }
 
@@ -559,6 +563,85 @@ func (s *server) setupEmergency(w http.ResponseWriter, r *http.Request, _ string
 }
 
 var errAlreadyDone = errors.New("setup already completed")
+
+var localUsernameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
+
+const minLocalPassword = 12
+
+// setupAccount is the short setup: a Keystone account with its own password,
+// and setup is done. The public address becomes the address the browser is
+// on; domain, AD, passkeys and the emergency account follow in Instellingen.
+func (s *server) setupAccount(w http.ResponseWriter, r *http.Request, token string) {
+	ctx := r.Context()
+	cfg := settingsFrom(ctx)
+	ip := clientIP(ctx)
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	username := strings.ToLower(strings.TrimSpace(req.Username))
+	if !localUsernameRe.MatchString(username) {
+		writeInvalid(w, "username", "Gebruik kleine letters, cijfers, punt, streepje of underscore (maximaal 64).")
+		return
+	}
+	if utf8.RuneCountInString(req.Password) < minLocalPassword {
+		writeInvalid(w, "password", "Kies een wachtwoord van minstens 12 tekens.")
+		return
+	}
+	hash, err := crypto.HashSecret(req.Password)
+	if err != nil {
+		errInternal(w, "hash password", err)
+		return
+	}
+	if o, err := url.Parse(r.Header.Get("Origin")); err == nil && o.Host != "" && cfg.PublicURL == "" {
+		cfg.PublicURL = strings.ToLower(o.Scheme) + "://" + o.Host
+		if h := o.Hostname(); net.ParseIP(h) == nil && strings.Count(h, ".") >= 2 && cfg.Domain == "" {
+			cfg.Domain = h[strings.IndexByte(h, '.')+1:]
+		}
+	}
+	cfg.Login.PasskeyRequired = false
+	if _, err := s.d.Settings.Put(ctx, cfg, netip.Addr{}); err != nil {
+		errInternal(w, "save settings", err)
+		return
+	}
+	handle := make([]byte, 64)
+	if _, err := rand.Read(handle); err != nil {
+		errInternal(w, "user handle", err)
+		return
+	}
+	if _, err := s.d.Pool.Exec(ctx, `insert into owner (id, username, display_name, user_handle, password_hash, created_at)
+		values (1, $1, null, $2, $3, now())
+		on conflict (id) do update set username = excluded.username, display_name = null, given_name = null,
+			email = null, password_hash = excluded.password_hash`, username, handle, hash); err != nil {
+		errInternal(w, "save owner", err)
+		return
+	}
+	sess, err := s.d.Sessions.Create(ctx, session.Session{
+		LastFullAuthAt: time.Now(), IP: ip.String(), UserAgent: r.UserAgent(), NoPasskey: true,
+	}, cfg)
+	if err != nil {
+		slog.Error("setup: create session", "err", err)
+		errUnavailable(w)
+		return
+	}
+	if err := s.completeSetup(ctx, nil); err != nil {
+		_ = s.d.Sessions.Revoke(context.WithoutCancel(ctx), sess.ID)
+		if errors.Is(err, errAlreadyDone) {
+			errSetupDone(w)
+			return
+		}
+		errInternal(w, "complete setup", err)
+		return
+	}
+	_ = s.d.Valkey.Del(ctx, setupKey(token)).Err()
+	setCookie(w, cfg, PendingCookie, "", 0)
+	setCookie(w, cfg, SessionCookie, sess.ID, time.Duration(cfg.Session.DurationHours)*time.Hour)
+	s.d.Audit.Log(ctx, audit.ActorOwner, "setup.account", ip, map[string]any{"username": username})
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
 
 // setupPasskeySkip goes on without a passkey: browsers only offer passkeys
 // on https (or localhost), and the reverse proxy may not exist yet. Logins

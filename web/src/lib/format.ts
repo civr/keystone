@@ -89,6 +89,7 @@ const ACTIONS: Record<string, string> = {
 	'setup.ad': 'Installatie: Active Directory ingesteld',
 	'setup.owner': 'Installatie: eigenaar gekozen',
 	'setup.owner_failed': 'Installatie: eigenaar niet herkend',
+	'setup.account': 'Installatie: account aangemaakt',
 	'setup.passkey': 'Installatie: passkey geregistreerd',
 	'setup.passkey_skipped': 'Installatie: passkey overgeslagen',
 	'setup.emergency': 'Installatie: nood-account ingesteld',

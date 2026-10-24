@@ -36,6 +36,14 @@ type fixture struct {
 	dir  *ad.Fake
 }
 
+func hash(s string) string {
+	h, err := crypto.HashSecret(s)
+	if err != nil {
+		panic(err)
+	}
+	return h
+}
+
 func start(t *testing.T) *fixture {
 	t.Helper()
 	opt, err := redis.ParseURL(testutil.Valkey(t))
@@ -147,6 +155,22 @@ func TestLDAP(t *testing.T) {
 		}
 		if err := c.Bind("uid=thijs,ou=jellyfin,dc=keystone", "correct horse"); code(err) != ldap.LDAPResultInvalidCredentials {
 			t.Fatalf("unmapped name = %v", err)
+		}
+	})
+
+	t.Run("LocalOwnerPasswordWithoutAD", func(t *testing.T) {
+		saved := f.view.v.Owner
+		f.view.v.Owner.PasswordHash = hash("keystone-only password")
+		defer func() { f.view.v.Owner = saved }()
+		down := f.dir.Down
+		f.dir.Down = true
+		defer func() { f.dir.Down = down }()
+		c := f.dial(t)
+		if err := c.Bind(jfUser, "keystone-only password"); err != nil {
+			t.Fatalf("local password: %v", err)
+		}
+		if err := c.Bind(jfUser, "correct horse"); code(err) != ldap.LDAPResultInvalidCredentials {
+			t.Fatalf("AD password accepted for a local owner: %v", err)
 		}
 	})
 

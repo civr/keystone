@@ -84,6 +84,9 @@ type Owner struct {
 	DisplayName string
 	Email       string
 	UserHandle  []byte
+	// PasswordHash is the Keystone password of an owner made in the short
+	// setup (argon2); empty when the owner signs in with AD.
+	PasswordHash string
 }
 
 var (
@@ -240,7 +243,8 @@ func ByID(ctx context.Context, q Querier, id string) (App, error) {
 // LoadOwner returns the owner chosen during setup.
 func LoadOwner(ctx context.Context, q Querier) (Owner, error) {
 	var o Owner
-	err := q.QueryRow(ctx, `select username, coalesce(display_name, ''), coalesce(email, ''), user_handle from owner where id = 1`).
-		Scan(&o.Username, &o.DisplayName, &o.Email, &o.UserHandle)
+	err := q.QueryRow(ctx, `select username, coalesce(display_name, ''), coalesce(email, ''), user_handle,
+		coalesce(password_hash, '') from owner where id = 1`).
+		Scan(&o.Username, &o.DisplayName, &o.Email, &o.UserHandle, &o.PasswordHash)
 	return o, err
 }

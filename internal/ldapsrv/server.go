@@ -243,14 +243,22 @@ func (cn *conn) userBind(ctx context.Context, reply func(int, string), v runtime
 		reply(resultUnwilling, "account temporarily locked")
 		return
 	}
-	dir := cn.s.Dir()
-	if dir == nil || v.Owner.Username == "" {
-		reply(resultUnavailable, "directory not configured")
-		return
+	var err error
+	if v.Owner.PasswordHash != "" {
+		// Owner from the short setup: the Keystone password, no AD.
+		if !crypto.VerifySecret(v.Owner.PasswordHash, password) {
+			err = ad.ErrInvalidCredentials
+		}
+	} else {
+		dir := cn.s.Dir()
+		if dir == nil || v.Owner.Username == "" {
+			reply(resultUnavailable, "directory not configured")
+			return
+		}
+		actx, cancel := context.WithTimeout(ctx, opTimeout)
+		defer cancel()
+		_, err = dir.Authenticate(actx, v.Owner.Username, password)
 	}
-	actx, cancel := context.WithTimeout(ctx, opTimeout)
-	defer cancel()
-	_, err := dir.Authenticate(actx, v.Owner.Username, password)
 	switch {
 	case err == nil:
 		_ = cn.s.Limiter.ResetFailures(ctx, account)

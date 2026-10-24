@@ -364,6 +364,27 @@ func (s *server) authPassword(w http.ResponseWriter, r *http.Request) {
 		!s.notLocked(w, ctx, account, ip) {
 		return
 	}
+	// An owner made in the short setup has a Keystone password: AD is not asked.
+	var localHash string
+	err := s.d.Pool.QueryRow(ctx, `select coalesce(password_hash, '') from owner where id = 1`).Scan(&localHash)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		errInternal(w, "load owner", err)
+		return
+	}
+	if localHash != "" {
+		owner, err := s.loadOwner(ctx)
+		if err != nil {
+			errInternal(w, "load owner", err)
+			return
+		}
+		ok := crypto.VerifySecret(localHash, req.Password) // always run: no timing hint about the name
+		if !ok || account != owner.Username {
+			s.loginFailed(w, ctx, cfg, account, "password", ip)
+			return
+		}
+		s.passwordAccepted(w, r, cfg, account, ip)
+		return
+	}
 	dir := s.directory()
 	if dir == nil {
 		s.d.Audit.Log(ctx, audit.ActorAnonymous, "login.failure", ip, map[string]any{"username": account, "reason": "ad_unavailable"})
@@ -399,6 +420,13 @@ func (s *server) authPassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "not_allowed", "Dit account mag niet inloggen bij Keystone.")
 		return
 	}
+	s.passwordAccepted(w, r, cfg, account, ip)
+}
+
+// passwordAccepted continues a sign-in whose password was right: on to the
+// passkey, or straight in when no passkey is required.
+func (s *server) passwordAccepted(w http.ResponseWriter, r *http.Request, cfg settings.Settings, account string, ip netip.Addr) {
+	ctx := r.Context()
 	if err := s.d.Limiter.ResetFailures(ctx, account); err != nil {
 		slog.Error("auth: reset failures", "err", err)
 	}
