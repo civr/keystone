@@ -33,18 +33,18 @@
 	const groups = [
 		{
 			id: 'adres',
-			title: 'Adres',
+			title: 'Address',
 			paths: ['domain', 'public_url'],
-			foot: 'Wijzig je het publieke adres naar een andere hostnaam, dan werken je huidige passkeys daar niet meer.'
+			foot: 'Passkeys belong to the host name they were made on; on a new one you add them again.'
 		}
 	];
 </script>
 
-<div class="pane-head"><h1 class="pane-title">Algemeen</h1></div>
-<p class="pane-intro">Waar Keystone woont en wie het beheert.</p>
+<div class="pane-head"><h1 class="pane-title">General</h1></div>
+<p class="pane-intro">Where Keystone lives and who owns it.</p>
 
 <section class="group" aria-labelledby="g-account">
-	<h2 id="g-account">Account</h2>
+	<h2 id="g-account">Owner</h2>
 	<div class="card">
 		<div class="srow">
 			<div class="avatar" aria-hidden="true">{(me?.display_name || me?.username || '·').trim().charAt(0).toUpperCase()}</div>
@@ -54,10 +54,10 @@
 					{#if me}{me.username}{#if me.email} · {me.email}{/if}{:else}&nbsp;{/if}
 				</p>
 			</div>
-			<span class="chip accent">Eigenaar</span>
+			<span class="chip accent">Owner</span>
 		</div>
 	</div>
-	<p class="foot">Alleen dit AD-account kan inloggen bij Keystone.</p>
+	<p class="foot">The owner made Keystone and is always an admin. Add other people under Users.</p>
 </section>
 
 {#if otherAddress}

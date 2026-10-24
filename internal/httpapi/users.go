@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/civr/keystone/internal/accounts"
+	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/crypto"
 )
 
@@ -108,6 +110,14 @@ func (s *server) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if msg := passwordError(in.Password); msg != "" {
 		writeInvalid(w, "password", msg)
+		return
+	}
+	if taken, err := s.ownerAppName(ctx, in.Username); err != nil || taken {
+		if err != nil {
+			errInternal(w, "load apps", err)
+		} else {
+			writeInvalid(w, "username", "The owner uses this name at one of the apps. Choose another.")
+		}
 		return
 	}
 	hash, err := crypto.HashSecret(in.Password)
@@ -240,6 +250,22 @@ func (s *server) deleteUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+// ownerAppName reports whether username is the name the owner is given at
+// some app (an account override). A user with that name would be the owner
+// there, so such names are refused.
+func (s *server) ownerAppName(ctx context.Context, username string) (bool, error) {
+	list, err := apps.Load(ctx, s.d.Pool)
+	if err != nil {
+		return false, err
+	}
+	for _, a := range list {
+		if strings.EqualFold(a.Config.Account.Username, username) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // changeOwnPassword sets the signed-in account's password after checking the
 // current one. An owner who signs in with AD changes it in AD.
 func (s *server) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
@@ -266,10 +292,15 @@ func (s *server) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
 		writeInvalid(w, "new", msg)
 		return
 	}
-	if !s.allow(w, ctx, "login-account", acct.Username, cfg.BruteForce.LoginPerAccountPerMinute) {
+	if !s.allow(w, ctx, "login-account", acct.Username, cfg.BruteForce.LoginPerAccountPerMinute) ||
+		!s.notLocked(w, ctx, acct.Username, ip) {
 		return
 	}
 	if !crypto.VerifySecret(acct.PasswordHash, in.Current) {
+		// Counts toward the lockout like a failed sign-in.
+		if _, err := s.d.Limiter.Fail(ctx, acct.Username, cfg); err != nil {
+			slog.Error("account: record failure", "err", err)
+		}
 		writeInvalid(w, "current", "That is not your current password.")
 		return
 	}

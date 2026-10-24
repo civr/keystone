@@ -145,7 +145,7 @@ func cidrCheck(next http.Handler) http.Handler {
 		}
 		if len(list) > 0 && !containsIP(parsePrefixes(list), clientIP(r.Context())) {
 			slog.Warn("http: blocked by network allowlist", "path", r.URL.Path, "ip", clientIP(r.Context()).String())
-			writeError(w, http.StatusForbidden, "ip_not_allowed", "Toegang vanaf dit netwerkadres is niet toegestaan.")
+			writeError(w, http.StatusForbidden, "ip_not_allowed", "Access from this network address is not allowed.")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -161,7 +161,7 @@ func (s *server) originCheck(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		writeError(w, http.StatusForbidden, "bad_origin", "Verzoek geweigerd: het komt niet van deze Keystone-pagina.")
+		writeError(w, http.StatusForbidden, "bad_origin", "Request refused: it did not come from this Keystone page.")
 	})
 }
 
@@ -242,7 +242,7 @@ func (s *server) loadSession(next http.Handler) http.Handler {
 func requireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if SessionFrom(r.Context()) == nil {
-			writeError(w, http.StatusUnauthorized, "unauthenticated", "Je bent niet ingelogd.")
+			writeError(w, http.StatusUnauthorized, "unauthenticated", "You are not signed in.")
 			return
 		}
 		next.ServeHTTP(w, r)

@@ -1,25 +1,25 @@
-/** Dutch display text for Instellingen: times, devices, setting values, audit entries. */
+/** Display text for Settings: times, devices, setting values, audit entries. */
 import { passkeyName } from './webauthn';
 import { settingsMeta, type FieldMeta } from './settingsMeta';
 
-const dateFmt = new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** "zojuist", "5 minuten geleden", "gisteren", … or a date after a week. */
+/** "just now", "5 minutes ago", "yesterday", … or a date after a week. */
 export function relativeTime(iso: string | null | undefined, now: Date = new Date()): string {
-	if (!iso) return 'nooit';
+	if (!iso) return 'never';
 	const at = new Date(iso);
 	const s = Math.max(0, (now.getTime() - at.getTime()) / 1000);
-	if (s < 45) return 'zojuist';
-	if (s < 3600) return plural(Math.max(1, Math.round(s / 60)), 'minuut', 'minuten') + ' geleden';
-	if (s < 86400) return plural(Math.round(s / 3600), 'uur', 'uur') + ' geleden';
+	if (s < 45) return 'just now';
+	if (s < 3600) return plural(Math.max(1, Math.round(s / 60)), 'minute', 'minutes') + ' ago';
+	if (s < 86400) return plural(Math.round(s / 3600), 'hour', 'hours') + ' ago';
 	const days = Math.floor(s / 86400);
-	if (days === 1) return 'gisteren';
-	if (days < 7) return `${days} dagen geleden`;
+	if (days === 1) return 'yesterday';
+	if (days < 7) return `${days} days ago`;
 	return dateFmt.format(at);
 }
 
-/** "Safari op iPhone" from a User-Agent string. */
+/** "Safari on iPhone" from a User-Agent string. */
 export function describeUA(ua: string): string {
 	const browser = /Edg\//.test(ua)
 		? 'Edge'
@@ -32,76 +32,76 @@ export function describeUA(ua: string): string {
 					: '';
 	const name = passkeyName(ua);
 	const device = name === 'Passkey' ? '' : name;
-	if (browser && device) return `${browser} op ${device}`;
-	return browser || device || 'Onbekend apparaat';
+	if (browser && device) return `${browser} on ${device}`;
+	return browser || device || 'Unknown device';
 }
 
-/** A setting value as the user reads it, e.g. "Aan", "720 uur", "Indien mogelijk". */
+/** A setting value as the user reads it, e.g. "On", "720 hours", "When possible". */
 export function formatValue(meta: FieldMeta | undefined, v: unknown): string {
 	if (!meta) return typeof v === 'string' ? v : JSON.stringify(v);
 	switch (meta.kind) {
 		case 'bool':
-			return v ? 'Aan' : 'Uit';
+			return v ? 'On' : 'Off';
 		case 'int':
 			return meta.unit ? `${v} ${meta.unit}` : String(v);
 		case 'enum':
 			return meta.options?.find((o) => o.value === v)?.label ?? String(v);
 		case 'cidrs':
-			return Array.isArray(v) && v.length ? v.join(', ') : 'leeg (overal vandaan)';
+			return Array.isArray(v) && v.length ? v.join(', ') : 'empty (anywhere)';
 		default:
-			return typeof v === 'string' && v !== '' ? v : 'leeg';
+			return typeof v === 'string' && v !== '' ? v : 'empty';
 	}
 }
 
 const ACTIONS: Record<string, string> = {
-	'login.success': 'Ingelogd',
-	'login.failure': 'Inloggen mislukt',
-	'login.locked': 'Inloggen geblokkeerd',
-	'login.not_allowed': 'Ander account geweigerd',
-	logout: 'Uitgelogd',
-	stepup: 'Bevestigd met passkey',
-	'recovery.used': 'Herstelcode gebruikt',
-	'recovery.regenerated': 'Nieuwe herstelcodes gemaakt',
-	'emergency.used': 'Nood-account gebruikt',
-	'emergency.changed': 'Nood-account gewijzigd',
-	'settings.changed': 'Instellingen gewijzigd',
-	'branding.changed': 'Huisstijl gewijzigd',
-	'vault.item_created': 'Kluisitem toegevoegd',
-	'vault.item_updated': 'Kluisitem gewijzigd',
-	'vault.item_deleted': 'Kluisitem verwijderd',
-	'user.created': 'Account toegevoegd',
-	'user.updated': 'Account gewijzigd',
-	'user.deleted': 'Account verwijderd',
-	'account.password_changed': 'Wachtwoord gewijzigd',
-	'settings.network_reset': 'Netwerkbeperkingen gewist',
-	'ad.changed': 'Active Directory gewijzigd',
-	'session.revoked': 'Sessie afgemeld',
-	'passkey.registered': 'Passkey toegevoegd',
-	'passkey.renamed': 'Passkey hernoemd',
-	'passkey.removed': 'Passkey verwijderd',
-	'app.created': 'App toegevoegd',
-	'app.updated': 'App gewijzigd',
-	'app.deleted': 'App verwijderd',
-	'app.reordered': 'Apps opnieuw geordend',
-	'app.secret_created': 'Nieuw app-geheim gemaakt',
-	'app.access': 'App geopend',
-	'keys.rotated': 'Sleutel vernieuwd',
-	'vault.updated': 'Kluis gewijzigd',
-	'vault.revealed': 'Wachtwoord uit kluis gebruikt',
-	'ldap.bind_failed': 'LDAP-inlog mislukt',
-	'gate.denied': 'Poortwachter weigerde toegang',
-	'audit.exported': 'Activiteit geëxporteerd',
-	'setup.unlocked': 'Installatie ontgrendeld',
-	'setup.unlock_failed': 'Verkeerde setupcode',
-	'setup.domain': 'Installatie: domein ingesteld',
-	'setup.ad': 'Installatie: Active Directory ingesteld',
-	'setup.owner': 'Installatie: eigenaar gekozen',
-	'setup.owner_failed': 'Installatie: eigenaar niet herkend',
-	'setup.account': 'Installatie: account aangemaakt',
-	'setup.passkey': 'Installatie: passkey geregistreerd',
-	'setup.passkey_skipped': 'Installatie: passkey overgeslagen',
-	'setup.emergency': 'Installatie: nood-account ingesteld',
-	'setup.completed': 'Installatie voltooid'
+	'login.success': 'Signed in',
+	'login.failure': 'Sign-in failed',
+	'login.locked': 'Sign-in locked',
+	'login.not_allowed': 'Other account refused',
+	logout: 'Signed out',
+	stepup: 'Confirmed',
+	'recovery.used': 'Recovery code used',
+	'recovery.regenerated': 'New recovery codes made',
+	'emergency.used': 'Emergency account used',
+	'emergency.changed': 'Emergency account changed',
+	'settings.changed': 'Settings changed',
+	'branding.changed': 'Branding changed',
+	'vault.item_created': 'Vault item added',
+	'vault.item_updated': 'Vault item changed',
+	'vault.item_deleted': 'Vault item deleted',
+	'user.created': 'User added',
+	'user.updated': 'User changed',
+	'user.deleted': 'User deleted',
+	'account.password_changed': 'Password changed',
+	'settings.network_reset': 'Network limits cleared',
+	'ad.changed': 'Active Directory changed',
+	'session.revoked': 'Session signed out',
+	'passkey.registered': 'Passkey added',
+	'passkey.renamed': 'Passkey renamed',
+	'passkey.removed': 'Passkey removed',
+	'app.created': 'App added',
+	'app.updated': 'App changed',
+	'app.deleted': 'App deleted',
+	'app.reordered': 'Apps reordered',
+	'app.secret_created': 'New app secret made',
+	'app.access': 'App opened',
+	'keys.rotated': 'Key renewed',
+	'vault.updated': 'Vault changed',
+	'vault.revealed': 'Vault password used',
+	'ldap.bind_failed': 'LDAP sign-in failed',
+	'gate.denied': 'Gate refused access',
+	'audit.exported': 'Activity exported',
+	'setup.unlocked': 'Setup unlocked',
+	'setup.unlock_failed': 'Wrong setup code',
+	'setup.domain': 'Setup: domain set',
+	'setup.ad': 'Setup: Active Directory set',
+	'setup.owner': 'Setup: owner chosen',
+	'setup.owner_failed': 'Setup: owner not recognised',
+	'setup.account': 'Setup: account created',
+	'setup.passkey': 'Setup: passkey registered',
+	'setup.passkey_skipped': 'Setup: passkey skipped',
+	'setup.emergency': 'Setup: emergency account set',
+	'setup.completed': 'Setup completed'
 };
 
 export function auditLabel(action: string): string {
@@ -109,31 +109,34 @@ export function auditLabel(action: string): string {
 }
 
 const KEYS: Record<string, string> = {
-	username: 'gebruiker',
-	method: 'methode',
-	reason: 'reden',
-	name: 'naam',
-	remaining: 'over',
-	domain: 'domein',
-	public_url: 'adres',
+	username: 'user',
+	method: 'method',
+	reason: 'reason',
+	name: 'name',
+	remaining: 'left',
+	domain: 'domain',
+	public_url: 'address',
 	url: 'server',
-	rows: 'regels',
-	recovery_codes: 'herstelcodes',
-	after: 'na'
+	rows: 'rows',
+	recovery_codes: 'recovery codes',
+	after: 'after',
+	title: 'item',
+	app: 'app',
+	role: 'role'
 };
 const VALUES: Record<string, string> = {
-	password: 'wachtwoord',
+	password: 'password',
 	passkey: 'passkey',
-	passkey_register: 'nieuwe passkey',
-	trusted_device: 'vertrouwd apparaat (passkey)',
-	emergency: 'nood-account',
-	recovery: 'herstelcode',
-	stepup: 'bevestiging',
-	ad_unavailable: 'AD niet bereikbaar',
-	ad_error: 'AD-fout'
+	passkey_register: 'new passkey',
+	trusted_device: 'trusted device (passkey)',
+	emergency: 'emergency account',
+	recovery: 'recovery code',
+	stepup: 'confirmation',
+	ad_unavailable: 'Active Directory unreachable',
+	ad_error: 'Active Directory error'
 };
 
-/** Dutch text for a known detail value (e.g. a login method), else undefined. */
+/** Text for a known detail value (e.g. a login method), else undefined. */
 export function auditValueLabel(v: string): string | undefined {
 	return VALUES[v];
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Everything under /instellingen is its own lazily loaded chunk: none of
+	// Everything under /settings is its own lazily loaded chunk: none of
 	// this (or forms.css/settings.css) ships with the home page.
 	import '$lib/forms.css';
 	import '$lib/settings.css';
@@ -25,7 +25,7 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle(current.label, 'Instellingen')}</title>
+	<title>{pageTitle(current.label, 'Settings')}</title>
 </svelte:head>
 
 <AppShell {me}>

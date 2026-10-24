@@ -129,7 +129,7 @@ func (s *server) oidcToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 	if err := r.ParseForm(); err != nil {
-		oauthError(w, http.StatusBadRequest, "invalid_request", "Ongeldig formulier.")
+		oauthError(w, http.StatusBadRequest, "invalid_request", "Invalid form.")
 		return
 	}
 	if !s.allow(w, ctx, "oidc-token", clientIP(ctx).String(), 60) {
@@ -142,7 +142,7 @@ func (s *server) oidcToken(w http.ResponseWriter, r *http.Request) {
 	}
 	client, ok := s.oidcClient(r, list)
 	if !ok {
-		oauthError(w, http.StatusUnauthorized, "invalid_client", "Clientauthenticatie mislukt.")
+		oauthError(w, http.StatusUnauthorized, "invalid_client", "Client authentication failed.")
 		return
 	}
 	cfg, f := settingsFrom(ctx), r.PostForm
@@ -153,7 +153,7 @@ func (s *server) oidcToken(w http.ResponseWriter, r *http.Request) {
 	case "refresh_token":
 		t, err = s.oidcProvider().Refresh(ctx, cfg, issuer(r), client, f.Get("refresh_token"), randomToken)
 	default:
-		oauthError(w, http.StatusBadRequest, "unsupported_grant_type", "Onbekend grant_type.")
+		oauthError(w, http.StatusBadRequest, "unsupported_grant_type", "Unknown grant_type.")
 		return
 	}
 	var oe *oidc.Error

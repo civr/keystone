@@ -61,7 +61,7 @@
 				saved = null;
 				return;
 			}
-			loadError = e instanceof ApiError ? e.message : 'De AD-instellingen konden niet worden geladen.';
+			loadError = e instanceof ApiError ? e.message : 'The Active Directory settings could not be loaded.';
 		}
 	}
 	onMount(load);
@@ -74,7 +74,7 @@
 
 	function fail(e: unknown) {
 		if (e instanceof ApiError && e.code === 'bind_password_required') passwordError = e.message;
-		else error = e instanceof ApiError ? e.message : 'Er ging iets mis.';
+		else error = e instanceof ApiError ? e.message : 'Something went wrong.';
 	}
 
 	async function runTest() {
@@ -94,20 +94,20 @@
 		e.preventDefault();
 		if (needsPassword && !password) {
 			passwordError = passwordSet
-				? 'Voer het bind-wachtwoord opnieuw in als je de AD-server wijzigt.'
-				: 'Vul het wachtwoord van het service-account in.';
+				? 'Enter the bind password again when you change the server.'
+				: 'Enter the service account’s password.';
 			return;
 		}
 		const weakened = adWeakenings(saved, form!);
 		if (
 			weakened.length &&
 			!(await confirmer.ask({
-				title: 'Dit verlaagt de beveiliging',
+				title: 'This lowers security',
 				message:
 					weakened.length === 1
-						? 'Deze wijziging maakt de verbinding met AD minder veilig. Weet je het zeker?'
-						: 'Deze wijzigingen maken de verbinding met AD minder veilig. Weet je het zeker?',
-				confirm: 'Toch opslaan',
+						? 'This change makes the Active Directory connection less safe. Save it anyway?'
+						: 'These changes make the Active Directory connection less safe. Save them anyway?',
+				confirm: 'Save anyway',
 				danger: true,
 				items: weakened
 			}))
@@ -121,7 +121,7 @@
 			storedURL = form!.url.trim();
 			passwordSet = true;
 			password = '';
-			toast('Opgeslagen');
+			toast('Saved');
 		} catch (err) {
 			fail(err);
 		} finally {
@@ -131,26 +131,26 @@
 </script>
 
 <div class="pane-head"><h1 class="pane-title">Active Directory</h1></div>
-<p class="pane-intro">Keystone controleert je wachtwoord bij je domeincontroller.</p>
+<p class="pane-intro">Optional: the owner can sign in with their Active Directory password instead of a Keystone password.</p>
 
 {#if loadError}
 	<div class="empty-note">
 		<p>{loadError}</p>
-		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Try again</button>
 	</div>
 {:else if !form}
-	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
+	<div class="loading-note" aria-label="Loading"><span class="spinner"></span></div>
 {:else}
 	<form onsubmit={save} novalidate>
 		<section class="group" aria-labelledby="g-conn">
-			<h2 id="g-conn">Verbinding</h2>
+			<h2 id="g-conn">Connection</h2>
 			<div class="card form-card">
 				<label class="field">
 					<span>Server</span>
 					<input class="input" placeholder="ldaps://dc.home.lan" autocapitalize="none" spellcheck="false" bind:value={form.url} />
 				</label>
 				<label class="field">
-					<span>Service-account (bind DN)</span>
+					<span>Service account (bind DN)</span>
 					<input
 						class="input"
 						placeholder="CN=keystone,OU=Service,DC=home,DC=lan"
@@ -160,43 +160,43 @@
 					/>
 				</label>
 				<label class="field">
-					<span>Wachtwoord service-account</span>
+					<span>Service account password</span>
 					<input
 						class="input"
 						type="password"
 						autocomplete="off"
-						placeholder={needsPassword ? '' : 'Ongewijzigd'}
+						placeholder={needsPassword ? '' : 'Unchanged'}
 						aria-invalid={passwordError ? 'true' : undefined}
 						bind:value={password}
 					/>
 					{#if passwordError}
 						<small class="field-error" role="alert">{passwordError}</small>
 					{:else if passwordSet && !needsPassword}
-						<small>Laat leeg om het opgeslagen wachtwoord te houden.</small>
+						<small>Leave empty to keep the stored password.</small>
 					{:else if passwordSet}
-						<small>Nieuwe server: vul het wachtwoord opnieuw in.</small>
+						<small>New server: enter the password again.</small>
 					{/if}
 				</label>
 				<label class="field">
-					<span>Zoekbasis (base DN)</span>
+					<span>Search base (base DN)</span>
 					<input class="input" placeholder="DC=home,DC=lan" autocapitalize="none" spellcheck="false" bind:value={form.base_dn} />
 				</label>
 			</div>
 		</section>
 
 		<section class="group" aria-labelledby="g-adv">
-			<h2 id="g-adv">Geavanceerd</h2>
+			<h2 id="g-adv">Advanced</h2>
 			<div class="card">
 				<div class="srow">
 					<div class="text">
-						<label class="label" for="ad-starttls">StartTLS gebruiken</label>
-						<p class="help">Voor ldap:// op poort 389.</p>
+						<label class="label" for="ad-starttls">Use StartTLS</label>
+						<p class="help">For ldap:// on port 389.</p>
 					</div>
 					<input id="ad-starttls" class="switch" type="checkbox" role="switch" bind:checked={form.start_tls} />
 				</div>
 				<div class="srow wrap-phone">
 					<div class="text">
-						<span class="label" id="ad-tls">Minimale TLS-versie</span>
+						<span class="label" id="ad-tls">Minimum TLS version</span>
 					</div>
 					<div class="segmented" role="radiogroup" aria-labelledby="ad-tls">
 						{#each ['1.2', '1.3'] as v}
@@ -206,39 +206,39 @@
 				</div>
 				<div class="srow">
 					<div class="text">
-						<label class="label" for="ad-timeout">Time-out</label>
-						<p class="help">Daarna meldt de inlogpagina dat AD niet bereikbaar is.</p>
+						<label class="label" for="ad-timeout">Timeout</label>
+						<p class="help">After this the sign-in page says Active Directory cannot be reached.</p>
 					</div>
 					<div class="control">
 						<input id="ad-timeout" class="input num" type="number" min="1" max="60" bind:value={form.timeout_seconds} />
-						<span class="unit">seconden</span>
+						<span class="unit">seconds</span>
 					</div>
 				</div>
 				<div class="srow stack">
 					<div class="text">
-						<label class="label" for="ad-filter">Gebruikersfilter</label>
-						<p class="help">%s wordt vervangen door de gebruikersnaam.</p>
+						<label class="label" for="ad-filter">User filter</label>
+						<p class="help">%s is replaced by the username.</p>
 					</div>
 					<input id="ad-filter" class="input mono" autocapitalize="none" spellcheck="false" bind:value={form.user_filter} />
 				</div>
 				<div class="srow stack">
 					<div class="text">
-						<label class="label" for="ad-ca">CA-certificaat (PEM)</label>
-						<p class="help">Alleen nodig als je domeincontroller een eigen CA gebruikt.</p>
+						<label class="label" for="ad-ca">CA certificate (PEM)</label>
+						<p class="help">Only needed when your domain controller uses its own CA.</p>
 					</div>
 					<textarea id="ad-ca" class="input" placeholder="-----BEGIN CERTIFICATE-----" bind:value={form.ca_pem}></textarea>
 				</div>
 				<div class="srow">
 					<div class="text">
-						<label class="label" for="ad-skip">Certificaat niet controleren</label>
-						<p class="help">Onveilig — alleen om te testen.</p>
+						<label class="label" for="ad-skip">Do not check the certificate</label>
+						<p class="help">Unsafe; for testing only.</p>
 					</div>
 					<input id="ad-skip" class="switch" type="checkbox" role="switch" bind:checked={form.insecure_skip_verify} />
 				</div>
 				<div class="srow">
 					<div class="text">
-						<label class="label" for="ad-plain">Onversleuteld ldap:// toestaan</label>
-						<p class="help">Wachtwoorden gaan dan leesbaar over het netwerk.</p>
+						<label class="label" for="ad-plain">Allow unencrypted ldap://</label>
+						<p class="help">Passwords then cross the network readable.</p>
 					</div>
 					<input id="ad-plain" class="switch" type="checkbox" role="switch" bind:checked={form.allow_plaintext} />
 				</div>
@@ -248,10 +248,10 @@
 		{#if test}
 			<p class={test.ok ? 'notice ok' : 'error'} role="status">
 				{#if test.ok}
-					Verbinding gelukt — {test.users_found}
-					{test.users_found === 1 ? 'gebruiker' : 'gebruikers'} gevonden.
+					Connected. Found {test.users_found}
+					{test.users_found === 1 ? 'user' : 'users'}.
 				{:else}
-					Verbinding mislukt: {test.message ?? 'onbekende fout'}
+					Connection failed: {test.message ?? 'unknown error'}
 				{/if}
 			</p>
 		{/if}
@@ -260,11 +260,11 @@
 		<div class="actions">
 			<button type="button" class="btn btn-secondary" onclick={runTest} disabled={busy !== ''}>
 				{#if busy === 'test'}<span class="spinner" aria-hidden="true"></span>{/if}
-				Test verbinding
+				Test connection
 			</button>
 			<button class="btn btn-primary" disabled={busy !== ''}>
 				{#if busy === 'save'}<span class="spinner" aria-hidden="true"></span>{/if}
-				Opslaan
+				Save
 			</button>
 		</div>
 	</form>

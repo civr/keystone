@@ -27,7 +27,7 @@
 	<div class="panel">
 		<header>
 			<h2 id={titleId}>{title}</h2>
-			<button type="button" class="close" aria-label="Sluiten" onclick={() => (open = false)}>
+			<button type="button" class="close" aria-label="Close" onclick={() => (open = false)}>
 				<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
 			</button>
 		</header>

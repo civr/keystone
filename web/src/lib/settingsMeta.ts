@@ -1,7 +1,7 @@
 /**
  * Labels, help, input kind and "does this lower security?" for every field of
- * keystone-core's Settings JSON (settings.Defaults() shape). Instellingen ›
- * Beveiliging renders entirely from this table; settingsMeta.test.ts proves it
+ * keystone-core's Settings JSON (settings.Defaults() shape). Settings ›
+ * Security renders entirely from this table; settingsMeta.test.ts proves it
  * covers every field in fixtures/defaults.json (`make web-fixtures`).
  */
 
@@ -51,7 +51,7 @@ export interface FieldMeta {
 	kind: Kind;
 	min?: number;
 	max?: number;
-	/** Shown after a number, e.g. "uur". */
+	/** Shown after a number, e.g. "hours". */
 	unit?: string;
 	options?: { value: string; label: string }[];
 	placeholder?: string;
@@ -75,54 +75,54 @@ const allowlistWidened = (o: string[], n: string[]) => o.length > 0 && (n.length
 
 export const settingsMeta: Record<string, FieldMeta> = {
 	domain: {
-		label: 'Domein',
-		help: 'Het domein van je thuisnetwerk, bijvoorbeeld home.lan.',
+		label: 'Domain',
+		help: 'Your home network’s domain, for example home.lan.',
 		kind: 'text',
 		placeholder: 'home.lan'
 	},
 	public_url: {
-		label: 'Publiek adres',
-		help: 'Het adres waarop Keystone bereikbaar is. Passkeys zijn aan deze hostnaam gekoppeld.',
+		label: 'Public address',
+		help: 'The address Keystone is reached on. Apps and sign-in links use it.',
 		kind: 'text',
 		placeholder: 'https://auth.home.lan'
 	},
 
 	'session.duration_hours': {
-		label: 'Sessieduur',
-		help: 'Hoe lang je aangemeld blijft.',
+		label: 'Session length',
+		help: 'How long you stay signed in.',
 		kind: 'int',
 		min: 1,
 		max: 8760,
-		unit: 'uur',
+		unit: 'hours',
 		weakens: raised
 	},
 	'session.trusted_device_days': {
-		label: 'Vertrouwd apparaat',
-		help: 'Hoe lang een apparaat na inloggen als vertrouwd geldt. 0 = nooit.',
+		label: 'Trusted device',
+		help: 'How long a device counts as trusted after signing in. 0 = never.',
 		kind: 'int',
 		min: 0,
 		max: 365,
-		unit: 'dagen',
+		unit: 'days',
 		weakens: raised
 	},
 	'session.idle_timeout_minutes': {
-		label: 'Afmelden na inactiviteit',
-		help: 'Meld af als je zo lang niets doet. 0 = uit.',
+		label: 'Sign out when idle',
+		help: 'Sign out after this long without activity. 0 = off.',
 		kind: 'int',
 		min: 0,
 		max: 43200,
-		unit: 'minuten',
+		unit: 'minutes',
 		weakens: limitLoosened
 	},
 	'session.sliding': {
-		label: 'Sessie verlengen bij gebruik',
-		help: 'De sessieduur telt vanaf je laatste activiteit in plaats van vanaf het inloggen.',
+		label: 'Extend session while in use',
+		help: 'The session length counts from your last activity instead of from signing in.',
 		kind: 'bool',
 		weakens: turnedOn
 	},
 	'session.same_site': {
-		label: 'SameSite-cookie',
-		help: 'Strict stuurt de sessiecookie nooit mee vanaf andere sites; Lax wel bij gewone links.',
+		label: 'SameSite cookie',
+		help: 'Strict never sends the session cookie from other sites; Lax does for plain links.',
 		kind: 'enum',
 		options: [
 			{ value: 'Lax', label: 'Lax' },
@@ -132,91 +132,91 @@ export const settingsMeta: Record<string, FieldMeta> = {
 	},
 
 	'login.passkey_required': {
-		label: 'Passkey verplicht',
-		help: 'Na je AD-wachtwoord is altijd een passkey nodig.',
+		label: 'Require a passkey',
+		help: 'A passkey is always needed after the password.',
 		kind: 'bool',
 		weakens: turnedOff
 	},
 	'login.passkey_only_on_trusted_device': {
-		label: 'Alleen passkey op vertrouwd apparaat',
-		help: 'Op een vertrouwd apparaat volstaat de passkey en is geen wachtwoord nodig.',
+		label: 'Passkey only on trusted devices',
+		help: 'On a trusted device the passkey is enough; no password needed.',
 		kind: 'bool',
 		weakens: turnedOn
 	},
 	'login.user_verification': {
-		label: 'Gebruikersverificatie',
-		help: 'Verplicht: de passkey vraagt altijd om Face ID, vingerafdruk of pincode.',
+		label: 'User verification',
+		help: 'Required: the passkey always asks for Face ID, a fingerprint or a PIN.',
 		kind: 'enum',
 		options: [
-			{ value: 'required', label: 'Verplicht' },
-			{ value: 'preferred', label: 'Indien mogelijk' }
+			{ value: 'required', label: 'Required' },
+			{ value: 'preferred', label: 'When possible' }
 		],
 		weakens: (o: string, n: string) => o === 'required' && n !== 'required'
 	},
 	'login.step_up_minutes': {
-		label: 'Opnieuw bevestigen na',
-		help: 'Wijzigingen in Instellingen vragen om je passkey als je die langer geleden gebruikte.',
+		label: 'Confirm again after',
+		help: 'Changes in Settings ask you to confirm again when your last confirmation is older than this.',
 		kind: 'int',
 		min: 1,
 		max: 60,
-		unit: 'minuten',
+		unit: 'minutes',
 		weakens: raised
 	},
 
 	'brute_force.login_per_ip_per_minute': {
-		label: 'Pogingen per IP-adres',
-		help: 'Maximaal aantal inlogpogingen per minuut vanaf één adres.',
+		label: 'Attempts per IP address',
+		help: 'Most sign-in attempts per minute from one address.',
 		kind: 'int',
 		min: 1,
 		max: 1000,
-		unit: 'per minuut',
+		unit: 'per minute',
 		weakens: raised
 	},
 	'brute_force.login_per_account_per_minute': {
-		label: 'Pogingen per account',
-		help: 'Maximaal aantal inlogpogingen per minuut voor je account.',
+		label: 'Attempts per account',
+		help: 'Most sign-in attempts per minute for one account.',
 		kind: 'int',
 		min: 1,
 		max: 1000,
-		unit: 'per minuut',
+		unit: 'per minute',
 		weakens: raised
 	},
 	'brute_force.lockout_threshold': {
-		label: 'Blokkeren na',
-		help: 'Aantal mislukte pogingen waarna inloggen tijdelijk wordt geblokkeerd.',
+		label: 'Lock after',
+		help: 'Failed attempts after which signing in is locked for a while.',
 		kind: 'int',
 		min: 1,
 		max: 1000,
-		unit: 'pogingen',
+		unit: 'attempts',
 		weakens: raised
 	},
 	'brute_force.lockout_minutes': {
-		label: 'Blokkeerduur',
-		help: 'Hoe lang inloggen geblokkeerd blijft.',
+		label: 'Lock duration',
+		help: 'How long signing in stays locked.',
 		kind: 'int',
 		min: 1,
 		max: 1000,
-		unit: 'minuten',
+		unit: 'minutes',
 		weakens: lowered
 	},
 
 	'network.login_cidrs': {
-		label: 'Inloggen toegestaan vanaf',
-		help: 'Netwerken (CIDR) die mogen inloggen. Leeg = overal vandaan.',
+		label: 'Sign-in allowed from',
+		help: 'Networks (CIDR) that may sign in. Empty = anywhere.',
 		kind: 'cidrs',
 		placeholder: '192.168.1.0/24',
 		weakens: allowlistWidened
 	},
 	'network.admin_cidrs': {
-		label: 'Instellingen toegestaan vanaf',
-		help: 'Netwerken (CIDR) die Instellingen mogen openen. Leeg = overal vandaan.',
+		label: 'Settings allowed from',
+		help: 'Networks (CIDR) that may open Settings. Empty = anywhere.',
 		kind: 'cidrs',
 		placeholder: '192.168.1.0/24',
 		weakens: allowlistWidened
 	},
 	'network.trusted_proxies': {
-		label: 'Vertrouwde proxy’s',
-		help: 'Proxy’s waarvan Keystone het X-Forwarded-For-adres gelooft. Staat er nog een reverse proxy vóór Keystone (bijv. voor https), voeg dan het adres toe waarmee die bij Keystone binnenkomt — vaak de Docker-gateway zoals 172.18.0.1/32. Dat adres zie je hieronder als jouw adres, en bij je sessies onder Apparaten.',
+		label: 'Trusted proxies',
+		help: 'Proxies whose X-Forwarded-For Keystone believes. With a reverse proxy in front of Keystone (for https), add the address it reaches Keystone from, often the Docker gateway such as 172.18.0.1/32. You see that address below as your address, and with your sessions under Devices.',
 		kind: 'cidrs',
 		placeholder: '10.0.0.2/32',
 		weakens: added
@@ -224,69 +224,69 @@ export const settingsMeta: Record<string, FieldMeta> = {
 
 	'headers.hsts': {
 		label: 'HSTS',
-		help: 'Browsers gebruiken voortaan alleen https voor Keystone.',
+		help: 'Browsers use only https for Keystone from then on.',
 		kind: 'bool',
 		weakens: turnedOff
 	},
 	'headers.hsts_include_subdomains': {
-		label: 'HSTS voor subdomeinen',
-		help: 'Geldt ook voor alle subdomeinen van dit adres.',
+		label: 'HSTS for subdomains',
+		help: 'Also applies to every subdomain of this address.',
 		kind: 'bool',
 		weakens: turnedOff
 	},
 	'headers.hsts_preload': {
-		label: 'HSTS-preload',
-		help: 'Staat opname in de preload-lijst van browsers toe. Alleen voor publieke domeinen.',
+		label: 'HSTS preload',
+		help: 'Allows inclusion in the browsers’ preload list. Public domains only.',
 		kind: 'bool',
 		weakens: turnedOff
 	},
 	'headers.frame_deny': {
-		label: 'Insluiten blokkeren',
-		help: 'Andere sites mogen Keystone niet in een frame tonen (beschermt tegen clickjacking).',
+		label: 'Block framing',
+		help: 'Other sites may not show Keystone in a frame (protects against clickjacking).',
 		kind: 'bool',
 		weakens: turnedOff
 	},
 	'headers.hsts_max_age': {
-		label: 'HSTS-duur',
-		help: 'Hoe lang browsers de https-afspraak onthouden. 31536000 = een jaar.',
+		label: 'HSTS duration',
+		help: 'How long browsers remember to use https. 31536000 = one year.',
 		kind: 'int',
 		min: 0,
 		max: 63072000,
-		unit: 'seconden',
+		unit: 'seconds',
 		weakens: lowered
 	},
 	'headers.csp_extra': {
-		label: 'Extra CSP-regels',
-		help: 'Wordt toegevoegd aan de Content-Security-Policy. Leeg laten tenzij je weet waarom.',
+		label: 'Extra CSP directives',
+		help: 'Appended to the Content-Security-Policy. Leave empty unless you know why.',
 		kind: 'text',
 		placeholder: "img-src 'self' https://cdn.example",
 		weakens: (o: string, n: string) => n.trim() !== '' && n.trim() !== o.trim()
 	},
 
 	'audit.retention_days': {
-		label: 'Activiteit bewaren',
-		help: 'Hoe lang de activiteitenlog bewaard blijft. 0 = voor altijd.',
+		label: 'Keep activity',
+		help: 'How long the activity log is kept. 0 = forever.',
 		kind: 'int',
 		min: 0,
 		max: 3650,
-		unit: 'dagen',
+		unit: 'days',
 		weakens: (o: number, n: number) => n > 0 && (o === 0 || n < o)
 	},
 	'audit.syslog_enabled': {
-		label: 'Doorsturen naar syslog',
-		help: 'Stuur elke gebeurtenis ook naar een syslog-server.',
+		label: 'Forward to syslog',
+		help: 'Also send every event to a syslog server.',
 		kind: 'bool',
 		weakens: turnedOff
 	},
 	'audit.syslog_addr': {
-		label: 'Syslog-server',
-		help: 'Host en poort, bijvoorbeeld 192.168.1.10:514.',
+		label: 'Syslog server',
+		help: 'Host and port, for example 192.168.1.10:514.',
 		kind: 'text',
 		placeholder: '192.168.1.10:514'
 	},
 	'audit.syslog_proto': {
-		label: 'Syslog-protocol',
-		help: 'TLS versleutelt het verkeer naar de syslog-server.',
+		label: 'Syslog protocol',
+		help: 'TLS encrypts the traffic to the syslog server.',
 		kind: 'enum',
 		options: [
 			{ value: 'udp', label: 'UDP' },
@@ -296,106 +296,106 @@ export const settingsMeta: Record<string, FieldMeta> = {
 		weakens: (o: string, n: string) => o === 'tls' && n !== 'tls'
 	},
 	'tokens.access_minutes': {
-		label: 'Levensduur access-token',
-		help: 'Hoe lang een OIDC-access-token van een app geldig blijft.',
+		label: 'Access token lifetime',
+		help: 'How long an app’s OIDC access token stays valid.',
 		kind: 'int',
 		min: 1,
 		max: 1440,
-		unit: 'minuten',
+		unit: 'minutes',
 		weakens: raised
 	},
 	'tokens.id_minutes': {
-		label: 'Levensduur ID-token',
-		help: 'Hoe lang een OIDC-ID-token geldig is.',
+		label: 'ID token lifetime',
+		help: 'How long an OIDC ID token is valid.',
 		kind: 'int',
 		min: 1,
 		max: 1440,
-		unit: 'minuten',
+		unit: 'minutes',
 		weakens: raised
 	},
 	'tokens.refresh_days': {
-		label: 'Levensduur refresh-token',
-		help: 'Hoe lang een app je sessie stil mag verlengen. Vervalt altijd met je Keystone-sessie. 0 = geen refresh-tokens.',
+		label: 'Refresh token lifetime',
+		help: 'How long an app may quietly extend your session. Always ends with your Keystone session. 0 = no refresh tokens.',
 		kind: 'int',
 		min: 0,
 		max: 365,
-		unit: 'dagen',
+		unit: 'days',
 		weakens: raised
 	},
 
 	'ldap.require_tls': {
-		label: 'Alleen LDAPS voor apps',
-		help: 'Apps moeten keystone-ldap via LDAPS (poort 636) gebruiken. Uit opent ook onversleuteld LDAP op poort 389.',
+		label: 'LDAPS only for apps',
+		help: 'Apps must use keystone-ldap over LDAPS (port 636). Off also opens unencrypted LDAP on port 389.',
 		kind: 'bool',
 		weakens: turnedOff
 	},
 	'ldap.allowed_cidrs': {
-		label: 'Toegestane LDAP-clients',
-		help: 'Alleen deze adressen mogen met keystone-ldap praten. Leeg = iedereen.',
+		label: 'Allowed LDAP clients',
+		help: 'Only these addresses may talk to keystone-ldap. Empty = everyone.',
 		kind: 'cidrs',
 		placeholder: '192.168.1.20/32',
 		weakens: allowlistWidened
 	},
 	'ldap.bind_per_ip_per_minute': {
-		label: 'LDAP-binds per IP',
-		help: 'Maximaal aantal inlogpogingen via LDAP per adres per minuut.',
+		label: 'LDAP binds per IP',
+		help: 'Most LDAP sign-in attempts per address per minute.',
 		kind: 'int',
 		min: 1,
 		max: 1000,
-		unit: 'per minuut',
+		unit: 'per minute',
 		weakens: raised
 	},
 
 	'gate.fail_per_ip_per_minute': {
-		label: 'Geweigerde poortwachter-checks per IP',
-		help: 'Na zoveel geweigerde verzoeken per minuut blokkeert de poortwachter een adres tijdelijk.',
+		label: 'Refused gate checks per IP',
+		help: 'After this many refused requests per minute the gate blocks an address for a while.',
 		kind: 'int',
 		min: 1,
 		max: 10000,
-		unit: 'per minuut',
+		unit: 'per minute',
 		weakens: raised
 	},
 
 	'vault.reconfirm_minutes': {
-		label: 'Herbevestigen na',
-		help: 'Een wachtwoord uit de kluis kopiëren vraagt eerst je passkey als je langer dan dit geleden bevestigde.',
+		label: 'Confirm again after',
+		help: 'Copying a password from the vault asks you to confirm first when your last confirmation is older than this.',
 		kind: 'int',
 		min: 1,
 		max: 1440,
-		unit: 'minuten',
+		unit: 'minutes',
 		weakens: raised
 	},
 	'vault.clipboard_clear_seconds': {
-		label: 'Klembord wissen na',
-		help: 'Een gekopieerd wachtwoord wordt daarna van het klembord gehaald.',
+		label: 'Clear clipboard after',
+		help: 'A copied password is removed from the clipboard after this.',
 		kind: 'int',
 		min: 5,
 		max: 600,
-		unit: 'seconden',
+		unit: 'seconds',
 		weakens: raised
 	},
 	'vault.allow_reveal': {
-		label: 'Wachtwoorden tonen',
-		help: 'Laat een wachtwoord uit de kluis ook zichtbaar maken, niet alleen kopiëren.',
+		label: 'Show passwords',
+		help: 'Let a vault password be shown, not only copied.',
 		kind: 'bool',
 		weakens: turnedOn
 	}
 };
 
-/** The Beveiliging page, top to bottom. Herstel (codes, nood-account) follows separately. */
+/** The Security page, top to bottom. Recovery (codes, emergency account) follows separately. */
 export interface SettingsGroup {
 	id: string;
 	title: string;
 	paths: string[];
 	foot?: string;
-	/** Show "Jouw adres volgens Keystone" under the group (from GET /me). */
+	/** Show "Your address as Keystone sees it" under the group (from GET /me). */
 	showClientIP?: boolean;
 }
 
 export const securityGroups: SettingsGroup[] = [
 	{
-		id: 'sessies',
-		title: 'Sessies',
+		id: 'sessions',
+		title: 'Sessions',
 		paths: [
 			'session.duration_hours',
 			'session.sliding',
@@ -405,8 +405,8 @@ export const securityGroups: SettingsGroup[] = [
 		]
 	},
 	{
-		id: 'inloggen',
-		title: 'Inloggen',
+		id: 'sign-in',
+		title: 'Sign-in',
 		paths: [
 			'login.passkey_required',
 			'login.passkey_only_on_trusted_device',
@@ -425,14 +425,14 @@ export const securityGroups: SettingsGroup[] = [
 		]
 	},
 	{
-		id: 'netwerk',
-		title: 'Netwerk',
+		id: 'network',
+		title: 'Network',
 		paths: ['network.login_cidrs', 'network.admin_cidrs', 'network.trusted_proxies'],
 		showClientIP: true
 	},
 	{
 		id: 'headers',
-		title: 'HTTP-headers',
+		title: 'HTTP headers',
 		paths: [
 			'headers.hsts',
 			'headers.hsts_max_age',
@@ -454,17 +454,17 @@ export const securityGroups: SettingsGroup[] = [
 	},
 	{
 		id: 'ldap',
-		title: 'LDAP voor apps',
+		title: 'LDAP for apps',
 		paths: ['ldap.require_tls', 'ldap.allowed_cidrs', 'ldap.bind_per_ip_per_minute']
 	},
 	{
-		id: 'poortwachter',
-		title: 'Poortwachter',
+		id: 'gate',
+		title: 'Gate',
 		paths: ['gate.fail_per_ip_per_minute']
 	},
 	{
-		id: 'kluis',
-		title: 'Kluis',
+		id: 'vault',
+		title: 'Vault',
 		paths: ['vault.reconfirm_minutes', 'vault.clipboard_clear_seconds', 'vault.allow_reveal']
 	}
 ];
@@ -507,10 +507,10 @@ export function weakenedPaths(a: unknown, b: unknown): string[] {
 		.map(([p]) => p);
 }
 
-/** Client-side check before saving (the server validates again): Dutch message or null. */
+/** Client-side check before saving (the server validates again): a message or null. */
 export function fieldError(meta: FieldMeta, v: unknown): string | null {
 	if (meta.kind !== 'int') return null;
-	if (typeof v !== 'number' || !Number.isInteger(v)) return 'Vul een geheel getal in.';
-	if (v < meta.min! || v > meta.max!) return `Kies een waarde van ${meta.min} tot ${meta.max}.`;
+	if (typeof v !== 'number' || !Number.isInteger(v)) return 'Enter a whole number.';
+	if (v < meta.min! || v > meta.max!) return `Choose a value from ${meta.min} to ${meta.max}.`;
 	return null;
 }

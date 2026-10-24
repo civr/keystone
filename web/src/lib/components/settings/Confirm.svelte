@@ -49,7 +49,7 @@
 			</ul>
 		{/if}
 		<div class="sheet-actions">
-			<button type="button" class="btn btn-secondary" onclick={() => answer(false)}>Annuleren</button>
+			<button type="button" class="btn btn-secondary" onclick={() => answer(false)}>Cancel</button>
 			<button type="button" class="btn {q.danger ? 'btn-danger' : 'btn-primary'}" onclick={() => answer(true)}>
 				{q.confirm}
 			</button>

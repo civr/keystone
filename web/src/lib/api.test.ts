@@ -35,12 +35,12 @@ describe('api.get', () => {
 		expect(init.method).toBe('GET');
 	});
 
-	it('throws ApiError with code and Dutch message', async () => {
-		fetchMock.mockResolvedValueOnce(json(404, { error: 'not_found', message: 'Niet gevonden' }));
+	it('throws ApiError with code and message', async () => {
+		fetchMock.mockResolvedValueOnce(json(404, { error: 'not_found', message: 'Not found' }));
 		const err = await rejection(api.get('/apps/x'));
 		expect(err).toBeInstanceOf(ApiError);
 		expect(err.code).toBe('not_found');
-		expect(err.message).toBe('Niet gevonden');
+		expect(err.message).toBe('Not found');
 		expect(err.status).toBe(404);
 	});
 
@@ -52,7 +52,7 @@ describe('api.get', () => {
 		expect(err.message).toMatch(/Keystone/);
 	});
 
-	it('maps a network failure to a Dutch offline error', async () => {
+	it('maps a network failure to an offline error', async () => {
 		fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 		const err = await rejection(api.get('/me'));
 		expect(err).toBeInstanceOf(ApiError);
@@ -75,15 +75,15 @@ describe('api.get', () => {
 
 	it('does not redirect from the setup wizard (wrong setup code is a 401)', async () => {
 		vi.stubGlobal('location', { pathname: '/setup', assign });
-		fetchMock.mockResolvedValueOnce(json(401, { error: 'bad_code', message: 'De setupcode klopt niet.' }));
+		fetchMock.mockResolvedValueOnce(json(401, { error: 'bad_code', message: 'That setup code is not right.' }));
 		const err = await rejection(api.send('POST', '/setup/unlock', { code: 'x' }));
-		expect(err.message).toBe('De setupcode klopt niet.');
+		expect(err.message).toBe('That setup code is not right.');
 		expect(assign).not.toHaveBeenCalled();
 	});
 
 	it('exposes extra error fields as data', async () => {
 		fetchMock.mockResolvedValueOnce(
-			json(503, { error: 'ad_unavailable', message: 'AD is niet bereikbaar.', emergency: true })
+			json(503, { error: 'ad_unavailable', message: 'Active Directory cannot be reached.', emergency: true })
 		);
 		const err = await rejection(api.send('POST', '/auth/password', {}));
 		expect(err.data.emergency).toBe(true);
@@ -153,7 +153,7 @@ describe('401 handling', () => {
 	it('redirects to /login only for unauthenticated, not for other 401s', async () => {
 		vi.stubGlobal('location', { pathname: '/instellingen/apparaten', assign });
 		fetchMock.mockResolvedValueOnce(
-			json(401, { error: 'passkey_failed', message: 'De passkey werd niet herkend.' })
+			json(401, { error: 'passkey_failed', message: 'The passkey was not recognised.' })
 		);
 		const err = await rejection(api.send('POST', '/admin/passkeys/finish', {}));
 		expect(err.code).toBe('passkey_failed');
@@ -233,7 +233,7 @@ describe('api.blob', () => {
 
 	it('maps errors and sends an expired session to /login', async () => {
 		vi.stubGlobal('location', { pathname: '/instellingen/activiteit', assign });
-		fetchMock.mockResolvedValueOnce(json(401, { error: 'unauthenticated', message: 'Je bent niet ingelogd.' }));
+		fetchMock.mockResolvedValueOnce(json(401, { error: 'unauthenticated', message: 'You are not signed in.' }));
 		const err = await rejection(api.blob('/admin/audit/export'));
 		expect(err).toBeInstanceOf(ApiError);
 		expect(err.code).toBe('unauthenticated');

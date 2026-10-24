@@ -46,7 +46,7 @@
 			passkeys = p.passkeys;
 			now = new Date();
 		} catch (e) {
-			loadError = e instanceof ApiError ? e.message : 'Apparaten konden niet worden geladen.';
+			loadError = e instanceof ApiError ? e.message : 'Devices could not be loaded.';
 		}
 	}
 	onMount(load);
@@ -57,15 +57,15 @@
 		const ok = await confirmer.ask(
 			s.current
 				? {
-						title: 'Hier afmelden?',
-						message: 'Je wordt op dit apparaat afgemeld en gaat naar de inlogpagina.',
-						confirm: 'Afmelden',
+						title: 'Sign out here?',
+						message: 'You are signed out on this device and go to the sign-in page.',
+						confirm: 'Sign out',
 						danger: true
 					}
 				: {
-						title: 'Sessie afmelden?',
-						message: `${describeUA(s.user_agent)} (${s.ip}) moet daarna opnieuw inloggen.`,
-						confirm: 'Afmelden',
+						title: 'Sign out this session?',
+						message: `${describeUA(s.user_agent)} (${s.ip}) has to sign in again.`,
+						confirm: 'Sign out',
 						danger: true
 					}
 		);
@@ -77,7 +77,7 @@
 			sessions = sessions!.filter((x) => x.id !== s.id);
 			toast('Afgemeld');
 		} catch (e) {
-			err(e, 'Afmelden is niet gelukt.');
+			err(e, 'Signing out failed.');
 		} finally {
 			busy = '';
 		}
@@ -88,7 +88,7 @@
 		try {
 			await ceremony('/admin/passkeys/begin', '/admin/passkeys/finish');
 			passkeys = (await api.get<{ passkeys: Passkey[] }>('/admin/passkeys')).passkeys;
-			toast('Passkey toegevoegd');
+			toast('Passkey added');
 		} catch (e) {
 			toast(passkeyError(e), 'error');
 		} finally {
@@ -112,7 +112,7 @@
 			p.name = name;
 			renaming = null;
 		} catch (e) {
-			err(e, 'Hernoemen is niet gelukt.');
+			err(e, 'Renaming failed.');
 		} finally {
 			busy = '';
 		}
@@ -120,9 +120,9 @@
 
 	async function removePasskey(p: Passkey) {
 		const ok = await confirmer.ask({
-			title: `“${p.name}” verwijderen?`,
-			message: 'Je kunt daarna niet meer met deze passkey inloggen.',
-			confirm: 'Verwijderen',
+			title: `Remove “${p.name}”?`,
+			message: 'You can no longer sign in with this passkey.',
+			confirm: 'Remove',
 			danger: true
 		});
 		if (!ok) return;
@@ -130,31 +130,31 @@
 		try {
 			await api.send('DELETE', `/admin/passkeys/${encodeURIComponent(p.id)}`);
 			passkeys = passkeys!.filter((x) => x.id !== p.id);
-			toast('Passkey verwijderd');
+			toast('Passkey removed');
 		} catch (e) {
-			err(e, 'Verwijderen is niet gelukt.');
+			err(e, 'Removing failed.');
 		} finally {
 			busy = '';
 		}
 	}
 
 	const still = reducedMotion();
-	const dateFmt = new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+	const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 </script>
 
-<div class="pane-head"><h1 class="pane-title">Apparaten</h1></div>
-<p class="pane-intro">Waar je bent aangemeld en met welke passkeys je kunt inloggen.</p>
+<div class="pane-head"><h1 class="pane-title">Devices</h1></div>
+<p class="pane-intro">Where you are signed in, and the passkeys you can sign in with.</p>
 
 {#if loadError}
 	<div class="empty-note">
 		<p>{loadError}</p>
-		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Try again</button>
 	</div>
 {:else if !sessions || !passkeys}
-	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
+	<div class="loading-note" aria-label="Loading"><span class="spinner"></span></div>
 {:else}
 	<section class="group" aria-labelledby="g-sessions">
-		<h2 id="g-sessions">Aangemeld</h2>
+		<h2 id="g-sessions">Signed in</h2>
 		<ul class="card list">
 			{#each sessions as s (s.id)}
 				<li class="srow wrap-phone" animate:flip={{ duration: still ? 0 : 200, easing: easeOut }} out:fade={{ duration: still ? 0 : 150 }}>
@@ -164,14 +164,14 @@
 					<div class="text">
 						<span class="label">
 							{describeUA(s.user_agent)}
-							{#if s.current}<span class="chip accent">Dit apparaat</span>{/if}
-							{#if s.emergency}<span class="chip warn">Nood-account</span>{/if}
+							{#if s.current}<span class="chip accent">This device</span>{/if}
+							{#if s.emergency}<span class="chip warn">Emergency account</span>{/if}
 						</span>
-						<p class="help">{s.ip} · actief {relativeTime(s.last_seen_at, now)} · sinds {dateFmt.format(new Date(s.created_at))}</p>
+						<p class="help">{s.ip} · active {relativeTime(s.last_seen_at, now)} · since {dateFmt.format(new Date(s.created_at))}</p>
 					</div>
 					<div class="control">
 						<button type="button" class="btn btn-secondary btn-sm danger-ink" disabled={busy === s.id} onclick={() => revoke(s)}>
-							{s.current ? 'Hier afmelden' : 'Afmelden'}
+							{s.current ? 'Sign out here' : 'Sign out'}
 						</button>
 					</div>
 				</li>
@@ -187,7 +187,7 @@
 					{#if busy === 'add'}<span class="spinner" aria-hidden="true"></span>{:else}
 						<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11" /></svg>
 					{/if}
-					Passkey toevoegen
+					Add passkey
 				</button>
 			{/if}
 		</div>
@@ -202,7 +202,7 @@
 					<div class="text">
 						{#if renaming === p.id}
 							<form class="rename" onsubmit={(e) => (e.preventDefault(), saveRename(p))}>
-								<label class="visually-hidden" for="rn-{p.id}">Naam van de passkey</label>
+								<label class="visually-hidden" for="rn-{p.id}">Passkey name</label>
 								<input
 									id="rn-{p.id}"
 									class="input"
@@ -211,24 +211,24 @@
 									bind:value={newName}
 									onkeydown={(e) => e.key === 'Escape' && (e.stopPropagation(), (renaming = null))}
 								/>
-								<button class="btn btn-primary btn-sm" disabled={busy === p.id}>Bewaar</button>
+								<button class="btn btn-primary btn-sm" disabled={busy === p.id}>Save</button>
 							</form>
 						{:else}
 							<span class="label">{p.name}</span>
 						{/if}
 						<p class="help">
-							Toegevoegd {dateFmt.format(new Date(p.created_at))} · laatst gebruikt {relativeTime(p.last_used_at, now)}
+							Added {dateFmt.format(new Date(p.created_at))} · last used {relativeTime(p.last_used_at, now)}
 						</p>
 					</div>
 					{#if renaming !== p.id}
 						<div class="control row-actions">
-							<button type="button" class="btn btn-secondary btn-sm" onclick={() => startRename(p)}>Wijzig naam</button>
+							<button type="button" class="btn btn-secondary btn-sm" onclick={() => startRename(p)}>Rename</button>
 							<button
 								type="button"
 								class="btn btn-secondary btn-sm danger-ink"
 								disabled={busy === p.id || passkeys.length === 1}
-								title={passkeys.length === 1 ? 'Je laatste passkey kan niet worden verwijderd.' : undefined}
-								onclick={() => removePasskey(p)}>Verwijder</button
+								title={passkeys.length === 1 ? 'Your last passkey cannot be removed.' : undefined}
+								onclick={() => removePasskey(p)}>Remove</button
 							>
 						</div>
 					{/if}
@@ -236,7 +236,7 @@
 			{/each}
 		</ul>
 		{#if passkeys.length === 1}
-			<p class="foot">Je laatste passkey kan niet worden verwijderd. Voeg eerst een tweede toe, bijvoorbeeld op je telefoon.</p>
+			<p class="foot">Your last passkey cannot be removed. Add a second one first, for example on your phone.</p>
 		{/if}
 	</section>
 {/if}

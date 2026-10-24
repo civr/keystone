@@ -91,3 +91,18 @@ func TestAccounts(t *testing.T) {
 		t.Fatal("audit")
 	}
 }
+
+// The owner's name at an app (an account override) cannot become another
+// account's username, either way round: that person would be the owner there.
+func TestOwnerAppNameReserved(t *testing.T) {
+	t.Parallel()
+	_, owner := adminClient(t, "192.168.1.20")
+	owner.must("POST", "/api/apps", map[string]any{"name": "Jellyfin", "url": "https://jf.home.lan", "color": "#00a4dc",
+		"config": map[string]any{"account": map[string]string{"username": "admin"}}}, 201)
+	owner.must("POST", "/api/admin/users", map[string]any{"username": "Admin", "password": "long enough secret", "role": "member"}, 400)
+	owner.must("POST", "/api/admin/users", map[string]any{"username": "bob", "password": "long enough secret", "role": "member"}, 201)
+	if w := owner.do("POST", "/api/apps", map[string]any{"name": "Grafana", "url": "https://gf.home.lan", "color": "#00a4dc",
+		"config": map[string]any{"account": map[string]string{"username": "BOB"}}}); w.Code != 400 || !strings.Contains(w.Body.String(), "config.account.username") {
+		t.Fatalf("override = %d %s", w.Code, w.Body.String())
+	}
+}

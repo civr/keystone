@@ -51,23 +51,23 @@ describe('settingsMeta coverage', () => {
 		}
 	});
 
-	it('Beveiliging groups list every security field exactly once', () => {
+	it('Security groups list every security field exactly once', () => {
 		const grouped = securityGroups.flatMap((g) => g.paths);
 		expect(new Set(grouped).size).toBe(grouped.length);
 		const general = ['domain', 'public_url'];
 		const expected = Object.keys(settingsMeta).filter((p) => !general.includes(p));
 		expect([...grouped].sort()).toEqual(expected.sort());
 		expect(securityGroups.map((g) => g.title)).toEqual([
-			'Sessies',
-			'Inloggen',
+			'Sessions',
+			'Sign-in',
 			'Brute-force',
-			'Netwerk',
-			'HTTP-headers',
+			'Network',
+			'HTTP headers',
 			'Audit',
 			'Tokens (OIDC)',
-			'LDAP voor apps',
-			'Poortwachter',
-			'Kluis'
+			'LDAP for apps',
+			'Gate',
+			'Vault'
 		]);
 	});
 });
@@ -166,10 +166,10 @@ describe('fieldError', () => {
 	it('checks whole numbers within range', () => {
 		const m = settingsMeta['session.duration_hours'];
 		expect(fieldError(m, 720)).toBeNull();
-		expect(fieldError(m, 0)).toBe('Kies een waarde van 1 tot 8760.');
-		expect(fieldError(m, 9000)).toBe('Kies een waarde van 1 tot 8760.');
-		expect(fieldError(m, 1.5)).toBe('Vul een geheel getal in.');
-		expect(fieldError(m, NaN)).toBe('Vul een geheel getal in.');
+		expect(fieldError(m, 0)).toBe('Choose a value from 1 to 8760.');
+		expect(fieldError(m, 9000)).toBe('Choose a value from 1 to 8760.');
+		expect(fieldError(m, 1.5)).toBe('Enter a whole number.');
+		expect(fieldError(m, NaN)).toBe('Enter a whole number.');
 	});
 	it('accepts other kinds as they are', () => {
 		expect(fieldError(settingsMeta['headers.hsts'], false)).toBeNull();
@@ -177,11 +177,11 @@ describe('fieldError', () => {
 	});
 });
 
-describe('Netwerk group', () => {
+describe('Network group', () => {
 	it('shows the client address and explains outer reverse proxies', () => {
-		const net = securityGroups.find((g) => g.id === 'netwerk');
+		const net = securityGroups.find((g) => g.id === 'network');
 		expect(net?.showClientIP).toBe(true);
 		expect(settingsMeta['network.trusted_proxies'].help).toMatch(/reverse proxy/);
-		expect(settingsMeta['network.trusted_proxies'].help).toMatch(/Docker-gateway/);
+		expect(settingsMeta['network.trusted_proxies'].help).toMatch(/Docker gateway/);
 	});
 });

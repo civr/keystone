@@ -175,7 +175,7 @@ func runResetNetwork(ctx context.Context, pool *pgxpool.Pool, out io.Writer) err
 	aw := audit.NewWriter(pool, nil)
 	defer aw.Close()
 	aw.Log(ctx, audit.ActorCLI, "settings.network_reset", netip.Addr{}, map[string]any{"cleared": []string{"login_cidrs", "admin_cidrs"}})
-	_, err := fmt.Fprintln(out, "Netwerkbeperkingen gewist: login_cidrs en admin_cidrs zijn leeg.")
+	_, err := fmt.Fprintln(out, "Network restrictions cleared: login_cidrs and admin_cidrs are empty.")
 	return err
 }
 

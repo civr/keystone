@@ -144,7 +144,7 @@ func (s *server) passkeyAddFinish(w http.ResponseWriter, r *http.Request) {
 	name := passkeyName(r)
 	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 	if err := svc.FinishRegistration(ctx, SessionFrom(ctx).UserID, state, r, name); err != nil {
-		writeError(w, http.StatusBadRequest, "passkey_failed", "De passkey kon niet worden geregistreerd. Probeer het opnieuw.")
+		writeError(w, http.StatusBadRequest, "passkey_failed", "The passkey could not be registered. Try again.")
 		return
 	}
 	// The first passkey of a session made without one: from now on only
@@ -175,7 +175,7 @@ func (s *server) renamePasskey(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimSpace(req.Name)
 	if n := utf8.RuneCountInString(name); n < 1 || n > maxPasskeyNameRunes {
-		writeInvalid(w, "name", "De naam moet 1 tot 64 tekens lang zijn.")
+		writeInvalid(w, "name", "The name must be 1 to 64 characters.")
 		return
 	}
 	id, ok := passkeyID(r)
@@ -230,7 +230,7 @@ func (s *server) deletePasskey(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, r)
 		return
 	case len(ids) <= 1:
-		writeError(w, http.StatusConflict, "last_passkey", "Dit is je laatste passkey en kan niet worden verwijderd.")
+		writeError(w, http.StatusConflict, "last_passkey", "This is your last passkey and cannot be removed.")
 		return
 	}
 	if _, err := tx.Exec(ctx, `delete from passkeys where id = $1`, id); err != nil {
@@ -307,14 +307,14 @@ func (s *server) putEmergency(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Enabled == nil {
-		writeInvalid(w, "enabled", "enabled is verplicht.")
+		writeInvalid(w, "enabled", "enabled is required.")
 		return
 	}
 	enabled := *req.Enabled
 	var hash *string
 	if req.Password != "" {
 		if utf8.RuneCountInString(req.Password) < emergencyMinLen {
-			writeError(w, http.StatusBadRequest, "weak_password", "Het noodwachtwoord moet minstens 16 tekens hebben.")
+			writeError(w, http.StatusBadRequest, "weak_password", "The emergency password must be at least 16 characters.")
 			return
 		}
 		h, err := crypto.HashSecret(req.Password)
@@ -330,7 +330,7 @@ func (s *server) putEmergency(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if enabled && hash == nil && !has {
-		writeError(w, http.StatusBadRequest, "password_required", "Stel eerst een noodwachtwoord in.")
+		writeError(w, http.StatusBadRequest, "password_required", "Set an emergency password first.")
 		return
 	}
 	var wasEnabled bool
@@ -401,7 +401,7 @@ func (s *server) listAudit(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 || n > auditMaxLimit {
-			writeInvalid(w, "limit", "limit moet tussen 1 en 200 liggen.")
+			writeInvalid(w, "limit", "limit must be between 1 and 200.")
 			return
 		}
 		limit = n
@@ -409,7 +409,7 @@ func (s *server) listAudit(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("before"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || n < 1 {
-			writeInvalid(w, "before", "before moet een positief getal zijn.")
+			writeInvalid(w, "before", "before must be a positive number.")
 			return
 		}
 		before = n

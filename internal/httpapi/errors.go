@@ -20,7 +20,7 @@ func readJSONLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) b
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "Het verzoek is ongeldig.")
+		writeError(w, http.StatusBadRequest, "bad_request", "The request is invalid.")
 		return false
 	}
 	return true
@@ -36,21 +36,21 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-// writeError writes {"error":code,"message":message}; message is Dutch, for the UI.
+// writeError writes {"error":code,"message":message}; message is English, for the UI.
 func writeError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, map[string]string{"error": code, "message": message})
 }
 
 func errUnavailable(w http.ResponseWriter) {
-	writeError(w, http.StatusServiceUnavailable, "unavailable", "Keystone is tijdelijk niet beschikbaar. Probeer het later opnieuw.")
+	writeError(w, http.StatusServiceUnavailable, "unavailable", "Keystone is temporarily unavailable. Try again later.")
 }
 
 func errNotFound(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, http.StatusNotFound, "not_found", "Niet gevonden.")
+	writeError(w, http.StatusNotFound, "not_found", "Not found.")
 }
 
 func errMethodNotAllowed(w http.ResponseWriter, _ *http.Request) {
-	writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Deze methode is hier niet toegestaan.")
+	writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "This method is not allowed here.")
 }
 
 // writeInvalid writes a 400 {"error":"invalid","field":...,"message":...}.

@@ -4,16 +4,16 @@ export function formatCode(raw: string): string {
 	return s.match(/.{1,4}/g)?.join('-') ?? '';
 }
 
-/** Text of keystone-herstelcodes.txt. */
+/** Text of keystone-recovery-codes.txt. */
 export function codesFile(codes: string[], site: string, at: Date = new Date()): string {
-	const date = new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }).format(at);
+	const date = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(at);
 	return [
-		'Keystone herstelcodes',
+		'Keystone recovery codes',
 		site,
-		`Aangemaakt op ${date}`,
+		`Made on ${date}`,
 		'',
-		'Elke code werkt één keer. Gebruik een code als je je passkey kwijt bent:',
-		'log in met je wachtwoord en kies "Herstelcode gebruiken".',
+		'Each code works once. Use one if you lose your passkey:',
+		'sign in with your password and choose "Use a recovery code".',
 		'',
 		...codes.map((c, i) => `${String(i + 1).padStart(3)}. ${c}`),
 		''

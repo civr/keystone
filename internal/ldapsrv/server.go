@@ -243,14 +243,19 @@ func (cn *conn) bind(ctx context.Context, id int64, op *ber.Packet) {
 	}
 }
 
-// member returns the account known at app a as uid: one that may use a.
+// member returns the account known at app a as uid: one that may use a. A
+// name that two accounts share at the app matches neither.
 func member(v runtime.View, a apps.App, uid string) (apps.Owner, bool) {
+	var found []apps.Owner
 	for _, acct := range members(v, a) {
 		if strings.EqualFold(uid, a.Mapped(acct).Username) {
-			return acct, true
+			found = append(found, acct)
 		}
 	}
-	return apps.Owner{}, false
+	if len(found) != 1 {
+		return apps.Owner{}, false
+	}
+	return found[0], true
 }
 
 // members are the enabled accounts that may use app a.

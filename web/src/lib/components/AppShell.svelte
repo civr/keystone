@@ -77,7 +77,7 @@
 			await api.send('POST', '/auth/logout');
 			location.assign('/login');
 		} catch (e) {
-			toast(e instanceof ApiError ? e.message : 'Uitloggen is niet gelukt.', 'error');
+			toast(e instanceof ApiError ? e.message : 'Signing out failed.', 'error');
 		}
 	}
 
@@ -85,7 +85,7 @@
 </script>
 
 {#snippet menu(collapsed: boolean, id: string, onpick?: () => void)}
-	<nav aria-label="Hoofdmenu">
+	<nav aria-label="Main menu">
 		{#each navFor(me?.admin ?? false) as g, gi (gi)}
 			{#if g.title}
 				{#if collapsed}
@@ -123,7 +123,7 @@
 <div class="shell" class:icons={iconsOnly}>
 	<aside class="rail">
 		<div class="rail-inner">
-			<a class="brand" href="/" aria-label="{brand.name}, mijn apps">
+			<a class="brand" href="/" aria-label="{brand.name}, my apps">
 				<img class="brand-mark" src={logoSrc()} alt="" width="28" height="28" />
 				<span class="brand-name">{brand.name}</span>
 			</a>
@@ -131,21 +131,21 @@
 			<button
 				type="button"
 				class="nav-foot"
-				aria-label={iconsOnly ? 'Menu uitklappen' : 'Menu inklappen'}
+				aria-label={iconsOnly ? 'Expand menu' : 'Collapse menu'}
 				aria-pressed={iconsOnly}
 				onclick={toggleNav}
 			>
 				<svg viewBox="0 0 20 20" aria-hidden="true">
 					<path d="M3.5 4.5h13v11h-13zM8 4.5v11" />
 				</svg>
-				{#if !iconsOnly}<span>Zijbalk verbergen</span>{/if}
+				{#if !iconsOnly}<span>Hide sidebar</span>{/if}
 			</button>
 		</div>
 	</aside>
 
 	<div class="main">
 		<header class="topbar">
-			<button type="button" class="topbar-btn menu-btn" aria-label="Menu openen" aria-expanded={drawerOpen} onclick={openDrawer}>
+			<button type="button" class="topbar-btn menu-btn" aria-label="Open menu" aria-expanded={drawerOpen} onclick={openDrawer}>
 				<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg>
 			</button>
 			<div class="search">
@@ -171,7 +171,7 @@
 				<img class="brand-mark" src={logoSrc()} alt="" width="28" height="28" />
 				<span class="brand-name">{brand.name}</span>
 			</span>
-			<button type="button" class="topbar-btn" aria-label="Menu sluiten" onclick={closeDrawer}>
+			<button type="button" class="topbar-btn" aria-label="Close menu" onclick={closeDrawer}>
 				<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" /></svg>
 			</button>
 		</div>

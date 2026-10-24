@@ -7,7 +7,7 @@ export type SaveResult =
 	| { status: 'invalid'; field: string; message: string };
 
 export interface SaveQuestions {
-	/** "Dit verlaagt de beveiliging" — resolve true to save anyway. */
+	/** "This lowers security": resolve true to save anyway. */
 	weakened(paths: string[]): Promise<boolean>;
 	/** The new public address breaks existing passkeys — resolve true to go ahead. */
 	rpChange(): Promise<boolean>;

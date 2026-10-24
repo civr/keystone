@@ -293,12 +293,12 @@ func (p *Provider) finish(ar *saml.IdpAuthnRequest, a apps.App, owner apps.Owner
 const submitScript = `document.forms[0].submit()`
 
 var postPage = template.Must(template.New("post").Parse(`<!doctype html>
-<html lang="nl"><head><meta charset="utf-8"><title>Doorsturen…</title></head>
+<html lang="en"><head><meta charset="utf-8"><title>Redirecting…</title></head>
 <body style="font-family:system-ui,sans-serif;background:#f5f7fb;color:#5b6475">
 <form method="post" action="{{.URL}}">
 <input type="hidden" name="SAMLResponse" value="{{.SAMLResponse}}">
 {{if .RelayState}}<input type="hidden" name="RelayState" value="{{.RelayState}}">{{end}}
-<noscript><button type="submit">Doorgaan</button></noscript>
+<noscript><button type="submit">Continue</button></noscript>
 </form>
 <script>` + submitScript + `</script>
 </body></html>`))

@@ -20,13 +20,13 @@ describe('adWeakenings', () => {
 	});
 
 	it('flags turning on skip-verify and plaintext', () => {
-		expect(titles(safe, { ...safe, insecure_skip_verify: true })).toEqual(['Certificaat niet controleren']);
-		expect(titles(safe, { ...safe, allow_plaintext: true })).toEqual(['Onversleuteld ldap:// toestaan']);
+		expect(titles(safe, { ...safe, insecure_skip_verify: true })).toEqual(['Do not check the certificate']);
+		expect(titles(safe, { ...safe, allow_plaintext: true })).toEqual(['Allow unencrypted ldap://']);
 	});
 
 	it('flags turning off StartTLS on an ldap:// URL only', () => {
 		const tls = { ...safe, url: 'ldap://dc.home.lan', start_tls: true };
-		expect(titles(tls, { ...tls, start_tls: false })).toEqual(['StartTLS gebruiken']);
+		expect(titles(tls, { ...tls, start_tls: false })).toEqual(['Use StartTLS']);
 		const ldaps = { ...safe, start_tls: true };
 		expect(adWeakenings(ldaps, { ...ldaps, start_tls: false })).toEqual([]);
 	});
@@ -38,12 +38,12 @@ describe('adWeakenings', () => {
 	});
 
 	it('flags a lower minimum TLS version', () => {
-		expect(titles({ ...safe, min_tls: '1.3' }, safe)).toEqual(['Minimale TLS-versie']);
+		expect(titles({ ...safe, min_tls: '1.3' }, safe)).toEqual(['Minimum TLS version']);
 	});
 
 	it('treats a first configuration as starting from safe defaults', () => {
 		expect(titles(null, { ...safe, url: 'ldap://dc', allow_plaintext: true })).toEqual([
-			'Onversleuteld ldap:// toestaan',
+			'Allow unencrypted ldap://',
 			'Server'
 		]);
 	});

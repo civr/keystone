@@ -1,7 +1,7 @@
 <script lang="ts">
 	let {
 		value = $bindable(''),
-		placeholder = 'Zoek een app…',
+		placeholder = 'Search apps',
 		onsubmit
 	}: { value?: string; placeholder?: string; onsubmit?: () => void } = $props();
 
@@ -42,7 +42,7 @@
 <svelte:window onkeydown={onWindowKey} />
 
 <label class="search">
-	<span class="visually-hidden">Zoek een app</span>
+	<span class="visually-hidden">Search apps</span>
 	<svg class="lens" viewBox="0 0 20 20" aria-hidden="true">
 		<circle cx="8.5" cy="8.5" r="5.75" />
 		<path d="M13 13l4.25 4.25" />
@@ -59,7 +59,7 @@
 		{placeholder}
 	/>
 	{#if value}
-		<button type="button" class="clear" aria-label="Wis zoekopdracht" onclick={() => ((value = ''), input.focus())}>
+		<button type="button" class="clear" aria-label="Clear search" onclick={() => ((value = ''), input.focus())}>
 			<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6" /></svg>
 		</button>
 	{:else}

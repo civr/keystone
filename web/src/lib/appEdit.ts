@@ -21,11 +21,11 @@ export function targetIndex(mids: readonly number[], from: number, y: number): n
 	return mids.filter((m, i) => i !== from && m < y).length;
 }
 
-/** Dutch error for an icon file (and its data URL once read), or null when acceptable. */
+/** Error for an icon file (and its data URL once read), or null when acceptable. */
 export function iconError(file: { type: string; size: number }, dataUrl?: string): string | null {
-	if (!ICON_TYPES.includes(file.type)) return 'Kies een afbeelding in png, svg of webp.';
+	if (!ICON_TYPES.includes(file.type)) return 'Choose a PNG, SVG or WebP image.';
 	if (file.size > MAX_ICON || (dataUrl !== undefined && dataUrl.length > MAX_ICON))
-		return 'Het icoon mag maximaal 64 kB zijn. Gebruik een kleinere afbeelding, bijvoorbeeld 180 × 180 px.';
+		return 'The icon may be at most 64 kB. Use a smaller image, for example 180 × 180 px.';
 	return null;
 }
 
@@ -38,7 +38,7 @@ export interface AppForm {
 /** First problem with the form as {field, message}, or null. Same rules as the API. */
 export function appFormError(f: AppForm): { field: keyof AppForm; message: string } | null {
 	const n = Array.from(f.name.trim()).length;
-	if (n < 1 || n > 40) return { field: 'name', message: 'De naam moet 1 tot 40 tekens lang zijn.' };
+	if (n < 1 || n > 40) return { field: 'name', message: 'The name must be 1 to 40 characters.' };
 	let ok = false;
 	try {
 		const u = new URL(f.url.trim());
@@ -46,8 +46,8 @@ export function appFormError(f: AppForm): { field: keyof AppForm; message: strin
 	} catch {
 		/* not absolute */
 	}
-	if (!ok) return { field: 'url', message: 'De URL moet met http:// of https:// beginnen.' };
-	if (!/^#[0-9a-f]{6}$/i.test(f.color)) return { field: 'color', message: 'Kies een kleur.' };
+	if (!ok) return { field: 'url', message: 'The URL must start with http:// or https://.' };
+	if (!/^#[0-9a-f]{6}$/i.test(f.color)) return { field: 'color', message: 'Choose a colour.' };
 	return null;
 }
 

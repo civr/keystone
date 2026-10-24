@@ -41,9 +41,9 @@ const (
 	ceremonyLogin    = "login"
 	ceremonyRegister = "register"
 
-	msgBadCredentials = "Gebruikersnaam of wachtwoord onjuist."
-	msgADDown         = "AD is niet bereikbaar."
-	msgRateLimited    = "Te veel pogingen. Wacht een minuut en probeer het opnieuw."
+	msgBadCredentials = "Wrong username or password."
+	msgADDown         = "Active Directory cannot be reached."
+	msgRateLimited    = "Too many attempts. Wait a minute and try again."
 )
 
 func (s *server) authRoutes(r chi.Router) {
@@ -79,7 +79,7 @@ func (s *server) requireSetupDone(next http.Handler) http.Handler {
 			return
 		}
 		if !done {
-			writeError(w, http.StatusConflict, "setup_needed", "Keystone is nog niet ingericht. Rond eerst de installatie af.")
+			writeError(w, http.StatusConflict, "setup_needed", "Keystone is not set up yet. Finish the setup first.")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -91,7 +91,7 @@ func (s *server) requireSetupDone(next http.Handler) http.Handler {
 func requireStepUp(next http.Handler) http.Handler {
 	return requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if needsStepUp(*SessionFrom(r.Context()), settingsFrom(r.Context()), time.Now()) {
-			writeError(w, http.StatusForbidden, "stepup_required", "Bevestig dit eerst met je passkey.")
+			writeError(w, http.StatusForbidden, "stepup_required", "Confirm this with your passkey first.")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -123,7 +123,7 @@ func mustRegisterGate(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		writeError(w, http.StatusForbidden, "must_register_passkey", "Registreer eerst een nieuwe passkey.")
+		writeError(w, http.StatusForbidden, "must_register_passkey", "Register a new passkey first.")
 	})
 }
 
@@ -173,13 +173,17 @@ func actor(ctx context.Context) string {
 	return audit.ActorOwner
 }
 
-// account loads the signed-in account.
+// errNoSession means a handler that needs an account ran without a session.
+var errNoSession = errors.New("httpapi: no session")
+
+// account loads the signed-in account; without a session it fails rather
+// than falling back to the owner.
 func (s *server) account(ctx context.Context) (accounts.Account, error) {
-	var id string
-	if sess := SessionFrom(ctx); sess != nil {
-		id = sess.UserID
+	sess := SessionFrom(ctx)
+	if sess == nil {
+		return accounts.Account{}, errNoSession
 	}
-	return accounts.Load(ctx, s.d.Pool, id)
+	return accounts.Load(ctx, s.d.Pool, sess.UserID)
 }
 
 type ownerInfo struct{ Username, DisplayName, GivenName, Email string }
@@ -236,7 +240,7 @@ func (s *server) allow(w http.ResponseWriter, ctx context.Context, scope, key st
 
 func writeLocked(w http.ResponseWriter, ttl time.Duration) {
 	writeJSON(w, http.StatusTooManyRequests, map[string]any{
-		"error": "locked", "message": "Te veel mislukte pogingen. Dit account is tijdelijk geblokkeerd.",
+		"error": "locked", "message": "Too many failed attempts. This account is temporarily locked.",
 		"retry_after": int(math.Ceil(ttl.Seconds())),
 	})
 }
@@ -282,7 +286,7 @@ func (s *server) adUnavailable(w http.ResponseWriter, ctx context.Context) {
 }
 
 func errPasswordRequired(w http.ResponseWriter) {
-	writeError(w, http.StatusUnauthorized, "password_required", "Log eerst in met je wachtwoord.")
+	writeError(w, http.StatusUnauthorized, "password_required", "Sign in with your password first.")
 }
 
 // --- pending login state ---
@@ -488,7 +492,7 @@ func (s *server) authPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	if ad.NormalizeUsername(u.Username) != owner.Username {
 		s.d.Audit.Log(ctx, audit.ActorAnonymous, "login.not_allowed", ip, map[string]any{"username": ad.NormalizeUsername(u.Username)})
-		writeError(w, http.StatusForbidden, "not_allowed", "Dit account mag niet inloggen bij Keystone.")
+		writeError(w, http.StatusForbidden, "not_allowed", "This account is not allowed to sign in to Keystone.")
 		return
 	}
 	s.passwordAccepted(w, r, cfg, account, "", ip)
@@ -593,7 +597,7 @@ func (s *server) authPasskeyBegin(w http.ResponseWriter, r *http.Request) {
 func (s *server) takeCeremonyOr400(w http.ResponseWriter, ctx context.Context, bind string) (string, []byte, bool) {
 	kind, state, err := s.takeBoundCeremony(ctx, bind)
 	if errors.Is(err, errNoCeremony) {
-		writeError(w, http.StatusBadRequest, "no_ceremony", "Start de passkey-stap opnieuw.")
+		writeError(w, http.StatusBadRequest, "no_ceremony", "Start the passkey step again.")
 		return "", nil, false
 	}
 	if err != nil {
@@ -605,7 +609,7 @@ func (s *server) takeCeremonyOr400(w http.ResponseWriter, ctx context.Context, b
 }
 
 func errPasskeyFailed(w http.ResponseWriter) {
-	writeError(w, http.StatusUnauthorized, "passkey_failed", "De passkey kon niet worden gecontroleerd. Probeer het opnieuw.")
+	writeError(w, http.StatusUnauthorized, "passkey_failed", "The passkey could not be verified. Try again.")
 }
 
 func (s *server) authPasskeyFinish(w http.ResponseWriter, r *http.Request) {
@@ -704,7 +708,7 @@ func (s *server) finishForcedRegistration(w http.ResponseWriter, r *http.Request
 	name := passkeyName(r)
 	if err := svc.FinishRegistration(ctx, sess.UserID, state, r, name); err != nil {
 		slog.Warn("auth: forced registration", "err", err)
-		writeError(w, http.StatusBadRequest, "passkey_failed", "De passkey kon niet worden geregistreerd. Probeer het opnieuw.")
+		writeError(w, http.StatusBadRequest, "passkey_failed", "The passkey could not be registered. Try again.")
 		return
 	}
 	now := time.Now()
@@ -753,7 +757,7 @@ func (s *server) authRecovery(w http.ResponseWriter, r *http.Request) {
 	}
 	invalid := func() {
 		s.d.Audit.Log(ctx, audit.ActorAnonymous, "login.failure", ip, map[string]any{"method": "recovery"})
-		writeError(w, http.StatusUnauthorized, "invalid_code", "Deze herstelcode is ongeldig of al gebruikt.")
+		writeError(w, http.StatusUnauthorized, "invalid_code", "This recovery code is invalid or already used.")
 	}
 	if id == 0 {
 		invalid()
@@ -830,7 +834,7 @@ func (s *server) authEmergency(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !enabled {
-		writeError(w, http.StatusForbidden, "emergency_disabled", "Het nood-account is niet ingeschakeld.")
+		writeError(w, http.StatusForbidden, "emergency_disabled", "The emergency account is not turned on.")
 		return
 	}
 	owner, err := s.loadOwner(ctx)
@@ -850,7 +854,7 @@ func (s *server) authEmergency(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, ad.ErrUnavailable):
 		case err == nil, errors.Is(err, ad.ErrNotFound):
-			writeError(w, http.StatusForbidden, "ad_available", "AD is bereikbaar. Log in met je gewone wachtwoord.")
+			writeError(w, http.StatusForbidden, "ad_available", "Active Directory is reachable. Sign in with your normal password.")
 			return
 		default:
 			errInternal(w, "AD lookup", err)
@@ -938,7 +942,7 @@ func (s *server) stepUpPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if passkeys > 0 {
-		writeError(w, http.StatusForbidden, "passkey_required", "Bevestig dit met je passkey.")
+		writeError(w, http.StatusForbidden, "passkey_required", "Confirm this with your passkey.")
 		return
 	}
 	acct, err := s.account(ctx)

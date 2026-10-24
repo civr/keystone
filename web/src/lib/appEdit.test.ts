@@ -37,8 +37,8 @@ describe('iconError', () => {
 		expect(iconError({ type: 'image/webp', size: MAX_ICON })).toBeNull();
 	});
 	it('rejects other types and large files', () => {
-		expect(iconError({ type: 'image/jpeg', size: 1000 })).toMatch(/png, svg of webp/);
-		expect(iconError({ type: 'text/html', size: 10 })).toMatch(/png, svg of webp/);
+		expect(iconError({ type: 'image/jpeg', size: 1000 })).toMatch(/PNG, SVG or WebP/);
+		expect(iconError({ type: 'text/html', size: 10 })).toMatch(/PNG, SVG or WebP/);
 		expect(iconError({ type: 'image/png', size: MAX_ICON + 1 })).toMatch(/64 kB/);
 	});
 	it('checks the encoded data URL length like the server', () => {

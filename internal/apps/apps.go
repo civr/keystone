@@ -133,13 +133,13 @@ func appURL(raw string) bool {
 }
 
 // Validate checks c for protocol and drops the sections of other protocols.
-// It returns the offending field and a Dutch message, or "" when valid.
+// It returns the offending field and an English message, or "" when valid.
 func (c *Config) Validate(protocol string) (field, msg string) {
 	for _, f := range []struct{ name, v string }{
 		{"username", c.Account.Username}, {"email", c.Account.Email}, {"display_name", c.Account.DisplayName},
 	} {
 		if utf8.RuneCountInString(f.v) > 256 || strings.ContainsAny(f.v, "\x00\r\n") {
-			return "config.account." + f.name, "Maximaal 256 tekens, zonder regeleinden."
+			return "config.account." + f.name, "At most 256 characters, no line breaks."
 		}
 	}
 	saml, oidc, ldap, gate := c.SAML, c.OIDC, c.LDAP, c.Gate
@@ -148,23 +148,23 @@ func (c *Config) Validate(protocol string) (field, msg string) {
 	case Link, Vault:
 	case SAMLP:
 		if saml == nil {
-			return "config.saml", "Vul de SAML-gegevens van de app in."
+			return "config.saml", "Enter the SAML details of the app."
 		}
 		saml.EntityID = strings.TrimSpace(saml.EntityID)
 		if saml.EntityID == "" || len(saml.EntityID) > 1024 {
-			return "config.saml.entity_id", "Vul de entity ID van de app in."
+			return "config.saml.entity_id", "Enter the entity ID of the app."
 		}
 		if !appURL(saml.ACSURL) {
-			return "config.saml.acs_url", "De ACS-URL moet absoluut zijn; http alleen voor adressen in je thuisnetwerk."
+			return "config.saml.acs_url", "The ACS URL must be absolute; http is only allowed for addresses on your home network."
 		}
 		c.SAML = saml
 	case OIDCP:
 		if oidc == nil || len(oidc.RedirectURIs) == 0 || len(oidc.RedirectURIs) > 10 {
-			return "config.oidc.redirect_uris", "Vul 1 tot 10 redirect-URI's in."
+			return "config.oidc.redirect_uris", "Enter 1 to 10 redirect URIs."
 		}
 		for _, u := range oidc.RedirectURIs {
 			if !appURL(u) {
-				return "config.oidc.redirect_uris", "Elke redirect-URI moet een absolute URL zonder #-deel zijn; http alleen in je thuisnetwerk."
+				return "config.oidc.redirect_uris", "Every redirect URI must be an absolute URL without a # part; http is only allowed on your home network."
 			}
 		}
 		c.OIDC = oidc
@@ -175,7 +175,7 @@ func (c *Config) Validate(protocol string) (field, msg string) {
 		c.LDAP = ldap
 	case GateP:
 		if gate == nil || !hostRe.MatchString(gate.Host) {
-			return "config.gate.host", "Vul de hostnaam van de app in, zoals ha.home.lan."
+			return "config.gate.host", "Enter the hostname of the app, such as ha.home.lan."
 		}
 		if gate.BypassPaths == nil {
 			gate.BypassPaths = []string{}
@@ -185,7 +185,7 @@ func (c *Config) Validate(protocol string) (field, msg string) {
 		}
 		for _, p := range gate.BypassPaths {
 			if !strings.HasPrefix(p, "/") || len(p) > 256 || strings.ContainsAny(p, " ?#") {
-				return "config.gate.bypass_paths", "Elke uitzondering is een pad dat met / begint."
+				return "config.gate.bypass_paths", "Every exception is a path that starts with /."
 			}
 		}
 		c.Gate = gate

@@ -24,7 +24,7 @@
 	}: {
 		/** Groups of settings paths to edit, in display order. */
 		groups: SettingsGroup[];
-		/** Extra content below the groups (e.g. Herstel on Beveiliging). */
+		/** Extra content below the groups (e.g. Recovery on Security). */
 		after?: Snippet;
 	} = $props();
 
@@ -60,7 +60,7 @@
 			saved = await api.get<Settings>('/admin/settings');
 			draft = saved;
 		} catch (e) {
-			loadError = e instanceof ApiError ? e.message : 'Instellingen konden niet worden geladen.';
+			loadError = e instanceof ApiError ? e.message : 'Settings could not be loaded.';
 		}
 	}
 	onMount(load);
@@ -95,12 +95,12 @@
 			const res = await saveSettings(base, next, {
 				weakened: (paths) =>
 					confirmer.ask({
-						title: 'Dit verlaagt de beveiliging',
+						title: 'This lowers security',
 						message:
 							paths.length === 1
-								? 'Deze wijziging maakt Keystone minder streng. Weet je het zeker?'
-								: 'Deze wijzigingen maken Keystone minder streng. Weet je het zeker?',
-						confirm: 'Toch opslaan',
+								? 'This change makes Keystone less strict. Save it anyway?'
+								: 'These changes make Keystone less strict. Save them anyway?',
+						confirm: 'Save anyway',
 						danger: true,
 						items: paths.map((p) => ({
 							title: settingsMeta[p].label,
@@ -109,10 +109,10 @@
 					}),
 				rpChange: () =>
 					confirmer.ask({
-						title: 'Passkeys werken niet meer',
+						title: 'Change the public address?',
 						message:
-							'Je passkeys zijn gekoppeld aan het huidige adres. Op een nieuwe hostnaam werken ze niet meer: je logt dan in met een herstelcode en maakt een nieuwe passkey. Zorg dat je herstelcodes bij de hand hebt.',
-						confirm: 'Adres toch wijzigen',
+							'Passkeys belong to the address they were made on. On a new host name you sign in with your password and add a new passkey there.',
+						confirm: 'Change address',
 						danger: true
 					})
 			});
@@ -120,7 +120,7 @@
 				saved = res.settings;
 				draft = res.settings;
 				errors = {};
-				toast('Opgeslagen');
+				toast('Saved');
 			} else if (res.status === 'invalid') {
 				if (res.field && mine.has(res.field)) {
 					errors = { [res.field]: res.message };
@@ -128,7 +128,7 @@
 				} else toast(res.message, 'error');
 			}
 		} catch (e) {
-			toast(e instanceof ApiError ? e.message : 'Opslaan is niet gelukt.', 'error');
+			toast(e instanceof ApiError ? e.message : 'Saving failed.', 'error');
 		} finally {
 			busy = false;
 		}
@@ -138,10 +138,10 @@
 {#if loadError}
 	<div class="empty-note">
 		<p>{loadError}</p>
-		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Try again</button>
 	</div>
 {:else if !draft}
-	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
+	<div class="loading-note" aria-label="Loading"><span class="spinner"></span></div>
 {:else}
 	<form onsubmit={(e) => (e.preventDefault(), save())} novalidate>
 		{#each groups as g (g.id)}
@@ -160,7 +160,7 @@
 					{/each}
 				</div>
 				{#if g.showClientIP && clientIP}
-					<p class="foot">Jouw adres volgens Keystone: <span class="mono">{clientIP}</span></p>
+					<p class="foot">Your address as Keystone sees it: <span class="mono">{clientIP}</span></p>
 				{/if}
 				{#if g.foot}<p class="foot">{g.foot}</p>{/if}
 			</section>
@@ -168,11 +168,11 @@
 
 		{#if dirty.length}
 			<div class="savebar" transition:rise={{ y: 8, duration: 200 }}>
-				<span class="count">{dirty.length === 1 ? '1 wijziging' : `${dirty.length} wijzigingen`}</span>
-				<button type="button" class="btn btn-secondary" onclick={reset} disabled={busy}>Herstel</button>
+				<span class="count">{dirty.length === 1 ? '1 change' : `${dirty.length} changes`}</span>
+				<button type="button" class="btn btn-secondary" onclick={reset} disabled={busy}>Revert</button>
 				<button type="submit" class="btn btn-primary" disabled={busy}>
 					{#if busy}<span class="spinner" aria-hidden="true"></span>{/if}
-					Opslaan
+					Save
 				</button>
 			</div>
 		{/if}

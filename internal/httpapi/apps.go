@@ -47,17 +47,17 @@ type appInput struct {
 	Access []string `json:"access"`
 }
 
-// validate trims and checks the input; it returns the offending field and a
-// Dutch message, or "" when valid.
+// validate trims and checks the input; it returns the offending field and an
+// English message, or "" when valid.
 func (a *appInput) validate() (field, msg string) {
 	a.Name = strings.TrimSpace(a.Name)
 	if n := utf8.RuneCountInString(a.Name); n < 1 || n > maxAppNameRunes {
-		return "name", "De naam moet 1 tot 40 tekens lang zijn."
+		return "name", "The name must be 1 to 40 characters."
 	}
 	u, err := url.Parse(a.URL)
 	if err != nil || len(a.URL) > maxAppURLLen || u.Host == "" ||
 		(!strings.EqualFold(u.Scheme, "http") && !strings.EqualFold(u.Scheme, "https")) {
-		return "url", "De URL moet absoluut zijn en met http:// of https:// beginnen."
+		return "url", "The URL must be absolute and start with http:// or https://."
 	}
 	if a.Protocol == "" {
 		a.Protocol = apps.Link
@@ -66,7 +66,7 @@ func (a *appInput) validate() (field, msg string) {
 		return f, m
 	}
 	if !colorRe.MatchString(a.Color) {
-		return "color", "De kleur moet de vorm #RRGGBB hebben."
+		return "color", "The color must be in the form #RRGGBB."
 	}
 	if a.Icon != "" {
 		if msg := iconError(a.Icon); msg != "" {
@@ -76,21 +76,21 @@ func (a *appInput) validate() (field, msg string) {
 	return "", ""
 }
 
-// iconError checks an icon data URL; it returns a Dutch message or "".
+// iconError checks an icon data URL; it returns an English message or "".
 func iconError(icon string) string {
 	if len(icon) > maxIconLen {
-		return "Het icoon mag maximaal 64 kB zijn."
+		return "The icon can be at most 64 kB."
 	}
 	m := iconRe.FindStringSubmatch(icon)
 	if m == nil {
-		return "Het icoon moet een base64 data-URL zijn (png, svg of webp)."
+		return "The icon must be a base64 data URL (png, svg or webp)."
 	}
 	raw, err := base64.StdEncoding.DecodeString(m[2])
 	if err != nil {
-		return "Het icoon is geen geldige base64."
+		return "The icon is not valid base64."
 	}
 	if m[1] == "svg+xml" && unsafeSVG(string(raw)) {
-		return "Het SVG-icoon bevat scripts of gevaarlijke attributen."
+		return "The SVG icon contains scripts or unsafe attributes."
 	}
 	return ""
 }
@@ -106,14 +106,14 @@ func (s *server) fetchAppIcon(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := url.Parse(strings.TrimSpace(req.URL))
 	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
-		writeInvalid(w, "url", "De URL moet absoluut zijn en met http:// of https:// beginnen.")
+		writeInvalid(w, "url", "The URL must be absolute and start with http:// or https://.")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	icon, err := appicon.Fetch(ctx, u.String(), func(d string) bool { return iconError(d) == "" })
 	if err != nil {
-		writeError(w, http.StatusNotFound, "no_icon", "Deze app biedt geen bruikbaar icoon aan. Kies er zelf een.")
+		writeError(w, http.StatusNotFound, "no_icon", "This app does not offer a usable icon. Choose one yourself.")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"icon": icon})
@@ -204,11 +204,11 @@ func (s *server) prepareConfig(ctx context.Context, w http.ResponseWriter, id st
 		o := a.Config
 		switch {
 		case c.SAML != nil && o.SAML != nil && o.SAML.EntityID == c.SAML.EntityID:
-			writeInvalid(w, "config.saml.entity_id", "Een andere app gebruikt deze entity ID al.")
+			writeInvalid(w, "config.saml.entity_id", "Another app already uses this entity ID.")
 		case c.LDAP != nil && o.LDAP != nil && o.LDAP.Slug == c.LDAP.Slug:
-			writeInvalid(w, "config.ldap.slug", "Een andere app gebruikt deze naam al.")
+			writeInvalid(w, "config.ldap.slug", "Another app already uses this name.")
 		case c.Gate != nil && o.Gate != nil && o.Gate.Host == c.Gate.Host:
-			writeInvalid(w, "config.gate.host", "Een andere app gebruikt deze hostnaam al.")
+			writeInvalid(w, "config.gate.host", "Another app already uses this hostname.")
 		default:
 			continue
 		}
@@ -235,7 +235,7 @@ func (s *server) appSecret(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.Config.OIDC == nil && a.Config.LDAP == nil {
-		writeInvalid(w, "protocol", "Alleen OIDC- en LDAP-apps hebben een geheim.")
+		writeInvalid(w, "protocol", "Only OIDC and LDAP apps have a secret.")
 		return
 	}
 	secret, err := randomToken()
@@ -300,7 +300,7 @@ func (s *server) readApp(w http.ResponseWriter, r *http.Request) (appInput, bool
 func (s *server) createApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, ok := s.readApp(w, r)
-	if !ok || !s.prepareConfig(ctx, w, "", &in) || !s.checkAccess(ctx, w, in.Access) {
+	if !ok || !s.prepareConfig(ctx, w, "", &in) || !s.checkAccess(ctx, w, in.Access) || !s.overrideFree(ctx, w, in.Config.Account.Username) {
 		return
 	}
 	rows, err := s.d.Pool.Query(ctx, `insert into apps (id, name, url, color, icon, protocol, config, access, sort, created_at)
@@ -317,6 +317,27 @@ func (s *server) createApp(w http.ResponseWriter, r *http.Request) {
 	}
 	s.d.Audit.Log(ctx, actor(ctx), "app.created", clientIP(ctx), map[string]any{"id": a.ID, "name": a.Name})
 	writeJSON(w, http.StatusCreated, a)
+}
+
+// overrideFree checks that the owner's name at the app (an account
+// override) is not another account's username: that person would be the
+// owner at the app. False when an answer was written.
+func (s *server) overrideFree(ctx context.Context, w http.ResponseWriter, name string) bool {
+	if name == "" {
+		return true
+	}
+	list, err := accounts.List(ctx, s.d.Pool)
+	if err != nil {
+		errInternal(w, "list accounts", err)
+		return false
+	}
+	for _, a := range list {
+		if !a.IsOwner() && strings.EqualFold(a.Username, name) {
+			writeInvalid(w, "config.account.username", "Another user has this username. Choose another name for the owner at this app.")
+			return false
+		}
+	}
+	return true
 }
 
 // checkAccess checks that every id in access is an account; false when an
@@ -359,7 +380,7 @@ func (s *server) updateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in, ok := s.readApp(w, r)
-	if !ok || !s.prepareConfig(ctx, w, id, &in) || !s.checkAccess(ctx, w, in.Access) {
+	if !ok || !s.prepareConfig(ctx, w, id, &in) || !s.checkAccess(ctx, w, in.Access) || !s.overrideFree(ctx, w, in.Config.Account.Username) {
 		return
 	}
 	rows, err := s.d.Pool.Query(ctx, `update apps set name = $2, url = $3, color = $4, icon = nullif($5, ''), protocol = $6, config = $7,
@@ -416,7 +437,7 @@ func (s *server) reorderApps(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
-	bad := func() { writeInvalid(w, "ids", "ids moet alle apps precies één keer bevatten.") }
+	bad := func() { writeInvalid(w, "ids", "ids must contain every app exactly once.") }
 	ids := make([]string, len(req.IDs))
 	seen := make(map[string]bool, len(ids))
 	for i, raw := range req.IDs {

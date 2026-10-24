@@ -80,37 +80,37 @@ type AuthRequest struct {
 func ParseAuthorize(q url.Values, list []apps.App) (AuthRequest, *Error) {
 	a, ok := clientByID(list, q.Get("client_id"))
 	if !ok {
-		return AuthRequest{}, &Error{Code: "invalid_client", Description: "Onbekende client_id."}
+		return AuthRequest{}, &Error{Code: "invalid_client", Description: "Unknown client_id."}
 	}
 	ru := q.Get("redirect_uri")
 	if !slices.Contains(a.Config.OIDC.RedirectURIs, ru) {
-		return AuthRequest{}, &Error{Code: "invalid_request", Description: "redirect_uri is niet geregistreerd voor deze app."}
+		return AuthRequest{}, &Error{Code: "invalid_request", Description: "redirect_uri is not registered for this app."}
 	}
 	ar := AuthRequest{App: a, RedirectURI: ru, State: q.Get("state"), Nonce: q.Get("nonce")}
 	fail := func(code, desc string) (AuthRequest, *Error) {
 		return ar, &Error{Code: code, Description: desc, Redirect: true}
 	}
 	if q.Get("response_type") != "code" {
-		return fail("unsupported_response_type", "Alleen response_type=code wordt ondersteund.")
+		return fail("unsupported_response_type", "Only response_type=code is supported.")
 	}
 	scopes := strings.Fields(q.Get("scope"))
 	if !slices.Contains(scopes, "openid") {
-		return fail("invalid_scope", "De scope moet openid bevatten.")
+		return fail("invalid_scope", "The scope must include openid.")
 	}
 	scopes = slices.DeleteFunc(scopes, func(s string) bool { return !slices.Contains(knownScopes, s) })
 	slices.Sort(scopes)
 	ar.Scope = strings.Join(slices.Compact(scopes), " ")
 	ar.Challenge = q.Get("code_challenge")
 	if q.Get("code_challenge_method") != "S256" || len(ar.Challenge) != 43 {
-		return fail("invalid_request", "PKCE met code_challenge_method=S256 is verplicht.")
+		return fail("invalid_request", "PKCE with code_challenge_method=S256 is required.")
 	}
 	if len(ar.State) > 1024 || len(ar.Nonce) > 1024 {
-		return fail("invalid_request", "state of nonce is te lang.")
+		return fail("invalid_request", "state or nonce is too long.")
 	}
 	// Sessions are checked before this point, so prompt=none needs nothing
 	// extra; request objects are not supported.
 	if q.Get("request") != "" || q.Get("request_uri") != "" {
-		return fail("request_not_supported", "Request-objecten worden niet ondersteund.")
+		return fail("request_not_supported", "Request objects are not supported.")
 	}
 	return ar, nil
 }
@@ -183,7 +183,7 @@ type Tokens struct {
 	Scope        string `json:"scope"`
 }
 
-var errGrant = &Error{Code: "invalid_grant", Description: "De code of het token is ongeldig of verlopen."}
+var errGrant = &Error{Code: "invalid_grant", Description: "The code or token is invalid or has expired."}
 
 // Exchange redeems an authorization code.
 func (p *Provider) Exchange(ctx context.Context, cfg settings.Settings, issuer string, client apps.App,
@@ -390,4 +390,4 @@ func (p *Provider) Userinfo(ctx context.Context, cfg settings.Settings, issuer, 
 	return out, nil
 }
 
-var errToken = &Error{Code: "invalid_token", Description: "Het access-token is ongeldig of verlopen."}
+var errToken = &Error{Code: "invalid_token", Description: "The access token is invalid or has expired."}

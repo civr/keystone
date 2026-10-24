@@ -79,13 +79,13 @@ export function luminance(hex: string): number {
 export function brandError(b: Branding): Partial<Record<keyof Branding, string>> {
 	const errors: Partial<Record<keyof Branding, string>> = {};
 	const name = b.name.trim();
-	if (!name) errors.name = 'Vul een naam in.';
-	else if (Array.from(name).length > 40) errors.name = 'De naam mag maximaal 40 tekens zijn.';
+	if (!name) errors.name = 'Enter a name.';
+	else if (Array.from(name).length > 40) errors.name = 'The name may be at most 40 characters.';
 	const hex = /^#[0-9a-f]{6}$/i;
-	if (!hex.test(b.accent)) errors.accent = 'Kies een kleur.';
+	if (!hex.test(b.accent)) errors.accent = 'Choose a colour.';
 	else if (1.05 / (luminance(b.accent) + 0.05) < 3)
-		errors.accent = 'Deze kleur is te licht: witte tekst op knoppen is dan slecht leesbaar. Kies een donkerdere kleur.';
-	if (!hex.test(b.background)) errors.background = 'Kies een kleur.';
-	else if (luminance(b.background) < 0.75) errors.background = 'Kies een lichte achtergrond; tekst staat er donker op.';
+		errors.accent = 'This colour is too light for white button text. Choose a darker one.';
+	if (!hex.test(b.background)) errors.background = 'Choose a colour.';
+	else if (luminance(b.background) < 0.75) errors.background = 'Choose a light background; text on it is dark.';
 	return errors;
 }

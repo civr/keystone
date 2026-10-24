@@ -11,7 +11,7 @@ import (
 )
 
 // TestAuditActionsFixture keeps web/src/lib/fixtures/audit-actions.json (whose
-// entries the web UI must label in Dutch) equal to the audit actions and login
+// entries the web UI must label in English) equal to the audit actions and login
 // methods the Go code writes.
 func TestAuditActionsFixture(t *testing.T) {
 	var src strings.Builder

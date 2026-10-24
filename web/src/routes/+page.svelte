@@ -24,7 +24,7 @@
 			if (e instanceof ApiError && e.status === 401) return; // api.ts is redirecting
 			// Signed in with a recovery code: a new passkey comes first (on /login).
 			if (e instanceof ApiError && e.code === 'must_register_passkey') return void location.assign('/login');
-			loadError = e instanceof ApiError ? e.message : 'Er ging iets mis bij het laden.';
+			loadError = e instanceof ApiError ? e.message : 'Something went wrong while loading.';
 		}
 	}
 
@@ -53,8 +53,8 @@
 				<path d="M10 8.3v3.6M10 14.2v.01" />
 			</svg>
 			<p>
-				<strong>Noodtoegang actief.</strong>
-				Je bent aangemeld met het noodaccount omdat AD niet bereikbaar was. Herstel de AD-verbinding zo snel mogelijk.
+				<strong>Emergency access is on.</strong>
+				You signed in with the emergency account because Active Directory could not be reached. Restore the connection soon.
 			</p>
 		</div>
 	{/if}
@@ -65,19 +65,19 @@
 				<path d="M10 8.3v3.6M10 14.2v.01" />
 			</svg>
 			<p>
-				<strong>Nog geen passkey.</strong>
-				Je logt nu in met alleen je AD-wachtwoord. Open Keystone via https en voeg een passkey toe onder
-				<a class="link" href="/instellingen/apparaten">Instellingen</a>.
+				<strong>No passkey yet.</strong>
+				You sign in with only your password. Open Keystone over https and add a passkey under
+				<a class="link" href="/settings/devices">Devices</a>.
 			</p>
 		</div>
 	{/if}
 
-	<h1 class="visually-hidden">Mijn apps</h1>
+	<h1 class="visually-hidden">My apps</h1>
 
 	{#if loadError}
 		<div class="surface state">
 			<p>{loadError}</p>
-			<button type="button" class="btn btn-secondary" onclick={load}>Opnieuw proberen</button>
+			<button type="button" class="btn btn-secondary" onclick={load}>Try again</button>
 		</div>
 	{:else if apps === null}
 		<ul class="skeleton" aria-hidden="true">
@@ -85,18 +85,22 @@
 				<li><span class="ghost icon"></span><span class="ghost line"></span><span class="ghost line short"></span></li>
 			{/each}
 		</ul>
-		<p class="visually-hidden" role="status">Apps worden geladen…</p>
+		<p class="visually-hidden" role="status">Loading apps…</p>
 	{:else if apps.length === 0}
 		<div class="surface state">
-			<p class="state-title">Nog geen apps</p>
-			<p>Voeg je eerste app toe; hij verschijnt meteen hier.</p>
-			<a class="btn btn-primary" href="/instellingen/apps">Naar Instellingen › Apps</a>
+			<p class="state-title">No apps yet</p>
+			{#if me?.admin}
+				<p>Add your first app; it shows up here right away.</p>
+				<a class="btn btn-primary" href="/settings/apps">Go to Settings › Apps</a>
+			{:else}
+				<p>An admin has not given you any apps yet.</p>
+			{/if}
 		</div>
 	{:else}
 		<AppGrid apps={matches} highlightFirst={query.trim() !== '' && matches.length > 0} />
 		{#if matches.length === 0}
 			<div class="surface state">
-				<p>Geen app gevonden voor “{query.trim()}”.</p>
+				<p>No app matches “{query.trim()}”.</p>
 			</div>
 		{/if}
 	{/if}

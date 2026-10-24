@@ -19,7 +19,7 @@
 		>
 			<span class="dot" aria-hidden="true"></span>
 			<span class="text">{t.text}</span>
-			<button type="button" aria-label="Sluiten" onclick={() => dismiss(t.id)}>
+			<button type="button" aria-label="Close" onclick={() => dismiss(t.id)}>
 				<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
 			</button>
 		</div>

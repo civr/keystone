@@ -39,9 +39,9 @@
 	async function copy(v: string) {
 		try {
 			await navigator.clipboard.writeText(v);
-			toast('Gekopieerd');
+			toast('Copied');
 		} catch {
-			toast('Kopiëren is niet gelukt.', 'error');
+			toast('Copying failed.', 'error');
 		}
 	}
 
@@ -51,7 +51,7 @@
 		try {
 			secret = (await api.send<{ secret: string }>('POST', `/apps/${app.id}/secret`)).secret;
 		} catch (e) {
-			toast(e instanceof ApiError ? e.message : 'Er kon geen geheim worden gemaakt.', 'error');
+			toast(e instanceof ApiError ? e.message : 'No secret could be made.', 'error');
 		} finally {
 			making = false;
 		}
@@ -59,7 +59,7 @@
 </script>
 
 <label class="field">
-	<span>Inloggen</span>
+	<span>Sign-in</span>
 	<select id="app-protocol" class="input" bind:value={form.protocol} onchange={choose}>
 		{#each PROTOCOLS as p}
 			<option value={p.value}>{p.label}</option>
@@ -70,46 +70,46 @@
 
 {#if form.protocol === 'saml'}
 	<label class="field">
-		<span>Entity ID van de app</span>
+		<span>App’s entity ID</span>
 		<input id="config.saml.entity_id" class="input mono" spellcheck="false" autocapitalize="none" placeholder="https://bastion.home.lan/api/auth/saml/metadata" aria-invalid={errors['config.saml.entity_id'] ? 'true' : undefined} bind:value={form.saml.entity_id} />
 		{#if errors['config.saml.entity_id']}<small class="field-error" role="alert">{errors['config.saml.entity_id']}</small>{/if}
 	</label>
 	<label class="field">
-		<span>ACS-URL</span>
+		<span>ACS URL</span>
 		<input id="config.saml.acs_url" class="input mono" type="url" spellcheck="false" autocapitalize="none" placeholder="https://bastion.home.lan/api/auth/saml/acs" aria-invalid={errors['config.saml.acs_url'] ? 'true' : undefined} bind:value={form.saml.acs_url} />
-		{#if errors['config.saml.acs_url']}<small class="field-error" role="alert">{errors['config.saml.acs_url']}</small>{:else}<small>Hier stuurt Keystone de ondertekende SAML-respons heen.</small>{/if}
+		{#if errors['config.saml.acs_url']}<small class="field-error" role="alert">{errors['config.saml.acs_url']}</small>{:else}<small>Where Keystone sends the signed SAML response.</small>{/if}
 	</label>
 	<label class="check">
 		<input type="checkbox" bind:checked={form.saml.idp_initiated} />
-		<span>Tegel logt direct in (IdP-initiated)</span>
-		<small>Uit: de tegel opent het adres hierboven en de app vraagt Keystone zelf om in te loggen.</small>
+		<span>Tile signs in directly (IdP-initiated)</span>
+		<small>Off: the tile opens the address above and the app asks Keystone to sign you in.</small>
 	</label>
 {:else if form.protocol === 'oidc'}
 	<label class="field">
-		<span>Redirect-URI's</span>
+		<span>Redirect URIs</span>
 		<textarea id="config.oidc.redirect_uris" class="input mono" rows="2" spellcheck="false" autocapitalize="none" placeholder="https://nimbus.home.lan/api/auth/sso/callback" aria-invalid={errors['config.oidc.redirect_uris'] ? 'true' : undefined} bind:value={form.oidc.redirect_uris}></textarea>
-		{#if errors['config.oidc.redirect_uris']}<small class="field-error" role="alert">{errors['config.oidc.redirect_uris']}</small>{:else}<small>Eén per regel, precies zoals de app ze meestuurt.</small>{/if}
+		{#if errors['config.oidc.redirect_uris']}<small class="field-error" role="alert">{errors['config.oidc.redirect_uris']}</small>{:else}<small>One per line, exactly as the app sends them.</small>{/if}
 	</label>
 {:else if form.protocol === 'ldap'}
 	<label class="field">
-		<span>Naam in LDAP</span>
+		<span>Name in LDAP</span>
 		<input id="config.ldap.slug" class="input mono" spellcheck="false" autocapitalize="none" placeholder="jellyfin" aria-invalid={errors['config.ldap.slug'] ? 'true' : undefined} bind:value={form.ldap.slug} />
-		{#if errors['config.ldap.slug']}<small class="field-error" role="alert">{errors['config.ldap.slug']}</small>{:else}<small>De app krijgt een eigen tak: ou={form.ldap.slug || '…'},dc=keystone.</small>{/if}
+		{#if errors['config.ldap.slug']}<small class="field-error" role="alert">{errors['config.ldap.slug']}</small>{:else}<small>The app gets its own branch: ou={form.ldap.slug || '…'},dc=keystone.</small>{/if}
 	</label>
 {:else if form.protocol === 'gate'}
 	<label class="field">
-		<span>Hostnaam van de app</span>
+		<span>App’s host name</span>
 		<input id="config.gate.host" class="input mono" spellcheck="false" autocapitalize="none" placeholder="ha.home.lan" aria-invalid={errors['config.gate.host'] ? 'true' : undefined} bind:value={form.gate.host} />
 		{#if errors['config.gate.host']}<small class="field-error" role="alert">{errors['config.gate.host']}</small>{/if}
 	</label>
 	<label class="field">
-		<span>Uitzonderingen</span>
+		<span>Exceptions</span>
 		<textarea id="config.gate.bypass_paths" class="input mono" rows="3" spellcheck="false" autocapitalize="none" placeholder="/api/" aria-invalid={errors['config.gate.bypass_paths'] ? 'true' : undefined} bind:value={form.gate.bypass}></textarea>
 		{#if errors['config.gate.bypass_paths']}
 			<small class="field-error" role="alert">{errors['config.gate.bypass_paths']}</small>
 		{:else}
 			<small>
-				Paden die de poortwachter doorlaat, zodat apps op je telefoon met hun eigen token werken. Voorstel:
+				Paths the gate lets through, so phone apps can use their own token. Suggested:
 				{#each BYPASS_PRESETS as p, i}
 					{#if i}·{/if}
 					<button type="button" class="link" onclick={() => (form.gate.bypass = p.paths.join('\n'))}>{p.name}</button>
@@ -119,50 +119,50 @@
 	</label>
 {:else if form.protocol === 'vault'}
 	<label class="field">
-		<span>Gebruikersnaam in de app</span>
+		<span>Username in the app</span>
 		<input class="input" autocomplete="off" spellcheck="false" autocapitalize="none" bind:value={vault.username} />
 	</label>
 	<label class="field">
-		<span>Wachtwoord</span>
+		<span>Password</span>
 		<input class="input" type="password" autocomplete="new-password" placeholder={vault.hasPassword ? '•••••••• (opgeslagen)' : ''} bind:value={vault.password} />
-		<small>{vault.hasPassword ? 'Laat leeg om het opgeslagen wachtwoord te houden.' : 'Versleuteld bewaard met de kluissleutel, niet in de database.'}</small>
+		<small>{vault.hasPassword ? 'Leave empty to keep the stored password.' : 'Kept encrypted with the vault key, outside the database.'}</small>
 	</label>
 {/if}
 
 {#if form.protocol !== 'link' && form.protocol !== 'vault'}
 	<fieldset class="field account">
-		<legend class="field-label">Account in de app</legend>
-		<small>Leeg = je eigen AD-gegevens.</small>
-		<input class="input" aria-label="Gebruikersnaam in de app" placeholder="Gebruikersnaam" autocomplete="off" spellcheck="false" autocapitalize="none" bind:value={form.account.username} />
-		<input class="input" aria-label="E-mailadres in de app" placeholder="E-mailadres" type="email" autocomplete="off" bind:value={form.account.email} />
-		<input class="input" aria-label="Weergavenaam in de app" placeholder="Weergavenaam" autocomplete="off" bind:value={form.account.display_name} />
+		<legend class="field-label">Owner’s account in the app</legend>
+		<small>Empty = the owner’s own details. Other people always use their own.</small>
+		<input class="input" aria-label="Username in the app" placeholder="Username" autocomplete="off" spellcheck="false" autocapitalize="none" bind:value={form.account.username} />
+		<input class="input" aria-label="E-mail address in the app" placeholder="E-mail address" type="email" autocomplete="off" bind:value={form.account.email} />
+		<input class="input" aria-label="Display name in the app" placeholder="Display name" autocomplete="off" bind:value={form.account.display_name} />
 	</fieldset>
 {/if}
 
 {#if info.length || ((form.protocol === 'oidc' || form.protocol === 'ldap') && app?.protocol === form.protocol)}
 	<div class="field">
-		<span class="field-label">Voor de instellingen van de app</span>
+		<span class="field-label">For the app’s settings</span>
 		<dl class="conn">
 			{#each info as row}
 				<dt>{row.label}</dt>
-				<dd><code class="mono">{row.value}</code> <button type="button" class="btn btn-flat btn-sm" onclick={() => copy(row.value)}>Kopieer</button></dd>
+				<dd><code class="mono">{row.value}</code> <button type="button" class="btn btn-flat btn-sm" onclick={() => copy(row.value)}>Copy</button></dd>
 			{/each}
 			{#if form.protocol === 'oidc' || form.protocol === 'ldap'}
-				<dt>{form.protocol === 'oidc' ? 'Client-secret' : 'Bind-wachtwoord'}</dt>
+				<dt>{form.protocol === 'oidc' ? 'Client secret' : 'Bind password'}</dt>
 				<dd>
 					{#if secret}
-						<code class="mono">{secret}</code> <button type="button" class="btn btn-flat btn-sm" onclick={() => copy(secret)}>Kopieer</button>
-						<small>Alleen nu zichtbaar. Bewaar het in de app.</small>
+						<code class="mono">{secret}</code> <button type="button" class="btn btn-flat btn-sm" onclick={() => copy(secret)}>Copy</button>
+						<small>Shown only now. Store it in the app.</small>
 					{:else}
-						<span class="muted">{app?.has_secret ? 'Ingesteld' : 'Nog niet gemaakt'}</span>
-						<button type="button" class="btn btn-secondary btn-sm" disabled={making} onclick={newSecret}>{app?.has_secret ? 'Vervang' : 'Maak aan'}</button>
+						<span class="muted">{app?.has_secret ? 'Set' : 'Not made yet'}</span>
+						<button type="button" class="btn btn-secondary btn-sm" disabled={making} onclick={newSecret}>{app?.has_secret ? 'Replace' : 'Make one'}</button>
 					{/if}
 				</dd>
 			{/if}
 		</dl>
 	</div>
 {:else if form.protocol !== 'link' && form.protocol !== 'vault' && (!app || app.protocol !== form.protocol)}
-	<p class="muted small">Na opslaan zie je hier de gegevens voor de app.</p>
+	<p class="muted small">After saving, the details for the app appear here.</p>
 {/if}
 
 <style>

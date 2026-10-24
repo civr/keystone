@@ -67,7 +67,7 @@
 		class="trigger"
 		aria-haspopup="menu"
 		aria-expanded={open}
-		aria-label="Account van {name}"
+		aria-label="Account of {name}"
 		onclick={toggle}
 	>
 		<span class="avatar" aria-hidden="true">{initials(name)}</span>
@@ -113,7 +113,7 @@
 				<svg viewBox="0 0 20 20" aria-hidden="true">
 					<path d="M8 3.5H5A1.5 1.5 0 0 0 3.5 5v10A1.5 1.5 0 0 0 5 16.5h3M13 13.5L16.5 10 13 6.5M16.5 10H8" />
 				</svg>
-				Uitloggen
+				Sign out
 			</button>
 		</div>
 	{/if}

@@ -51,13 +51,13 @@
 
 	function fail(e: unknown) {
 		if (!(e instanceof ApiError)) {
-			error = 'Er ging iets mis. Probeer het opnieuw.';
+			error = 'Something went wrong. Try again.';
 			return;
 		}
 		if (e.code === 'setup_done') return void goto('/', { replaceState: true });
 		if (e.code === 'setup_locked') {
 			go('unlock');
-			error = 'Je setup-sessie is verlopen. Vul de setupcode opnieuw in.';
+			error = 'Your setup session timed out. Enter the setup code again.';
 			return;
 		}
 		error = e.message;
@@ -88,8 +88,8 @@
 
 	async function createAccount(e: SubmitEvent) {
 		e.preventDefault();
-		if (password.length < MIN_PASSWORD) return void (error = `Kies een wachtwoord van minstens ${MIN_PASSWORD} tekens.`);
-		if (password !== repeat) return void (error = 'De wachtwoorden zijn niet gelijk.');
+		if (password.length < MIN_PASSWORD) return void (error = `Choose a password of at least ${MIN_PASSWORD} characters.`);
+		if (password !== repeat) return void (error = 'The passwords do not match.');
 		if (await run(() => api.send('POST', '/setup/account', { username, password }))) {
 			location.assign('/');
 		}
@@ -97,7 +97,7 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle('Installatie')}</title>
+	<title>{pageTitle('Setup')}</title>
 </svelte:head>
 
 {#snippet busyLabel(text: string)}
@@ -116,18 +116,18 @@
 			{#key current}
 				<section in:slide={{ dir }} out:slide={{ dir, out: true }}>
 					{#if current === 'loading'}
-						<p class="visually-hidden" role="status">Laden…</p>
+						<p class="visually-hidden" role="status">Loading…</p>
 					{:else if current === 'unlock'}
-						<h1>Welkom</h1>
+						<h1>Welcome</h1>
 						<p class="lede">
-							Vul de setupcode in. Je vindt hem met
+							Enter the setup code. Find it with
 							<code>docker compose logs core</code>.
 						</p>
 						<form class="form" onsubmit={unlock} novalidate>
 							<!-- svelte-ignore a11y_autofocus -->
 							<input
 								class="input code"
-								aria-label="Setupcode"
+								aria-label="Setup code"
 								autocomplete="one-time-code"
 								autocapitalize="characters"
 								spellcheck="false"
@@ -138,17 +138,17 @@
 							/>
 							{@render errorBox()}
 							<button class="btn btn-primary block" disabled={busy || unlockCode.length < 19}>
-								{@render busyLabel('Verder')}
+								{@render busyLabel('Continue')}
 							</button>
 						</form>
 					{:else}
-						<h1>Maak je account</h1>
-						<p class="lede">Hiermee log je in bij Keystone. De rest stel je later in.</p>
+						<h1>Create your account</h1>
+						<p class="lede">You sign in to Keystone with it. Everything else comes later.</p>
 						<form class="form" onsubmit={createAccount} novalidate>
 							<input
 								class="input"
-								aria-label="Gebruikersnaam"
-								placeholder="Gebruikersnaam"
+								aria-label="Username"
+								placeholder="Username"
 								autocomplete="username"
 								autocapitalize="none"
 								spellcheck="false"
@@ -158,16 +158,16 @@
 							<input
 								class="input"
 								type="password"
-								aria-label="Wachtwoord"
-								placeholder="Wachtwoord (minstens {MIN_PASSWORD} tekens)"
+								aria-label="Password"
+								placeholder="Password (at least {MIN_PASSWORD} characters)"
 								autocomplete="new-password"
 								bind:value={password}
 							/>
 							<input
 								class="input"
 								type="password"
-								aria-label="Herhaal wachtwoord"
-								placeholder="Herhaal wachtwoord"
+								aria-label="Repeat password"
+								placeholder="Repeat password"
 								autocomplete="new-password"
 								aria-invalid={mismatch ? 'true' : undefined}
 								bind:value={repeat}
@@ -177,7 +177,7 @@
 								class="btn btn-primary block"
 								disabled={busy || !username.trim() || password.length < MIN_PASSWORD || password !== repeat}
 							>
-								{@render busyLabel('Account maken')}
+								{@render busyLabel('Create account')}
 							</button>
 						</form>
 					{/if}

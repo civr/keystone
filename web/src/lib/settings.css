@@ -1,5 +1,5 @@
 /*
- * Instellingen (loaded only with /instellingen), laid out like the Settings
+ * Settings (loaded only with /settings), laid out like the Settings
  * app: a large title, then inset grouped sections — a quiet header above a
  * white rounded card, 44px rows, separators inset from the leading edge, and
  * a footnote below. Cards are never nested.

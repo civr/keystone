@@ -33,17 +33,17 @@ export async function openVaultApp(app: App, href: string): Promise<void> {
 		await copyThenClear(password, await clipboardSeconds());
 	} catch (e) {
 		const err = await password.then(() => e).catch((pe) => pe);
-		if (err instanceof ApiError && err.code === 'no_password') toast(`Voor ${app.name} is geen wachtwoord opgeslagen.`, 'error');
+		if (err instanceof ApiError && err.code === 'no_password') toast(`No password is stored for ${app.name}.`, 'error');
 		else if (err instanceof ApiError) toast(err.message, 'error');
-		else toast('Kopiëren naar het klembord is niet gelukt.', 'error');
+		else toast('The password could not be copied.', 'error');
 		return;
 	}
 	const w = window.open(href, '_blank');
 	if (w) {
 		w.opener = null;
-		toast(`Wachtwoord gekopieerd — wordt over ${await clipboardSeconds()} s gewist`);
+		toast(`Password copied; cleared in ${await clipboardSeconds()} s`);
 	} else {
-		toast(`Wachtwoord gekopieerd. Open ${app.name} via de tegel.`);
+		toast(`Password copied. Open ${app.name} from its tile.`);
 	}
 }
 

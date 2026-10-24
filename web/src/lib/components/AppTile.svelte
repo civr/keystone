@@ -35,9 +35,9 @@
 			<span aria-hidden="true">{initial}</span>
 		{/if}
 		{#if app.protocol === 'vault'}
-			<span class="badge" title="Opent met het wachtwoord uit de kluis op je klembord">
+			<span class="badge" title="Opens with the vault password on your clipboard">
 				<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V7a4 4 0 0 1 8 0v2M5 9h10v7H5z" /></svg>
-				<span class="visually-hidden">Kluis</span>
+				<span class="visually-hidden">Vault</span>
 			</span>
 		{/if}
 	</span>

@@ -493,7 +493,7 @@ func TestAuditListAndExport(t *testing.T) {
 	}
 }
 
-func TestADTestMessagesAreDutch(t *testing.T) {
+func TestADTestMessagesAreEnglish(t *testing.T) {
 	t.Parallel()
 	for _, err := range []error{ad.ErrInvalidCredentials, ad.ErrUnavailable, ad.ErrNotFound, errors.New("x")} {
 		if m := adTestMessage(fmt.Errorf("wrap: %w", err)); m == "" || strings.Contains(m, "ad:") {

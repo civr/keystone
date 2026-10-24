@@ -1,5 +1,5 @@
 {
-	"_comment": "Every audit action and login method keystone-core writes. internal/httpapi/audit_actions_test.go keeps this list in sync with the Go code; format.test.ts checks each has a Dutch label.",
+	"_comment": "Every audit action and login method keystone-core writes. internal/httpapi/audit_actions_test.go keeps this list in sync with the Go code; format.test.ts checks each has a label.",
 	"actions": [
 		"account.password_changed",
 		"ad.changed",

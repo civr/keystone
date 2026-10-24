@@ -35,13 +35,13 @@ func assertField(t *testing.T, err error, field, contains string) {
 func TestRejectsAdminCIDRExcludingRequester(t *testing.T) {
 	s := Defaults()
 	s.Network.AdminCIDRs = []string{"10.0.0.0/24"}
-	assertField(t, s.Validate(requester), "network.admin_cidrs", "buitensluiten")
+	assertField(t, s.Validate(requester), "network.admin_cidrs", "lock out")
 }
 
 func TestRejectsLoginCIDRExcludingRequester(t *testing.T) {
 	s := Defaults()
 	s.Network.LoginCIDRs = []string{"10.0.0.0/24"}
-	assertField(t, s.Validate(requester), "network.login_cidrs", "buitensluiten")
+	assertField(t, s.Validate(requester), "network.login_cidrs", "lock out")
 }
 
 func TestAcceptsCIDRContainingRequester(t *testing.T) {

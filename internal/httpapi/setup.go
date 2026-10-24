@@ -97,8 +97,8 @@ func (s *server) setupUnlocked(ctx context.Context, r *http.Request) (string, bo
 
 // Step preconditions; each returns "" when the step may run.
 const (
-	msgPrevious = "Rond eerst de vorige stap af."
-	msgFrozen   = "Deze stap kan niet meer worden gewijzigd nadat er een passkey is geregistreerd."
+	msgPrevious = "Finish the previous step first."
+	msgFrozen   = "This step cannot be changed after a passkey has been registered."
 )
 
 func beforePasskey(prereq func(setupProgress) bool) func(setupProgress) string {
@@ -154,7 +154,7 @@ func (s *server) setupStep(cond func(setupProgress) string, h setupHandler) http
 			return
 		}
 		if !ok {
-			writeError(w, http.StatusUnauthorized, "setup_locked", "Voer eerst de setupcode in.")
+			writeError(w, http.StatusUnauthorized, "setup_locked", "Enter the setup code first.")
 			return
 		}
 		if msg := cond(p); msg != "" {
@@ -166,12 +166,12 @@ func (s *server) setupStep(cond func(setupProgress) string, h setupHandler) http
 }
 
 func errSetupDone(w http.ResponseWriter) {
-	writeError(w, http.StatusGone, "setup_done", "De installatie is al afgerond.")
+	writeError(w, http.StatusGone, "setup_done", "Setup is already finished.")
 }
 
 func errInternal(w http.ResponseWriter, what string, err error) {
 	slog.Error("http: "+what, "err", err)
-	writeError(w, http.StatusInternalServerError, "internal", "Er ging iets mis. Probeer het opnieuw.")
+	writeError(w, http.StatusInternalServerError, "internal", "Something went wrong. Try again.")
 }
 
 func (s *server) setupRoutes(r chi.Router) {
@@ -246,12 +246,12 @@ func (s *server) setupUnlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !allowed {
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "Te veel pogingen. Wacht een minuut en probeer het opnieuw.")
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many attempts. Wait a minute and try again.")
 		return
 	}
 	if !crypto.VerifySecret(s.d.SetupCodeHash, strings.ToUpper(strings.TrimSpace(req.Code))) {
 		s.d.Audit.Log(ctx, audit.ActorAnonymous, "setup.unlock_failed", ip, nil)
-		writeError(w, http.StatusUnauthorized, "bad_code", "De setupcode klopt niet.")
+		writeError(w, http.StatusUnauthorized, "bad_code", "The setup code is wrong.")
 		return
 	}
 	if err := s.d.Limiter.Refund(ctx, "setup-unlock", ip.String()); err != nil {
@@ -298,16 +298,16 @@ func validHostname(h string) bool {
 func normalizeDomain(domain, publicURL string) (string, string, string) {
 	d := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(domain)), ".")
 	if !validHostname(d) {
-		return "", "", "Vul een geldig domein in, bijvoorbeeld home.lan."
+		return "", "", "Enter a valid domain, for example home.lan."
 	}
 	u, err := url.Parse(strings.TrimSpace(publicURL))
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil ||
 		(u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
-		return "", "", "Het publieke adres moet een http(s)-adres zonder pad zijn, bijvoorbeeld https://keystone.home.lan."
+		return "", "", "The public address must be an http(s) address without a path, for example https://keystone.home.lan."
 	}
 	host := strings.ToLower(u.Hostname())
 	if !validHostname(host) || (host != d && !strings.HasSuffix(host, "."+d)) {
-		return "", "", "Het publieke adres moet binnen het domein " + d + " vallen."
+		return "", "", "The public address must be within the domain " + d + " vallen."
 	}
 	return d, strings.ToLower(u.Scheme) + "://" + strings.ToLower(u.Host), ""
 }
@@ -359,7 +359,7 @@ func (s *server) readADConfig(w http.ResponseWriter, r *http.Request) (ad.Config
 		return ad.Config{}, false
 	}
 	if req.BindPassword == "" {
-		writeError(w, http.StatusBadRequest, "invalid_ad_config", "bind_password is verplicht")
+		writeError(w, http.StatusBadRequest, "invalid_ad_config", "bind_password is required")
 		return ad.Config{}, false
 	}
 	sealed, err := crypto.Seal(s.d.Secrets.DataKey, []byte(req.BindPassword))
@@ -431,7 +431,7 @@ func (s *server) setupOwner(w http.ResponseWriter, r *http.Request, _ string) {
 		return
 	}
 	if !allowed {
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "Te veel pogingen. Wacht een minuut en probeer het opnieuw.")
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many attempts. Wait a minute and try again.")
 		return
 	}
 	var dir ad.Directory
@@ -439,18 +439,18 @@ func (s *server) setupOwner(w http.ResponseWriter, r *http.Request, _ string) {
 		dir = s.d.Dir()
 	}
 	if dir == nil {
-		writeError(w, http.StatusServiceUnavailable, "ad_unavailable", "AD is niet bereikbaar.")
+		writeError(w, http.StatusServiceUnavailable, "ad_unavailable", "Active Directory cannot be reached.")
 		return
 	}
 	u, err := dir.Authenticate(ctx, req.Username, req.Password)
 	switch {
 	case errors.Is(err, ad.ErrInvalidCredentials), errors.Is(err, ad.ErrNotFound):
 		s.d.Audit.Log(ctx, audit.ActorAnonymous, "setup.owner_failed", ip, map[string]any{"username": ad.NormalizeUsername(req.Username)})
-		writeError(w, http.StatusUnauthorized, "invalid_credentials", "Gebruikersnaam of wachtwoord onjuist.")
+		writeError(w, http.StatusUnauthorized, "invalid_credentials", "Wrong username or password.")
 		return
 	case err != nil:
 		slog.Warn("setup: AD authenticate", "err", err)
-		writeError(w, http.StatusServiceUnavailable, "ad_unavailable", "AD is niet bereikbaar.")
+		writeError(w, http.StatusServiceUnavailable, "ad_unavailable", "Active Directory cannot be reached.")
 		return
 	}
 	handle := make([]byte, 64)
@@ -505,7 +505,7 @@ func (s *server) setupPasskeyFinish(w http.ResponseWriter, r *http.Request, toke
 	}
 	state, err := s.takeCeremony(ctx, id)
 	if errors.Is(err, errNoCeremony) {
-		writeError(w, http.StatusBadRequest, "no_ceremony", "Start de registratie van de passkey opnieuw.")
+		writeError(w, http.StatusBadRequest, "no_ceremony", "Start the passkey registration again.")
 		return
 	}
 	if err != nil {
@@ -523,7 +523,7 @@ func (s *server) setupPasskeyFinish(w http.ResponseWriter, r *http.Request, toke
 	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 	if err := svc.FinishRegistration(ctx, accounts.OwnerID, state, r, name); err != nil {
 		slog.Warn("setup: finish registration", "err", err)
-		writeError(w, http.StatusBadRequest, "passkey_failed", "De passkey kon niet worden geregistreerd. Probeer het opnieuw.")
+		writeError(w, http.StatusBadRequest, "passkey_failed", "The passkey could not be registered. Try again.")
 		return
 	}
 	s.d.Audit.Log(ctx, audit.ActorAnonymous, "setup.passkey", clientIP(ctx), map[string]any{"name": name})
@@ -539,7 +539,7 @@ func (s *server) setupEmergency(w http.ResponseWriter, r *http.Request, _ string
 		return
 	}
 	if utf8.RuneCountInString(req.Password) < emergencyMinLen {
-		writeError(w, http.StatusBadRequest, "weak_password", "Het noodwachtwoord moet minstens 16 tekens hebben.")
+		writeError(w, http.StatusBadRequest, "weak_password", "The emergency password must be at least 16 characters.")
 		return
 	}
 	hash, err := crypto.HashSecret(req.Password)
@@ -578,11 +578,11 @@ func (s *server) setupAccount(w http.ResponseWriter, r *http.Request, token stri
 	}
 	username := strings.ToLower(strings.TrimSpace(req.Username))
 	if !localUsernameRe.MatchString(username) {
-		writeInvalid(w, "username", "Gebruik kleine letters, cijfers, punt, streepje of underscore (maximaal 64).")
+		writeInvalid(w, "username", "Use lowercase letters, digits, dot, dash or underscore (at most 64).")
 		return
 	}
 	if utf8.RuneCountInString(req.Password) < minLocalPassword {
-		writeInvalid(w, "password", "Kies een wachtwoord van minstens 12 tekens.")
+		writeInvalid(w, "password", "Choose a password of at least 12 characters.")
 		return
 	}
 	hash, err := crypto.HashSecret(req.Password)

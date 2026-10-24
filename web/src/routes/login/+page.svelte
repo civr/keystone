@@ -67,13 +67,13 @@
 			if (e.code === 'password_required') {
 				// The 5-minute pending login expired: start over.
 				go('password');
-				error = 'Je inlogpoging is verlopen. Log opnieuw in.';
+				error = 'Your sign-in timed out. Sign in again.';
 				return;
 			}
 			error = e.message;
 			if (e.code === 'locked' && typeof e.data.retry_after === 'number') {
 				const min = Math.max(1, Math.ceil(e.data.retry_after / 60));
-				error += ` Probeer het over ${min} ${min === 1 ? 'minuut' : 'minuten'} opnieuw.`;
+				error += ` Try again in ${min} ${min === 1 ? 'minute' : 'minutes'}.`;
 			}
 			if (e.code === 'ad_unavailable') emergencyOffered = e.data.emergency === true;
 			return;
@@ -254,7 +254,7 @@
 	function chooseRecovery() {
 		if (mode === 'passkey' || mode === 'register') return go('recovery');
 		wantRecovery = true;
-		notice = 'Log eerst in met je wachtwoord; daarna vul je een herstelcode in.';
+		notice = 'Sign in with your password first; then enter a recovery code.';
 	}
 
 	function restart() {
@@ -265,16 +265,16 @@
 
 	const titles: Record<Mode, string> = {
 		loading: site.name,
-		password: 'Inloggen',
-		emergency: 'Nood-account',
-		passkey: 'Bevestig met je passkey',
-		register: 'Maak een passkey',
-		recovery: 'Herstelcode'
+		password: 'Sign in',
+		emergency: 'Emergency account',
+		passkey: 'Confirm with your passkey',
+		register: 'Create a passkey',
+		recovery: 'Recovery code'
 	};
 </script>
 
 <svelte:head>
-	<title>{pageTitle('Inloggen')}</title>
+	<title>{pageTitle('Sign in')}</title>
 </svelte:head>
 
 {#snippet brand()}
@@ -292,7 +292,7 @@
 			{#key mode}
 				<section in:step={{ dir }} out:step={{ dir, out: true }} aria-labelledby="title">
 					{#if mode === 'loading'}
-						<p class="visually-hidden" role="status">Laden…</p>
+						<p class="visually-hidden" role="status">Loading…</p>
 					{:else}
 						<h1 id="title">{titles[mode]}</h1>
 					{/if}
@@ -302,13 +302,13 @@
 							{#if trusted}
 								<button type="button" class="btn btn-primary block" onclick={passkeyOnly} disabled={busy}>
 									<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4" /><path d="M2 21v-1a6 6 0 0 1 9.5-4.9" /><circle cx="17.5" cy="15.5" r="2.5" /><path d="M17.5 18v4M17.5 20h2" /></svg>
-									Inloggen met passkey
+									Sign in with a passkey
 								</button>
-								<div class="divider"><span>of met je wachtwoord</span></div>
+								<div class="divider"><span>or with your password</span></div>
 							{/if}
 							{#if notice}<p class="notice" role="status">{notice}</p>{/if}
 							<label class="field">
-								<span>Gebruikersnaam</span>
+								<span>Username</span>
 								<input
 									bind:this={userInput}
 									class="input"
@@ -321,7 +321,7 @@
 								/>
 							</label>
 							<label class="field">
-								<span>Wachtwoord</span>
+								<span>Password</span>
 								<input
 									class="input"
 									bind:this={passwordInput}
@@ -338,24 +338,24 @@
 								class="btn block {trusted ? 'btn-secondary' : 'btn-primary'}"
 								disabled={busy || !username.trim() || !password}
 							>
-								{@render busyLabel('Inloggen')}
+								{@render busyLabel('Sign in')}
 							</button>
 						</form>
 						<div class="links">
 							{#if !wantRecovery}
-								<button type="button" class="link" onclick={chooseRecovery}>Herstelcode gebruiken</button>
+								<button type="button" class="link" onclick={chooseRecovery}>Use a recovery code</button>
 							{:else}
-								<button type="button" class="link" onclick={restart}>Annuleren</button>
+								<button type="button" class="link" onclick={restart}>Cancel</button>
 							{/if}
 							{#if emergencyOffered}
-								<button type="button" class="link" onclick={() => go('emergency')}>Nood-account gebruiken</button>
+								<button type="button" class="link" onclick={() => go('emergency')}>Use the emergency account</button>
 							{/if}
 						</div>
 					{:else if mode === 'emergency'}
-						<p class="lede">AD is niet bereikbaar. Log in met het noodwachtwoord; daarna bevestig je nog met je passkey.</p>
+						<p class="lede">Active Directory cannot be reached. Sign in with the emergency password, then confirm with your passkey.</p>
 						<form class="form" onsubmit={submitEmergency} novalidate>
 							<label class="field">
-								<span>Noodwachtwoord</span>
+								<span>Emergency password</span>
 								<!-- svelte-ignore a11y_autofocus -->
 								<input
 									class="input"
@@ -368,41 +368,41 @@
 							</label>
 							{#if error}<p class="error" role="alert">{error}</p>{/if}
 							<button class="btn btn-primary block" disabled={busy || !emergencyPassword}>
-								{@render busyLabel('Doorgaan')}
+								{@render busyLabel('Continue')}
 							</button>
 						</form>
 						<div class="links">
-							<button type="button" class="link" onclick={restart}>Terug</button>
+							<button type="button" class="link" onclick={restart}>Back</button>
 						</div>
 					{:else if mode === 'passkey' || mode === 'register'}
 						<p class="lede">
 							{#if mode === 'passkey'}
-								Gebruik Face ID, Touch ID, Windows Hello of je beveiligingssleutel.
+								Use Face ID, Touch ID, Windows Hello or your security key.
 							{:else if forced}
-								Je bent binnen met een herstelcode. Maak nu een nieuwe passkey voor dit apparaat.
+								You are in with a recovery code. Create a new passkey for this device now.
 							{:else}
-								Er is nog geen passkey. Maak er een op dit apparaat om verder te gaan.
+								There is no passkey yet. Create one on this device to continue.
 							{/if}
 						</p>
 						<div class="form">
 							{#if error}<p class="error" role="alert">{error}</p>{/if}
 							<button type="button" class="btn btn-primary block" onclick={runPasskey} disabled={busy}>
-								{@render busyLabel(mode === 'passkey' ? 'Gebruik passkey' : 'Passkey maken')}
+								{@render busyLabel(mode === 'passkey' ? 'Use passkey' : 'Create passkey')}
 							</button>
 						</div>
 						{#if !forced}
 							<div class="links">
 								{#if mode === 'passkey'}
-									<button type="button" class="link" onclick={chooseRecovery}>Herstelcode gebruiken</button>
+									<button type="button" class="link" onclick={chooseRecovery}>Use a recovery code</button>
 								{/if}
-								<button type="button" class="link" onclick={restart}>Ander account</button>
+								<button type="button" class="link" onclick={restart}>Other account</button>
 							</div>
 						{/if}
 					{:else if mode === 'recovery'}
-						<p class="lede">Vul een van je herstelcodes in. Daarna maak je een nieuwe passkey.</p>
+						<p class="lede">Enter one of your recovery codes. Then create a new passkey.</p>
 						<form class="form" onsubmit={submitRecovery} novalidate>
 							<label class="field">
-								<span>Herstelcode</span>
+								<span>Recovery code</span>
 								<!-- svelte-ignore a11y_autofocus -->
 								<input
 									class="input code"
@@ -417,11 +417,11 @@
 							</label>
 							{#if error}<p class="error" role="alert">{error}</p>{/if}
 							<button class="btn btn-primary block" disabled={busy || code.length < 19}>
-								{@render busyLabel('Doorgaan')}
+								{@render busyLabel('Continue')}
 							</button>
 						</form>
 						<div class="links">
-							<button type="button" class="link" onclick={restart}>Terug</button>
+							<button type="button" class="link" onclick={restart}>Back</button>
 						</div>
 					{/if}
 				</section>

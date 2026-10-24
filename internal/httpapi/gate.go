@@ -19,7 +19,7 @@ func (s *server) gateStart(w http.ResponseWriter, r *http.Request) {
 	rd := r.URL.Query().Get("rd")
 	u, err := url.Parse(rd)
 	bad := func() {
-		writeError(w, http.StatusBadRequest, "bad_redirect", "Dit adres hoort niet bij een app achter de poortwachter.")
+		writeError(w, http.StatusBadRequest, "bad_redirect", "This address does not belong to an app behind the gate.")
 	}
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil || u.Host == "" || cfg.Domain == "" {
 		bad()
@@ -29,7 +29,7 @@ func (s *server) gateStart(w http.ResponseWriter, r *http.Request) {
 	if secure && u.Scheme == "http" {
 		// The cookie below is Secure: a browser on http:// never sends it
 		// back, and would bounce between the gate and Keystone forever.
-		writeError(w, http.StatusBadRequest, "insecure_app", "Deze app draait op http, maar Keystone op https. Zet de app ook achter https.")
+		writeError(w, http.StatusBadRequest, "insecure_app", "This app runs on http, but Keystone runs on https. Put the app behind https too.")
 		return
 	}
 	host := strings.ToLower(u.Hostname())

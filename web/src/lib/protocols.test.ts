@@ -69,13 +69,13 @@ describe('connection info', () => {
 		expect(saml.map((r) => r.value)).toContain('https://keystone.home.lan/saml/metadata');
 		const oidc = connectionInfo(origin, { ...base, protocol: 'oidc', config: { oidc: { client_id: 'cid', redirect_uris: [] } } });
 		expect(oidc).toContainEqual({ label: 'Issuer', value: origin });
-		expect(oidc).toContainEqual({ label: 'Client-ID', value: 'cid' });
+		expect(oidc).toContainEqual({ label: 'Client ID', value: 'cid' });
 		const ldap = connectionInfo(origin, { ...base, protocol: 'ldap', config: { ldap: { slug: 'jellyfin' }, account: { username: 't.willems', email: '', display_name: '' } } });
-		expect(ldap).toContainEqual({ label: 'Bind-DN', value: 'cn=bind,ou=jellyfin,dc=keystone' });
+		expect(ldap).toContainEqual({ label: 'Bind DN', value: 'cn=bind,ou=jellyfin,dc=keystone' });
 		expect(ldap).toContainEqual({ label: 'Server', value: 'ldaps://keystone.home.lan:636' });
-		expect(ldap).toContainEqual({ label: 'Zoekbasis', value: 'ou=jellyfin,dc=keystone' });
+		expect(ldap).toContainEqual({ label: 'Search base', value: 'ou=jellyfin,dc=keystone' });
 		const gate = connectionInfo(origin, { ...base, protocol: 'gate', config: { gate: { host: 'ha.home.lan', bypass_paths: [] } } });
-		expect(gate).toContainEqual({ label: 'Forward-auth-adres', value: 'http://keystone.home.lan:8081/verify' });
+		expect(gate).toContainEqual({ label: 'Forward-auth address', value: 'http://keystone.home.lan:8081/verify' });
 	});
 });
 

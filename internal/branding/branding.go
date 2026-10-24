@@ -49,25 +49,25 @@ func (b *Branding) Normalize() {
 func (b Branding) Check() (field, msg string) {
 	switch n := utf8.RuneCountInString(b.Name); {
 	case n == 0:
-		return "name", "Vul een naam in."
+		return "name", "Enter a name."
 	case n > MaxName:
-		return "name", fmt.Sprintf("De naam mag maximaal %d tekens zijn.", MaxName)
+		return "name", fmt.Sprintf("The name can be at most %d characters.", MaxName)
 	case strings.IndexFunc(b.Name, unicode.IsControl) >= 0:
-		return "name", "De naam bevat ongeldige tekens."
+		return "name", "The name contains invalid characters."
 	}
 	if !hexRe.MatchString(b.Accent) {
-		return "accent", "Kies een kleur."
+		return "accent", "Choose a color."
 	}
 	// Buttons carry white text on the accent.
 	if contrast(b.Accent, "#ffffff") < 3 {
-		return "accent", "Deze kleur is te licht: witte tekst op knoppen is dan slecht leesbaar. Kies een donkerdere kleur."
+		return "accent", "This color is too light: white text on buttons would be hard to read. Choose a darker color."
 	}
 	if !hexRe.MatchString(b.Background) {
-		return "background", "Kies een kleur."
+		return "background", "Choose a color."
 	}
 	// The theme is light: dark text sits on the background.
 	if luminance(b.Background) < 0.75 {
-		return "background", "Kies een lichte achtergrond; tekst staat er donker op."
+		return "background", "Choose a light background; text is dark on it."
 	}
 	return "", ""
 }

@@ -6,7 +6,7 @@ import (
 	"net/url"
 )
 
-// ValidationError identifies the offending field (JSON path) and a Dutch message.
+// ValidationError identifies the offending field (JSON path) and an English message.
 type ValidationError struct {
 	Field   string
 	Message string
@@ -20,7 +20,7 @@ func bad(field, format string, a ...any) error {
 
 func inRange(field string, v, lo, hi int) error {
 	if v < lo || v > hi {
-		return bad(field, "moet tussen %d en %d liggen", lo, hi)
+		return bad(field, "must be between %d and %d", lo, hi)
 	}
 	return nil
 }
@@ -31,7 +31,7 @@ func oneOf(field, v string, allowed ...string) error {
 			return nil
 		}
 	}
-	return bad(field, "moet een van deze waarden zijn: %v", allowed)
+	return bad(field, "must be one of: %v", allowed)
 }
 
 func parseCIDRs(field string, list []string) ([]netip.Prefix, error) {
@@ -39,7 +39,7 @@ func parseCIDRs(field string, list []string) ([]netip.Prefix, error) {
 	for _, c := range list {
 		p, err := netip.ParsePrefix(c)
 		if err != nil {
-			return nil, bad(field, "%q is geen geldige CIDR (bijv. 192.168.1.0/24)", c)
+			return nil, bad(field, "%q is not a valid CIDR (for example 192.168.1.0/24)", c)
 		}
 		out = append(out, p)
 	}
@@ -64,7 +64,7 @@ func (s Settings) Validate(requesterIP netip.Addr) error {
 	if s.PublicURL != "" {
 		u, err := url.Parse(s.PublicURL)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			return bad("public_url", "moet een absolute http(s)-URL zijn")
+			return bad("public_url", "must be an absolute http(s) URL")
 		}
 	}
 	checks := []error{
@@ -107,10 +107,10 @@ func (s Settings) Validate(requesterIP netip.Addr) error {
 	}
 	if requesterIP.IsValid() {
 		if len(admin) > 0 && !contains(admin, requesterIP) {
-			return bad("network.admin_cidrs", "dit zou je eigen adres (%s) buitensluiten van de beheerpagina", requesterIP.Unmap())
+			return bad("network.admin_cidrs", "this would lock out your own address (%s) from the admin pages", requesterIP.Unmap())
 		}
 		if len(login) > 0 && !contains(login, requesterIP) {
-			return bad("network.login_cidrs", "dit zou je eigen adres (%s) buitensluiten van inloggen", requesterIP.Unmap())
+			return bad("network.login_cidrs", "this would lock out your own address (%s) from signing in", requesterIP.Unmap())
 		}
 	}
 	return nil

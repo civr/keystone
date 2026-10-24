@@ -105,7 +105,7 @@
 				{id}
 				class="input mono"
 				rows="3"
-				placeholder={meta.placeholder ? `${meta.placeholder}\n(één per regel)` : 'Eén per regel'}
+				placeholder={meta.placeholder ? `${meta.placeholder}\n(one per line)` : 'One per line'}
 				autocapitalize="none"
 				spellcheck="false"
 				aria-describedby={helpId}

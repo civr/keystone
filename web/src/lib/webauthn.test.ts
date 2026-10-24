@@ -168,7 +168,7 @@ describe('passkeyName', () => {
 	it('names the passkey after the device', () => {
 		expect(passkeyName('Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X)')).toBe('iPhone');
 		expect(passkeyName('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')).toBe('Mac');
-		expect(passkeyName('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('Windows-pc');
+		expect(passkeyName('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('Windows PC');
 		expect(passkeyName('Mozilla/5.0 (Linux; Android 15; Pixel 9)')).toBe('Android');
 		expect(passkeyName('curl/8')).toBe('Passkey');
 	});

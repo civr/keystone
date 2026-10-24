@@ -56,7 +56,7 @@ func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
 	if tok := r.URL.Query().Get("resume"); tok != "" && r.Method == http.MethodGet {
 		raw, err := s.d.Valkey.GetDel(ctx, samlStashKey(tok)).Bytes()
 		if errors.Is(err, redis.Nil) {
-			samlFail(w, http.StatusBadRequest, "Deze inlogpoging is verlopen. Open de app opnieuw.")
+			samlFail(w, http.StatusBadRequest, "This sign-in attempt has expired. Open the app again.")
 			return
 		}
 		if err != nil {
@@ -71,7 +71,7 @@ func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
 		var err error
 		if req, err = samlidp.Parse(r); err != nil {
 			slog.Info("saml: bad request", "err", err)
-			samlFail(w, http.StatusBadRequest, "Ongeldig SAML-verzoek.")
+			samlFail(w, http.StatusBadRequest, "Invalid SAML request.")
 			return
 		}
 	}
@@ -84,7 +84,7 @@ func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := s.samlProvider().Check(ctx, settingsFrom(ctx).PublicURL, r, req); err != nil {
 			slog.Info("saml: request refused before sign-in", "err", err)
-			samlFail(w, http.StatusBadRequest, "Dit SAML-verzoek komt niet van een app die in Keystone is ingesteld.")
+			samlFail(w, http.StatusBadRequest, "This SAML request did not come from an app set up in Keystone.")
 			return
 		}
 		tok, err := randomToken()
@@ -113,11 +113,11 @@ func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
 		samlFail(w, http.StatusForbidden, "You do not have access to this app.")
 		return
 	case errors.Is(err, samlidp.ErrUnknownSP):
-		samlFail(w, http.StatusBadRequest, "Deze app is niet als SAML-app in Keystone ingesteld.")
+		samlFail(w, http.StatusBadRequest, "This app is not set up as a SAML app in Keystone.")
 		return
 	case err != nil:
 		slog.Info("saml: request refused", "err", err)
-		samlFail(w, http.StatusBadRequest, "Het SAML-verzoek van de app klopt niet met de instellingen in Keystone.")
+		samlFail(w, http.StatusBadRequest, "The SAML request from the app does not match its settings in Keystone.")
 		return
 	}
 	s.appAccess(ctx, a, "saml")

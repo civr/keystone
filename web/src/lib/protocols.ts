@@ -2,12 +2,12 @@
 import type { App, AppConfig, Protocol } from './apps';
 
 export const PROTOCOLS: { value: Protocol; label: string; help: string }[] = [
-	{ value: 'link', label: 'Link', help: 'Alleen een tegel; de app regelt zelf het inloggen.' },
-	{ value: 'saml', label: 'SAML', help: 'Keystone logt je in via SAML 2.0 (bijvoorbeeld Bastion).' },
-	{ value: 'oidc', label: 'OpenID Connect', help: 'Keystone is de OIDC-provider van de app (bijvoorbeeld Project Nimbus).' },
-	{ value: 'ldap', label: 'LDAP', help: 'De app controleert je wachtwoord via keystone-ldap (bijvoorbeeld Jellyfin).' },
-	{ value: 'gate', label: 'Poortwachter', help: 'keystone-gate laat alleen jou door en meldt de app wie je bent (bijvoorbeeld Home Assistant).' },
-	{ value: 'vault', label: 'Kluis', help: 'Keystone bewaart gebruikersnaam en wachtwoord en kopieert het wachtwoord bij openen.' }
+	{ value: 'link', label: 'Link', help: 'Just a tile; the app handles sign-in itself.' },
+	{ value: 'saml', label: 'SAML', help: 'Keystone signs you in with SAML 2.0 (for example Bastion).' },
+	{ value: 'oidc', label: 'OpenID Connect', help: 'Keystone is the app’s OIDC provider (for example Project Nimbus).' },
+	{ value: 'ldap', label: 'LDAP', help: 'The app checks your password through keystone-ldap (for example Jellyfin).' },
+	{ value: 'gate', label: 'Gate', help: 'keystone-gate lets only signed-in people through and tells the app who they are (for example Home Assistant).' },
+	{ value: 'vault', label: 'Vault', help: 'Keystone keeps the username and password and copies the password when you open the app.' }
 ];
 
 /** Suggested gate exceptions for native apps (spec §10). */
@@ -83,23 +83,23 @@ export function protocolError(f: ProtocolForm): { field: string; message: string
 	const p = protocolPayload(f);
 	const c = p.config;
 	if (p.protocol === 'saml') {
-		if (!c.saml!.entity_id) return { field: 'config.saml.entity_id', message: 'Vul de entity ID van de app in.' };
+		if (!c.saml!.entity_id) return { field: 'config.saml.entity_id', message: 'Enter the app’s entity ID.' };
 		if (!appUrl(c.saml!.acs_url))
-			return { field: 'config.saml.acs_url', message: 'De ACS-URL moet absoluut zijn; http alleen voor adressen in je thuisnetwerk.' };
+			return { field: 'config.saml.acs_url', message: 'The ACS URL must be absolute; http only for addresses on your home network.' };
 	}
 	if (p.protocol === 'oidc') {
 		const uris = c.oidc!.redirect_uris;
 		if (uris.length < 1 || uris.length > 10) return { field: 'config.oidc.redirect_uris', message: "Vul 1 tot 10 redirect-URI's in." };
 		if (!uris.every(appUrl))
-			return { field: 'config.oidc.redirect_uris', message: 'Elke redirect-URI moet een absolute URL zonder #-deel zijn; http alleen in je thuisnetwerk.' };
+			return { field: 'config.oidc.redirect_uris', message: 'Each redirect URI must be an absolute URL without a # part; http only on your home network.' };
 	}
 	if (p.protocol === 'ldap' && !/^[a-z0-9][a-z0-9-]{0,31}$/.test(c.ldap!.slug))
-		return { field: 'config.ldap.slug', message: 'Gebruik 1 tot 32 kleine letters, cijfers of streepjes.' };
+		return { field: 'config.ldap.slug', message: 'Use 1 to 32 lowercase letters, digits or dashes.' };
 	if (p.protocol === 'gate') {
 		if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/.test(c.gate!.host))
-			return { field: 'config.gate.host', message: 'Vul de hostnaam van de app in, zoals ha.home.lan.' };
+			return { field: 'config.gate.host', message: 'Enter the app’s host name, such as ha.home.lan.' };
 		if (!c.gate!.bypass_paths.every((x) => x.startsWith('/') && !/[\s?#]/.test(x)))
-			return { field: 'config.gate.bypass_paths', message: 'Elke uitzondering is een pad dat met / begint.' };
+			return { field: 'config.gate.bypass_paths', message: 'Each exception is a path starting with /.' };
 	}
 	return null;
 }
@@ -123,29 +123,29 @@ export function connectionInfo(origin: string, app: App): { label: string; value
 	switch (app.protocol) {
 		case 'saml':
 			return [
-				{ label: 'IdP-metadata', value: `${origin}/saml/metadata` },
-				{ label: 'IdP-entity-ID', value: `${origin}/saml/metadata` },
-				{ label: 'SSO-adres', value: `${origin}/saml/sso` }
+				{ label: 'IdP metadata', value: `${origin}/saml/metadata` },
+				{ label: 'IdP entity ID', value: `${origin}/saml/metadata` },
+				{ label: 'SSO address', value: `${origin}/saml/sso` }
 			];
 		case 'oidc':
 			return [
 				{ label: 'Issuer', value: origin },
 				{ label: 'Discovery', value: `${origin}/.well-known/openid-configuration` },
-				{ label: 'Client-ID', value: c.oidc?.client_id ?? '' }
+				{ label: 'Client ID', value: c.oidc?.client_id ?? '' }
 			];
 		case 'ldap': {
 			const ou = `ou=${c.ldap?.slug ?? ''},dc=keystone`;
 			return [
 				{ label: 'Server', value: `ldaps://${host}:636` },
-				{ label: 'Bind-DN', value: `cn=bind,${ou}` },
-				{ label: 'Zoekbasis', value: ou },
-				{ label: 'Gebruikersfilter', value: '(uid={0})' }
+				{ label: 'Bind DN', value: `cn=bind,${ou}` },
+				{ label: 'Search base', value: ou },
+				{ label: 'User filter', value: '(uid={0})' }
 			];
 		}
 		case 'gate':
 			return [
-				{ label: 'Forward-auth-adres', value: `http://${host}:8081/verify` },
-				{ label: 'Headers naar de app', value: 'X-Keystone-User, X-Keystone-Email, X-Keystone-Name' }
+				{ label: 'Forward-auth address', value: `http://${host}:8081/verify` },
+				{ label: 'Headers to the app', value: 'X-Keystone-User, X-Keystone-Email, X-Keystone-Name' }
 			];
 	}
 	return [];

@@ -23,7 +23,7 @@
 		try {
 			apps = (await api.get<{ apps: App[] }>('/apps')).apps;
 		} catch (e) {
-			loadError = e instanceof ApiError ? e.message : 'De apps konden niet worden geladen.';
+			loadError = e instanceof ApiError ? e.message : 'The apps could not be loaded.';
 		}
 	}
 	onMount(load);
@@ -39,7 +39,7 @@
 		orderQueue(
 			() => api.send('PUT', '/apps/order', { ids }),
 			(e) => {
-				toast(e instanceof ApiError ? e.message : 'De volgorde kon niet worden opgeslagen.', 'error');
+				toast(e instanceof ApiError ? e.message : 'The order could not be saved.', 'error');
 				load();
 			}
 		);
@@ -50,7 +50,7 @@
 		if (!apps || to < 0 || to >= apps.length || to === i) return;
 		const app = apps[i];
 		apps = moveItem(apps, i, to);
-		announce = `${app.name} staat nu op plaats ${to + 1} van ${apps.length}.`;
+		announce = `${app.name} is now at position ${to + 1} of ${apps.length}.`;
 		if (focusSel) {
 			await tick();
 			document.querySelector<HTMLElement>(`[data-id="${app.id}"] ${focusSel}`)?.focus();
@@ -104,7 +104,7 @@
 		await tick();
 		requestAnimationFrame(() => (committing = false));
 		if (from !== to) {
-			announce = `${apps[to].name} staat nu op plaats ${to + 1} van ${apps.length}.`;
+			announce = `${apps[to].name} is now at position ${to + 1} of ${apps.length}.`;
 			saveOrder();
 		}
 	}
@@ -179,7 +179,7 @@
 			form.icon = (await api.send<{ icon: string }>('POST', '/apps/icon', { url: form.url.trim() })).icon;
 			delete fieldErrors.icon;
 		} catch (e) {
-			if (!quiet) fieldErrors.icon = e instanceof ApiError ? e.message : 'Het icoon kon niet worden opgehaald.';
+			if (!quiet) fieldErrors.icon = e instanceof ApiError ? e.message : 'The icon could not be fetched.';
 		} finally {
 			fetchingIcon = false;
 		}
@@ -201,7 +201,7 @@
 				delete fieldErrors.icon;
 			}
 		};
-		reader.onerror = () => (fieldErrors.icon = 'Dit bestand kon niet worden gelezen.');
+		reader.onerror = () => (fieldErrors.icon = 'This file could not be read.');
 		reader.readAsDataURL(file);
 	}
 
@@ -230,12 +230,12 @@
 			if (editing) {
 				const updated = await api.send<App>('PUT', `/apps/${editing.id}`, body);
 				apps = apps!.map((a) => (a.id === updated.id ? updated : a));
-				toast('Opgeslagen');
+				toast('Saved');
 			} else {
 				const created = await api.send<App>('POST', '/apps', body);
 				apps = [...apps!, created];
 				editing = created;
-				toast(`${created.name} toegevoegd`);
+				toast(`${created.name} added`);
 			}
 			if (proto.protocol === 'vault') {
 				const v: { username: string; password?: string } = { username: vault.username.trim() };
@@ -254,7 +254,7 @@
 				if (f.startsWith('config.') || f === 'protocol') protoErrors = { [f]: err.message };
 				else fieldErrors = { [f]: err.message };
 			}
-			else formError = err instanceof ApiError ? err.message : 'Opslaan is niet gelukt.';
+			else formError = err instanceof ApiError ? err.message : 'Saving failed.';
 		} finally {
 			saving = false;
 		}
@@ -267,10 +267,10 @@
 		try {
 			await api.send('DELETE', `/apps/${editing.id}`);
 			apps = apps!.filter((a) => a.id !== editing!.id);
-			toast(`${editing.name} verwijderd`);
+			toast(`${editing.name} deleted`);
 			sheetOpen = false;
 		} catch (err) {
-			formError = err instanceof ApiError ? err.message : 'Verwijderen is niet gelukt.';
+			formError = err instanceof ApiError ? err.message : 'Deleting failed.';
 		} finally {
 			saving = false;
 		}
@@ -296,27 +296,27 @@
 	{#if apps}
 		<button type="button" class="btn btn-primary btn-sm" onclick={() => openEditor(null)}>
 			<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11" /></svg>
-			Nieuwe app
+			Add
 		</button>
 	{/if}
 </div>
-<p class="pane-intro">De tegels op je startpagina. Sleep aan de greep om de volgorde te wijzigen.</p>
+<p class="pane-intro">The tiles on the home page. Drag the handle to change the order.</p>
 
 {#if loadError}
 	<div class="empty-note">
 		<p>{loadError}</p>
-		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Try again</button>
 	</div>
 {:else if !apps}
-	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
+	<div class="loading-note" aria-label="Loading"><span class="spinner"></span></div>
 {:else if apps.length === 0}
 	<div class="group empty">
-		<p class="empty-title">Nog geen apps</p>
-		<p>Voeg je eerste app toe; hij verschijnt meteen op je startpagina.</p>
-		<button type="button" class="btn btn-primary" onclick={() => openEditor(null)}>Eerste app toevoegen</button>
+		<p class="empty-title">No apps yet</p>
+		<p>Add your first app; it shows up on the home page right away.</p>
+		<button type="button" class="btn btn-primary" onclick={() => openEditor(null)}>Add your first app</button>
 	</div>
 {:else}
-	<section class="group apps-group" aria-label="Apps op je startpagina">
+	<section class="group apps-group" aria-label="Apps on the home page">
 		<ul class="card list" class:dragging={drag} class:committing bind:this={list} aria-describedby="reorder-help">
 			{#each apps as app, i (app.id)}
 				<li
@@ -335,7 +335,7 @@
 					<button
 						type="button"
 						class="handle"
-						aria-label="Verplaats {app.name} (pijltjes omhoog/omlaag)"
+						aria-label="Move {app.name} (arrow keys up and down)"
 						onpointerdown={(e) => dragStart(e, i)}
 						onpointermove={dragMove}
 						onpointerup={dragEnd}
@@ -352,13 +352,13 @@
 						</span>
 					</button>
 					<span class="steps">
-						<button type="button" class="step up" aria-label="{app.name} omhoog" disabled={i === 0} onclick={() => move(i, i - 1, '.up')}>
+						<button type="button" class="step up" aria-label="Move {app.name} up" disabled={i === 0} onclick={() => move(i, i - 1, '.up')}>
 							<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 12.5 10 8l4.5 4.5" /></svg>
 						</button>
 						<button
 							type="button"
 							class="step down"
-							aria-label="{app.name} omlaag"
+							aria-label="Move {app.name} down"
 							disabled={i === apps.length - 1}
 							onclick={() => move(i, i + 1, '.down')}
 						>
@@ -369,20 +369,20 @@
 				</li>
 			{/each}
 		</ul>
-		<p class="foot reorder-help" id="reorder-help">Tip: met het toetsenbord verplaats je een app met de pijltjestoetsen op de greep.</p>
+		<p class="foot reorder-help" id="reorder-help">Tip: with the keyboard, move an app with the arrow keys on its handle.</p>
 	</section>
 {/if}
 <p class="visually-hidden" role="status" aria-live="polite">{announce}</p>
 
-<Sheet bind:open={sheetOpen} title={editing ? 'App wijzigen' : 'Nieuwe app'}>
+<Sheet bind:open={sheetOpen} title={editing ? 'Edit app' : 'New app'}>
 	<form class="form" onsubmit={saveApp} novalidate>
 		<div class="preview">
 			{@render tile(form.name || '?', form.color, form.icon, 48)}
-			<span class="preview-name">{form.name.trim() || 'Naam'}</span>
+			<span class="preview-name">{form.name.trim() || 'Name'}</span>
 		</div>
 
 		<label class="field">
-			<span>Naam</span>
+			<span>Name</span>
 			<input
 				id="app-name"
 				class="input"
@@ -394,7 +394,7 @@
 			{#if fieldErrors.name}<small class="field-error" role="alert">{fieldErrors.name}</small>{/if}
 		</label>
 		<label class="field">
-			<span>Adres</span>
+			<span>Address</span>
 			<input
 				id="app-url"
 				class="input"
@@ -410,32 +410,32 @@
 		</label>
 
 		<fieldset class="field">
-			<legend class="field-label">Kleur</legend>
+			<legend class="field-label">Colour</legend>
 			<div class="swatches">
 				{#each COLORS as c}
 					<label class="swatch" style:--c={c} title={c}>
-						<input type="radio" name="color" value={c} bind:group={form.color} aria-label="Kleur {c}" />
+						<input type="radio" name="color" value={c} bind:group={form.color} aria-label="Colour {c}" />
 					</label>
 				{/each}
-				<label class="swatch custom" title="Eigen kleur" style:--c={COLORS.includes(form.color) ? 'transparent' : form.color}>
-					<input id="app-color" type="color" bind:value={form.color} aria-label="Eigen kleur" />
+				<label class="swatch custom" title="Custom colour" style:--c={COLORS.includes(form.color) ? 'transparent' : form.color}>
+					<input id="app-color" type="color" bind:value={form.color} aria-label="Custom colour" />
 				</label>
 			</div>
 			{#if fieldErrors.color}<small class="field-error" role="alert">{fieldErrors.color}</small>{/if}
 		</fieldset>
 
 		<div class="field">
-			<span class="field-label">Icoon</span>
+			<span class="field-label">Icon</span>
 			<div class="icon-row">
 				<button type="button" class="btn btn-secondary btn-sm" onclick={() => fetchIcon()} disabled={fetchingIcon}>
 					{#if fetchingIcon}<span class="spinner" aria-hidden="true"></span>{/if}
-					Van de app ophalen
+					Fetch from the app
 				</button>
 				<button type="button" class="btn btn-secondary btn-sm" onclick={() => fileInput?.click()}>
-					{form.icon ? 'Ander bestand' : 'Bestand kiezen'}
+					{form.icon ? 'Other file' : 'Choose file'}
 				</button>
 				{#if form.icon}
-					<button type="button" class="btn btn-secondary btn-sm danger-ink" onclick={() => (form.icon = null)}>Verwijder icoon</button>
+					<button type="button" class="btn btn-secondary btn-sm danger-ink" onclick={() => (form.icon = null)}>Remove icon</button>
 				{/if}
 				<input
 					id="app-icon"
@@ -450,7 +450,7 @@
 			{#if fieldErrors.icon}
 				<small class="field-error" role="alert">{fieldErrors.icon}</small>
 			{:else}
-				<small>Keystone haalt het icoon van de app zelf op als je een nieuwe app toevoegt. Of kies een PNG, SVG of WebP (maximaal 64 kB).</small>
+				<small>Keystone fetches the app’s own icon when you add an app. Or choose a PNG, SVG or WebP (at most 64 kB).</small>
 			{/if}
 		</div>
 
@@ -486,12 +486,12 @@
 		<div class="sheet-actions">
 			{#if editing}
 				<button type="button" class="btn {confirmDelete ? 'btn-danger' : 'btn-secondary danger-ink'}" onclick={deleteApp} disabled={saving}>
-					{confirmDelete ? 'Zeker weten?' : 'Verwijder'}
+					{confirmDelete ? 'Delete for good?' : 'Delete'}
 				</button>
 			{/if}
 			<button class="btn btn-primary" disabled={saving}>
 				{#if saving}<span class="spinner" aria-hidden="true"></span>{/if}
-				{editing ? 'Bewaar' : 'Voeg toe'}
+				{editing ? 'Save' : 'Add'}
 			</button>
 		</div>
 	</form>

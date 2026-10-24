@@ -219,7 +219,7 @@ func (s *server) revealVaultItem(w http.ResponseWriter, r *http.Request) {
 	}
 	cfg := settingsFrom(ctx)
 	if !confirmedWithin(*SessionFrom(ctx), time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
-		writeError(w, http.StatusForbidden, "stepup_required", "Bevestig dit eerst met je passkey.")
+		writeError(w, http.StatusForbidden, "stepup_required", "Confirm this with your passkey first.")
 		return
 	}
 	var title string

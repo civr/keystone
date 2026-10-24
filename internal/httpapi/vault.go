@@ -32,7 +32,7 @@ func (s *server) vaultApp(w http.ResponseWriter, r *http.Request) (apps.App, boo
 		return a, false
 	}
 	if a.Protocol != apps.Vault {
-		writeInvalid(w, "protocol", "Alleen kluis-apps hebben opgeslagen inloggegevens.")
+		writeInvalid(w, "protocol", "Only vault apps have stored credentials.")
 		return a, false
 	}
 	if !a.Allowed(accountKey(SessionFrom(r.Context()).UserID)) {
@@ -71,7 +71,7 @@ func (s *server) putVault(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(in.Username) > maxVaultField || (in.Password != nil && len(*in.Password) > maxVaultField) {
-		writeInvalid(w, "password", "Maximaal 1024 tekens.")
+		writeInvalid(w, "password", "At most 1024 characters.")
 		return
 	}
 	var err error
@@ -110,13 +110,13 @@ func (s *server) vaultPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	cfg := settingsFrom(ctx)
 	if !confirmedWithin(*SessionFrom(ctx), time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
-		writeError(w, http.StatusForbidden, "stepup_required", "Bevestig dit eerst met je passkey.")
+		writeError(w, http.StatusForbidden, "stepup_required", "Confirm this with your passkey first.")
 		return
 	}
 	var sealed *string
 	err := s.d.Pool.QueryRow(ctx, `select password_sealed from vault_entries where app_id = $1`, a.ID).Scan(&sealed)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && sealed == nil) {
-		writeError(w, http.StatusNotFound, "no_password", "Voor deze app is geen wachtwoord opgeslagen.")
+		writeError(w, http.StatusNotFound, "no_password", "No password is stored for this app.")
 		return
 	}
 	if err != nil {

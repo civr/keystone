@@ -113,7 +113,7 @@ export async function conditionalSupported(): Promise<boolean> {
 export async function register(opts: OptionsJSON): Promise<Json> {
 	if (!isCreation(opts)) throw new Error('webauthn: registration options expected');
 	const cred = await navigator.credentials.create({ publicKey: creationOptions(opts.publicKey) });
-	if (!cred) throw new DOMException('Geen passkey aangemaakt.', 'NotAllowedError');
+	if (!cred) throw new DOMException('No passkey was created.', 'NotAllowedError');
 	return credentialJSON(cred as PublicKeyCredential);
 }
 
@@ -129,7 +129,7 @@ export async function authenticate(
 	if (conditional) req.mediation = 'conditional' as CredentialMediationRequirement;
 	if (signal) req.signal = signal;
 	const cred = await navigator.credentials.get(req);
-	if (!cred) throw new DOMException('Geen passkey gekozen.', 'NotAllowedError');
+	if (!cred) throw new DOMException('No passkey was chosen.', 'NotAllowedError');
 	return credentialJSON(cred as PublicKeyCredential);
 }
 
@@ -139,7 +139,7 @@ export function passkeyName(ua: string = navigator.userAgent): string {
 	if (/iPad/.test(ua)) return 'iPad';
 	if (/Android/.test(ua)) return 'Android';
 	if (/Macintosh|Mac OS X/.test(ua)) return 'Mac';
-	if (/Windows/.test(ua)) return 'Windows-pc';
+	if (/Windows/.test(ua)) return 'Windows PC';
 	if (/Linux|CrOS/.test(ua)) return 'Linux';
 	return 'Passkey';
 }
@@ -161,13 +161,13 @@ export async function ceremony<T = unknown>(
 	return api.send<T>('POST', finish, await authenticate(opts, { conditional, signal }));
 }
 
-/** Readable Dutch text for a failed passkey prompt. */
+/** Readable text for a failed passkey prompt. */
 export function passkeyError(e: unknown): string {
 	const name = (e as { name?: string })?.name;
-	if (name === 'NotAllowedError' || name === 'AbortError') return 'De passkey-vraag is geannuleerd of verlopen.';
-	if (name === 'InvalidStateError') return 'Er staat op dit apparaat al een passkey voor Keystone.';
-	if (name === 'SecurityError') return 'Passkeys werken alleen op het publieke adres van Keystone (https).';
-	if (name === 'NotSupportedError') return 'Passkeys worden niet ondersteund in deze browser.';
+	if (name === 'NotAllowedError' || name === 'AbortError') return 'The passkey request was cancelled or timed out.';
+	if (name === 'InvalidStateError') return 'This device already has a passkey for Keystone.';
+	if (name === 'SecurityError') return 'Passkeys only work when Keystone is opened over https.';
+	if (name === 'NotSupportedError') return 'This browser does not support passkeys.';
 	if (name === 'ApiError') return (e as Error).message;
-	return 'De passkey-stap is mislukt. Probeer het opnieuw.';
+	return 'The passkey step failed. Try again.';
 }

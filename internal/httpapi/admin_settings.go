@@ -35,7 +35,7 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 	// Admin routes only run after setup, where public_url is the anchor for
 	// CSRF, cookies and passkeys: it can be changed but never cleared.
 	if strings.TrimSpace(next.PublicURL) == "" {
-		writeInvalid(w, "public_url", "Het publieke adres is verplicht.")
+		writeInvalid(w, "public_url", "The public address is required.")
 		return
 	}
 	if next.Login.PasskeyRequired {
@@ -45,7 +45,7 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if passkeys == 0 {
-			writeInvalid(w, "login.passkey_required", "Voeg eerst een passkey toe (dat kan alleen via https); anders kun je niet meer inloggen.")
+			writeInvalid(w, "login.passkey_required", "Add a passkey first (this only works over https); otherwise you could not sign in anymore.")
 			return
 		}
 	}
@@ -53,7 +53,7 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 	if originOf(cur.PublicURL) != originOf(next.PublicURL) && r.URL.Query().Get("confirm") != "1" {
 		writeJSON(w, http.StatusConflict, map[string]string{
 			"error": "confirm_required", "warning": "passkeys_rp_change",
-			"message": "Een ander publiek adres kan bestaande passkeys onbruikbaar maken en sluit deze pagina af tot je het nieuwe adres opent. Bevestig om door te gaan.",
+			"message": "A different public address can make existing passkeys unusable and locks you out of this page until you open the new address. Confirm to continue.",
 		})
 		return
 	}
@@ -195,12 +195,12 @@ func (s *server) readAdminAD(w http.ResponseWriter, r *http.Request) (ad.Config,
 		return ad.Config{}, false
 	}
 	if !ok || stored.BindPasswordSealed == "" {
-		writeError(w, http.StatusBadRequest, "invalid_ad_config", "bind_password is verplicht")
+		writeError(w, http.StatusBadRequest, "invalid_ad_config", "bind_password is required")
 		return ad.Config{}, false
 	}
 	// The stored password is never sent to a different server.
 	if stored.URL != cfg.URL {
-		writeError(w, http.StatusBadRequest, "bind_password_required", "Voer het bind-wachtwoord opnieuw in als je de AD-server wijzigt.")
+		writeError(w, http.StatusBadRequest, "bind_password_required", "Enter the bind password again when you change the Active Directory server.")
 		return ad.Config{}, false
 	}
 	cfg.BindPasswordSealed = stored.BindPasswordSealed
@@ -267,11 +267,11 @@ func (s *server) testAD(w http.ResponseWriter, r *http.Request) {
 func adTestMessage(err error) string {
 	switch {
 	case errors.Is(err, ad.ErrInvalidCredentials):
-		return "De bind-gebruiker of het wachtwoord is onjuist."
+		return "The bind user or password is wrong."
 	case errors.Is(err, ad.ErrUnavailable):
-		return "AD is niet bereikbaar."
+		return "Active Directory cannot be reached."
 	case errors.Is(err, ad.ErrNotFound):
-		return "Geen gebruikers gevonden met deze base DN en dit filter."
+		return "No users found with this base DN and filter."
 	}
-	return "De verbinding met AD is mislukt: " + err.Error()
+	return "The connection to Active Directory failed: " + err.Error()
 }

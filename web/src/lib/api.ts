@@ -1,4 +1,4 @@
-/** Error thrown for every failed API call; message is Dutch and user-presentable. */
+/** Error thrown for every failed API call; message is user-presentable. */
 export class ApiError extends Error {
 	constructor(
 		public code: string,
@@ -42,7 +42,7 @@ async function request<T>(method: string, path: string, body?: unknown, asBlob =
 	try {
 		res = await fetch('/api' + path, init);
 	} catch {
-		throw new ApiError('network', 'Keystone is niet bereikbaar. Controleer je verbinding.', 0);
+		throw new ApiError('network', 'Keystone cannot be reached. Check your connection.', 0);
 	}
 	if (res.ok) {
 		if (asBlob) return (await res.blob()) as T;
@@ -50,7 +50,7 @@ async function request<T>(method: string, path: string, body?: unknown, asBlob =
 		return (text ? JSON.parse(text) : undefined) as T;
 	}
 	let code = `http_${res.status}`;
-	let message = `Er ging iets mis bij Keystone (${res.status}).`;
+	let message = `Something went wrong in Keystone (${res.status}).`;
 	let data: Record<string, unknown> = {};
 	try {
 		const body = await res.json();

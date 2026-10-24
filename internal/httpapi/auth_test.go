@@ -293,7 +293,7 @@ func TestADDownReturns503Fast(t *testing.T) {
 	if el := time.Since(start); el > 5*time.Second {
 		t.Fatalf("took %v: the AD timeout did not cut the 10 s wait short", el)
 	}
-	if r.Code != http.StatusServiceUnavailable || r.err() != "ad_unavailable" || r.Body["emergency"] != true || r.Body["message"] != "AD is niet bereikbaar." {
+	if r.Code != http.StatusServiceUnavailable || r.err() != "ad_unavailable" || r.Body["emergency"] != true || r.Body["message"] != "Active Directory cannot be reached." {
 		t.Fatalf("AD slow = %d %v", r.Code, r.Body)
 	}
 	if _, err := l.deps.Pool.Exec(context.Background(), `update emergency set enabled = false`); err != nil {

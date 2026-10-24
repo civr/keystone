@@ -33,7 +33,7 @@
 			next = r.next_before;
 			loaded = true;
 		} catch (e) {
-			error = e instanceof ApiError ? e.message : 'De activiteit kon niet worden geladen.';
+			error = e instanceof ApiError ? e.message : 'The activity could not be loaded.';
 		} finally {
 			loading = false;
 		}
@@ -50,8 +50,8 @@
 		return () => io.disconnect();
 	});
 
-	const dayFmt = new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-	const timeFmt = new Intl.DateTimeFormat('nl-NL', { hour: '2-digit', minute: '2-digit' });
+	const dayFmt = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+	const timeFmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 	const days = $derived.by(() => {
 		const out: { day: string; items: Entry[] }[] = [];
@@ -78,35 +78,43 @@
 			a.remove();
 			setTimeout(() => URL.revokeObjectURL(url), 1000);
 		} catch (e) {
-			toast(e instanceof ApiError ? e.message : 'De export is mislukt.', 'error');
+			toast(e instanceof ApiError ? e.message : 'The export failed.', 'error');
 		} finally {
 			exporting = false;
 		}
 	}
 
-	const ACTORS: Record<string, string> = { owner: 'jij', anonymous: 'onbekend', cli: 'opdrachtregel', system: 'systeem' };
+	const ACTORS: Record<string, string> = { owner: 'owner', anonymous: 'unknown', cli: 'command line', system: 'system' };
+	// Added accounts are logged as user:<id>; their names come from Users.
+	let names = $state<Record<string, string>>({});
+	onMount(() => {
+		api.get<{ users: { id: string; username: string; display_name: string }[] }>('/admin/users').then(
+			(r) => (names = Object.fromEntries(r.users.map((u) => [`user:${u.id}`, u.display_name || u.username]))),
+			() => {}
+		);
+	});
 	const tone = (a: string) =>
 		/failure|failed|locked|not_allowed|denied/.test(a) ? 'bad' : /emergency|recovery|network_reset/.test(a) ? 'warn' : '';
 </script>
 
 <div class="pane-head">
-	<h1 class="pane-title">Activiteit</h1>
+	<h1 class="pane-title">Activity</h1>
 	<button type="button" class="btn btn-secondary btn-sm" onclick={exportLog} disabled={exporting} aria-busy={exporting}>
 		<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9M6 9l4 4 4-4M4 16.5h12" /></svg>
-		Exporteren
+		Export
 	</button>
 </div>
-<p class="pane-intro">Alles wat er met je account en Keystone gebeurt, nieuwste eerst.</p>
+<p class="pane-intro">Everything that happens in Keystone, newest first.</p>
 
 {#if !loaded && error}
 	<div class="empty-note">
 		<p>{error}</p>
-		<button type="button" class="btn btn-secondary btn-sm" onclick={more}>Opnieuw proberen</button>
+		<button type="button" class="btn btn-secondary btn-sm" onclick={more}>Try again</button>
 	</div>
 {:else if !loaded}
-	<div class="loading-note" aria-label="Laden"><span class="spinner"></span></div>
+	<div class="loading-note" aria-label="Loading"><span class="spinner"></span></div>
 {:else if entries.length === 0}
-	<p class="empty-note">Nog geen activiteit.</p>
+	<p class="empty-note">No activity yet.</p>
 {:else}
 	{#each days as d (d.day)}
 		<section class="group">
@@ -119,7 +127,7 @@
 						<div class="text">
 							<span class="label">{auditLabel(e.action)}</span>
 							<p class="help">
-								{timeFmt.format(new Date(e.at))} · {ACTORS[e.actor] ?? e.actor}{e.ip ? ` · ${e.ip}` : ''}
+								{timeFmt.format(new Date(e.at))} · {ACTORS[e.actor] ?? names[e.actor] ?? e.actor}{e.ip ? ` · ${e.ip}` : ''}
 							</p>
 							{#if lines.length}
 								<ul class="detail">
@@ -135,13 +143,13 @@
 	{#if error}
 		<div class="empty-note">
 			<p>{error}</p>
-			<button type="button" class="btn btn-secondary btn-sm" onclick={more}>Opnieuw proberen</button>
+			<button type="button" class="btn btn-secondary btn-sm" onclick={more}>Try again</button>
 		</div>
 	{:else if next !== null}
 		<div class="end" bind:this={sentinel}>
 			<button type="button" class="btn btn-secondary btn-sm" onclick={more} disabled={loading}>
 				{#if loading}<span class="spinner" aria-hidden="true"></span>{/if}
-				Meer laden
+				Load more
 			</button>
 		</div>
 	{/if}
