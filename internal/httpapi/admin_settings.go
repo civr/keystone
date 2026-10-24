@@ -39,8 +39,9 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if next.Login.PasskeyRequired {
-		var passkeys int
-		if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&passkeys); err != nil {
+		// The admin making the change must be able to sign in afterwards.
+		passkeys, err := s.passkeyCount(ctx, SessionFrom(ctx).UserID)
+		if err != nil {
 			errInternal(w, "count passkeys", err)
 			return
 		}

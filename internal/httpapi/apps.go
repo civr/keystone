@@ -277,12 +277,23 @@ func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "list apps", err)
 		return
 	}
-	apps, err := pgx.CollectRows(rows, scanApp)
+	list, err := pgx.CollectRows(rows, scanApp)
 	if err != nil {
 		errInternal(w, "list apps", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"apps": apps})
+	if !acct.IsAdmin() {
+		// Members get the tile, not how the app is set up or who else uses
+		// it; only whether a SAML tile signs in directly (tileHref).
+		for i := range list {
+			cfg := apps.Config{}
+			if sm := list[i].Config.SAML; sm != nil {
+				cfg.SAML = &apps.SAML{IdPInitiated: sm.IdPInitiated}
+			}
+			list[i].Config, list[i].Access, list[i].HasSecret = cfg, nil, false
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"apps": list})
 }
 
 func (s *server) readApp(w http.ResponseWriter, r *http.Request) (appInput, bool) {
@@ -300,8 +311,12 @@ func (s *server) readApp(w http.ResponseWriter, r *http.Request) (appInput, bool
 func (s *server) createApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, ok := s.readApp(w, r)
-	if !ok || !s.prepareConfig(ctx, w, "", &in) || !s.checkAccess(ctx, w, in.Access) || !s.overrideFree(ctx, w, in.Config.Account.Username) {
+	if !ok || !s.prepareConfig(ctx, w, "", &in) || !s.checkAccess(ctx, w, in.Access) || !s.overrideFree(ctx, w, in.Config.Account) {
 		return
+	}
+	// A shared vault password is the owner's until an admin says otherwise.
+	if in.Protocol == apps.Vault && in.Access == nil {
+		in.Access = []string{accounts.OwnerID}
 	}
 	rows, err := s.d.Pool.Query(ctx, `insert into apps (id, name, url, color, icon, protocol, config, access, sort, created_at)
 		values ($1, $2, $3, $4, nullif($5, ''), $6, $7, $8, (select coalesce(max(sort) + 1, 0) from apps), now())
@@ -322,8 +337,9 @@ func (s *server) createApp(w http.ResponseWriter, r *http.Request) {
 // overrideFree checks that the owner's name at the app (an account
 // override) is not another account's username: that person would be the
 // owner at the app. False when an answer was written.
-func (s *server) overrideFree(ctx context.Context, w http.ResponseWriter, name string) bool {
-	if name == "" {
+func (s *server) overrideFree(ctx context.Context, w http.ResponseWriter, acct apps.Account) bool {
+	name, email := acct.Username, acct.Email
+	if name == "" && email == "" {
 		return true
 	}
 	list, err := accounts.List(ctx, s.d.Pool)
@@ -332,8 +348,15 @@ func (s *server) overrideFree(ctx context.Context, w http.ResponseWriter, name s
 		return false
 	}
 	for _, a := range list {
-		if !a.IsOwner() && strings.EqualFold(a.Username, name) {
+		if a.IsOwner() {
+			continue
+		}
+		if name != "" && strings.EqualFold(a.Username, name) {
 			writeInvalid(w, "config.account.username", "Another user has this username. Choose another name for the owner at this app.")
+			return false
+		}
+		if email != "" && strings.EqualFold(a.Email, email) {
+			writeInvalid(w, "config.account.email", "Another user has this e-mail address. Choose another for the owner at this app.")
 			return false
 		}
 	}
@@ -380,7 +403,7 @@ func (s *server) updateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in, ok := s.readApp(w, r)
-	if !ok || !s.prepareConfig(ctx, w, id, &in) || !s.checkAccess(ctx, w, in.Access) || !s.overrideFree(ctx, w, in.Config.Account.Username) {
+	if !ok || !s.prepareConfig(ctx, w, id, &in) || !s.checkAccess(ctx, w, in.Access) || !s.overrideFree(ctx, w, in.Config.Account) {
 		return
 	}
 	rows, err := s.d.Pool.Query(ctx, `update apps set name = $2, url = $3, color = $4, icon = nullif($5, ''), protocol = $6, config = $7,

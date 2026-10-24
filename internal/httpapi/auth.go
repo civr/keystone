@@ -1037,7 +1037,8 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 		"passkey_missing": passkeys == 0,
 		"username":        acct.Username, "display_name": acct.DisplayName, "given_name": acct.GivenName, "email": acct.Email,
 		"emergency": sess.Emergency, "must_register_passkey": sess.MustRegisterPasskey,
-		"needs_stepup": needsStepUp(*sess, settingsFrom(ctx), time.Now()),
-		"client_ip":    clientIP(ctx).String(),
+		"needs_stepup":            needsStepUp(*sess, settingsFrom(ctx), time.Now()),
+		"clipboard_clear_seconds": settingsFrom(ctx).Vault.ClipboardClearSeconds,
+		"client_ip":               clientIP(ctx).String(),
 	})
 }

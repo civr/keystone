@@ -8,7 +8,7 @@ let clearSeconds: number | null = null;
 async function clipboardSeconds(): Promise<number> {
 	if (clearSeconds === null) {
 		try {
-			clearSeconds = (await api.get<{ vault: { clipboard_clear_seconds: number } }>('/admin/settings')).vault.clipboard_clear_seconds;
+			clearSeconds = (await api.get<{ clipboard_clear_seconds: number }>('/me')).clipboard_clear_seconds || 30;
 		} catch {
 			return 30;
 		}

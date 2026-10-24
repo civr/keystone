@@ -112,6 +112,9 @@ func (s *server) createUser(w http.ResponseWriter, r *http.Request) {
 		writeInvalid(w, "password", msg)
 		return
 	}
+	if !s.emailFree(ctx, w, in.Email, "") {
+		return
+	}
 	if taken, err := s.ownerAppName(ctx, in.Username); err != nil || taken {
 		if err != nil {
 			errInternal(w, "load apps", err)
@@ -183,6 +186,9 @@ func (s *server) updateUser(w http.ResponseWriter, r *http.Request) {
 		writeInvalid(w, f, msg)
 		return
 	}
+	if in.Email != nil && !s.emailFree(ctx, w, email, id) {
+		return
+	}
 	change := accounts.Change{DisplayName: in.DisplayName, Email: in.Email, Role: in.Role, Disabled: in.Disabled}
 	if in.Password != nil {
 		if msg := passwordError(*in.Password); msg != "" {
@@ -248,6 +254,33 @@ func (s *server) deleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	s.d.Audit.Log(ctx, actor(ctx), "user.deleted", clientIP(ctx), map[string]any{"id": id, "username": a.Username})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// emailFree checks that email is no other account's, nor the owner's address
+// at an app (an override): apps that link people by e-mail would merge them.
+// False when an answer was written.
+func (s *server) emailFree(ctx context.Context, w http.ResponseWriter, email, except string) bool {
+	if email == "" {
+		return true
+	}
+	taken, err := accounts.EmailTaken(ctx, s.d.Pool, email, except)
+	if err == nil && !taken {
+		var list []apps.App
+		if list, err = apps.Load(ctx, s.d.Pool); err == nil {
+			for _, a := range list {
+				taken = taken || strings.EqualFold(a.Config.Account.Email, email)
+			}
+		}
+	}
+	if err != nil {
+		errInternal(w, "check e-mail", err)
+		return false
+	}
+	if taken {
+		writeInvalid(w, "email", "Another person already uses this e-mail address.")
+		return false
+	}
+	return true
 }
 
 // ownerAppName reports whether username is the name the owner is given at

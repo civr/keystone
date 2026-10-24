@@ -153,8 +153,16 @@ type New struct {
 	Username, DisplayName, Email, PasswordHash, Role string
 }
 
-// Create adds a user. The username must not be the owner's either.
+// Create adds a user. The username must not be the owner's, nor one a
+// deleted account had.
 func Create(ctx context.Context, q Querier, n New) (Account, error) {
+	var retired bool
+	if err := q.QueryRow(ctx, `select exists(select 1 from retired_usernames where username = $1)`, n.Username).Scan(&retired); err != nil {
+		return Account{}, err
+	}
+	if retired {
+		return Account{}, ErrTaken
+	}
 	if taken, err := ownerHas(ctx, q, n.Username); err != nil || taken {
 		if err == nil {
 			err = ErrTaken
@@ -216,11 +224,29 @@ func Delete(ctx context.Context, q Querier, id string) error {
 	if id == OwnerID {
 		return fmt.Errorf("accounts: the owner cannot be deleted")
 	}
-	tag, err := q.Exec(ctx, `delete from users where id::text = $1`, id)
-	if err == nil && tag.RowsAffected() != 1 {
+	var n int
+	err := q.QueryRow(ctx, `with gone as (delete from users where id::text = $1 returning username),
+		kept as (insert into retired_usernames (username) select username from gone on conflict do nothing)
+		select count(*) from gone`, id).Scan(&n)
+	if err == nil && n != 1 {
 		err = ErrNotFound
 	}
 	return err
+}
+
+// EmailTaken reports whether email (case-insensitive) belongs to an account
+// other than except.
+func EmailTaken(ctx context.Context, q Reader, email, except string) (bool, error) {
+	list, err := List(ctx, q)
+	if err != nil {
+		return false, err
+	}
+	for _, a := range list {
+		if a.ID != except && a.Email != "" && strings.EqualFold(a.Email, email) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Admins counts the admins that can sign in: the owner and enabled admin users.

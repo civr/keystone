@@ -106,3 +106,37 @@ func TestOwnerAppNameReserved(t *testing.T) {
 		t.Fatalf("override = %d %s", w.Code, w.Body.String())
 	}
 }
+
+// Review fixes: shared vault passwords default to the owner, e-mail addresses
+// and deleted usernames are not handed to someone else, and members see only
+// tiles, not how apps are set up.
+func TestAccountIsolation(t *testing.T) {
+	t.Parallel()
+	l, owner := adminClient(t, "192.168.1.20")
+	l.settings(t, func(s *settings.Settings) { s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100 })
+	var vapp map[string]any
+	body(t, owner.must("POST", "/api/apps", map[string]any{"name": "Router", "url": "https://r.home.lan", "color": "#007aff", "protocol": "vault"}, 201).Body, &vapp)
+	if acc, _ := vapp["access"].([]any); len(acc) != 1 || acc[0] != "owner" {
+		t.Fatalf("vault app access = %v, want owner only", vapp["access"])
+	}
+	owner.must("PUT", "/api/apps/"+vapp["id"].(string)+"/vault", map[string]string{"username": "admin", "password": "hunter2"}, 200)
+	owner.must("POST", "/api/apps", map[string]any{"name": "Wiki", "url": "https://w.home.lan", "color": "#007aff",
+		"config": map[string]any{"account": map[string]string{"email": "boss@home.lan"}}}, 201)
+
+	owner.must("POST", "/api/admin/users", map[string]any{"username": "x", "email": "Boss@home.lan", "password": "long enough secret", "role": "member"}, 400)
+	var anna userView
+	body(t, owner.must("POST", "/api/admin/users", map[string]any{"username": "anna", "email": "anna@home.lan", "password": "long enough secret", "role": "member"}, 201).Body, &anna)
+	owner.must("POST", "/api/admin/users", map[string]any{"username": "anna2", "email": "ANNA@home.lan", "password": "long enough secret", "role": "member"}, 400)
+
+	a := newClient(t, l.env, "192.168.1.30")
+	if r := password(a, "anna", "long enough secret"); r.Code != 200 {
+		t.Fatalf("sign-in = %d", r.Code)
+	}
+	a.must("POST", "/api/apps/"+vapp["id"].(string)+"/vault/password", nil, 404)
+	if s := a.must("GET", "/api/apps", nil, 200).Body.String(); strings.Contains(s, "boss@home.lan") || strings.Contains(s, `"access":[`) {
+		t.Fatalf("member app list leaks setup: %s", s)
+	}
+
+	owner.must("DELETE", "/api/admin/users/"+anna.ID, nil, 200)
+	owner.must("POST", "/api/admin/users", map[string]any{"username": "anna", "password": "long enough secret", "role": "member"}, 400)
+}

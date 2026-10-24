@@ -8,6 +8,8 @@ export interface NavItem {
 	tint: string;
 	/** Only admins see it. */
 	admin?: boolean;
+	/** Only the owner sees it. */
+	owner?: boolean;
 }
 export interface NavGroup {
 	/** Group heading; null for the ungrouped top items. */
@@ -57,7 +59,7 @@ export const NAV: NavGroup[] = [
 				admin: true,
 				icon: 'M10 2.5 16 5v4.6c0 3.7-2.6 6.6-6 7.9-3.4-1.3-6-4.2-6-7.9V5z'
 			},
-			{ href: '/settings/ad', tint: '#636366', label: 'Active Directory', admin: true, icon: 'M3 4.5h14v5H3zM3 10.5h14v5H3zM6 7h.01M6 13h.01' },
+			{ href: '/settings/ad', tint: '#636366', label: 'Active Directory', admin: true, owner: true, icon: 'M3 4.5h14v5H3zM3 10.5h14v5H3zM6 7h.01M6 13h.01' },
 			{
 				href: '/settings/activity', tint: '#ff3b30',
 				label: 'Activity',
@@ -69,8 +71,8 @@ export const NAV: NavGroup[] = [
 ];
 
 /** The menu for an account: members do not see the admin sections. */
-export function navFor(admin: boolean): NavGroup[] {
-	return NAV.map((g) => ({ ...g, items: g.items.filter((i) => admin || !i.admin) }));
+export function navFor(admin: boolean, owner = admin): NavGroup[] {
+	return NAV.map((g) => ({ ...g, items: g.items.filter((i) => (admin || !i.admin) && (owner || !i.owner)) }));
 }
 
 /** Old (Dutch) paths and where they live now. */

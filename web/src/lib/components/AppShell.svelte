@@ -86,7 +86,7 @@
 
 {#snippet menu(collapsed: boolean, id: string, onpick?: () => void)}
 	<nav aria-label="Main menu">
-		{#each navFor(me?.admin ?? false) as g, gi (gi)}
+		{#each navFor(me?.admin ?? false, me?.role === 'owner') as g, gi (gi)}
 			{#if g.title}
 				{#if collapsed}
 					<div class="nav-rule" role="presentation"></div>
