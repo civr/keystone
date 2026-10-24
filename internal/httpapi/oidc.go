@@ -15,7 +15,9 @@ import (
 )
 
 // issuer is the OIDC issuer: public_url without a trailing slash.
-func issuer(r *http.Request) string { return strings.TrimRight(settingsFrom(r.Context()).PublicURL, "/") }
+func issuer(r *http.Request) string {
+	return strings.TrimRight(settingsFrom(r.Context()).PublicURL, "/")
+}
 
 func (s *server) oidcProvider() *oidc.Provider {
 	return &oidc.Provider{Keys: s.keys, Valkey: s.d.Valkey, Sessions: s.d.Sessions}

@@ -119,7 +119,7 @@ var (
 	condADTest  = func(p setupProgress) string { return ifThen(!p.domain, msgPrevious) }
 	condPasskey = func(p setupProgress) string { return ifThen(!(p.domain && p.ad && p.owner), msgPrevious) }
 	condAfterPK = func(p setupProgress) string { return ifThen(!p.passkeyDone(), msgPrevious) }
-	condAccount = func(setupProgress) string { return "" }
+	condAccount = func(p setupProgress) string { return ifThen(p.done, msgFrozen) }
 )
 
 func ifThen(c bool, msg string) string {
@@ -599,7 +599,7 @@ func (s *server) setupAccount(w http.ResponseWriter, r *http.Request, token stri
 	// The address the browser is on becomes the public one — also over a
 	// value an earlier, unfinished wizard saved — so the session cookie and
 	// the next sign-in work right here. It can be changed in Instellingen.
-	if o, err := url.Parse(r.Header.Get("Origin")); err == nil && o.Host != "" {
+	if o, err := url.Parse(r.Header.Get("Origin")); err == nil && o.Host != "" && originAllowed(r, "") {
 		cfg.PublicURL = strings.ToLower(o.Scheme) + "://" + o.Host
 		if h := o.Hostname(); net.ParseIP(h) == nil && strings.Count(h, ".") >= 2 && cfg.Domain == "" {
 			cfg.Domain = h[strings.IndexByte(h, '.')+1:]
@@ -615,19 +615,16 @@ func (s *server) setupAccount(w http.ResponseWriter, r *http.Request, token stri
 		errInternal(w, "user handle", err)
 		return
 	}
-	// Passkeys left by an abandoned run of the AD wizard belong to a setup
-	// that never finished: nobody can sign in with them.
-	if _, err := s.d.Pool.Exec(ctx, `delete from passkeys`); err != nil {
-		errInternal(w, "clear passkeys", err)
+	if err := s.completeAccountSetup(ctx, username, handle, hash); err != nil {
+		if errors.Is(err, errAlreadyDone) {
+			errSetupDone(w)
+			return
+		}
+		errInternal(w, "complete setup", err)
 		return
 	}
-	if _, err := s.d.Pool.Exec(ctx, `insert into owner (id, username, display_name, user_handle, password_hash, created_at)
-		values (1, $1, null, $2, $3, now())
-		on conflict (id) do update set username = excluded.username, display_name = null, given_name = null,
-			email = null, password_hash = excluded.password_hash`, username, handle, hash); err != nil {
-		errInternal(w, "save owner", err)
-		return
-	}
+	// The password works from here on, so a failed session only means
+	// signing in once more.
 	sess, err := s.d.Sessions.Create(ctx, session.Session{
 		LastFullAuthAt: time.Now(), IP: ip.String(), UserAgent: r.UserAgent(), NoPasskey: true,
 	}, cfg)
@@ -636,20 +633,48 @@ func (s *server) setupAccount(w http.ResponseWriter, r *http.Request, token stri
 		errUnavailable(w)
 		return
 	}
-	if err := s.completeSetup(ctx, nil); err != nil {
-		_ = s.d.Sessions.Revoke(context.WithoutCancel(ctx), sess.ID)
-		if errors.Is(err, errAlreadyDone) {
-			errSetupDone(w)
-			return
-		}
-		errInternal(w, "complete setup", err)
-		return
-	}
 	_ = s.d.Valkey.Del(ctx, setupKey(token)).Err()
 	setCookie(w, cfg, PendingCookie, "", 0)
 	setCookie(w, cfg, SessionCookie, sess.ID, time.Duration(cfg.Session.DurationHours)*time.Hour)
 	s.d.Audit.Log(ctx, audit.ActorOwner, "setup.account", ip, map[string]any{"username": username})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// completeAccountSetup stores the account and finishes setup in one
+// transaction, under the setup_state row lock: it only runs while setup is
+// unfinished, so the passkeys and recovery codes it removes can only stem
+// from an abandoned run of the AD wizard that never gave anyone access.
+func (s *server) completeAccountSetup(ctx context.Context, username string, handle []byte, hash string) error {
+	tx, err := s.d.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	if _, err := tx.Exec(ctx, `insert into setup_state (id) values (1) on conflict (id) do nothing`); err != nil {
+		return err
+	}
+	var completed *time.Time
+	if err := tx.QueryRow(ctx, `select completed_at from setup_state where id = 1 for update`).Scan(&completed); err != nil {
+		return err
+	}
+	if completed != nil {
+		return errAlreadyDone
+	}
+	for _, q := range []string{`delete from passkeys`, `delete from recovery_codes`} {
+		if _, err := tx.Exec(ctx, q); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(ctx, `insert into owner (id, username, display_name, user_handle, password_hash, created_at)
+		values (1, $1, null, $2, $3, now())
+		on conflict (id) do update set username = excluded.username, display_name = null, given_name = null,
+			email = null, user_handle = excluded.user_handle, password_hash = excluded.password_hash`, username, handle, hash); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `update setup_state set completed_at = now() where id = 1`); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // setupPasskeySkip goes on without a passkey: browsers only offer passkeys

@@ -29,7 +29,7 @@ type Deps struct {
 	Dir      func() ad.Directory // current AD directory; nil while unconfigured
 	Audit    *audit.Writer
 	Secrets  secrets.Secrets
-	Shell    []byte // SPA shell; EmbeddedShell when empty
+	Shell    []byte      // SPA shell; EmbeddedShell when empty
 	Keys     *keys.Store // signing keys; keys.New(Pool, Secrets.DataKey) when nil
 
 	// SetupCodeHash is the argon2 hash of the setup code printed at startup;

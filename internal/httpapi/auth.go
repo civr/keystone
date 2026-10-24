@@ -864,7 +864,7 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"passkey_missing": passkeys == 0,
-		"username": o.Username, "display_name": o.DisplayName, "given_name": o.GivenName, "email": o.Email,
+		"username":        o.Username, "display_name": o.DisplayName, "given_name": o.GivenName, "email": o.Email,
 		"emergency": sess.Emergency, "must_register_passkey": sess.MustRegisterPasskey,
 		"needs_stepup": needsStepUp(*sess, settingsFrom(ctx), time.Now()),
 		"client_ip":    clientIP(ctx).String(),

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"testing"
 )
 
@@ -91,5 +92,24 @@ func TestSetupAccountAfterAbandonedPasskey(t *testing.T) {
 	body(t, c.must("GET", "/api/me", nil, 200).Body, &me)
 	if me["passkey_missing"] != true {
 		t.Fatalf("passkeys of the abandoned setup kept: %v", me)
+	}
+}
+
+// After setup is finished the account step is closed: it never replaces the
+// owner, the password or the passkeys of a running Keystone.
+func TestSetupAccountClosedAfterSetup(t *testing.T) {
+	t.Parallel()
+	l := newLoginEnv(t) // finished setup with an AD owner and a passkey
+	c := newClient(t, l.env, "192.168.1.30")
+	c.must("POST", "/api/setup/unlock", map[string]string{"code": l.code}, 410)
+	c.cookies[PendingCookie] = "setup.forged"
+	c.must("POST", "/api/setup/account", map[string]string{"username": "eve", "password": "long enough secret"}, 410)
+	var passkeys int
+	var owner string
+	if err := l.deps.Pool.QueryRow(context.Background(), `select (select count(*) from passkeys), (select username from owner)`).Scan(&passkeys, &owner); err != nil {
+		t.Fatal(err)
+	}
+	if passkeys == 0 || owner != "thijs" {
+		t.Fatalf("passkeys=%d owner=%q after a closed account step", passkeys, owner)
 	}
 }
