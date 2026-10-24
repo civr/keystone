@@ -20,6 +20,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/civr/keystone/internal/ad"
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/session"
@@ -477,7 +478,7 @@ func (s *server) setupPasskeyBegin(w http.ResponseWriter, r *http.Request, token
 		errInternal(w, "passkey service", err)
 		return
 	}
-	opts, state, err := svc.BeginRegistration(ctx)
+	opts, state, err := svc.BeginRegistration(ctx, accounts.OwnerID)
 	if err != nil {
 		errInternal(w, "begin registration", err)
 		return
@@ -520,7 +521,7 @@ func (s *server) setupPasskeyFinish(w http.ResponseWriter, r *http.Request, toke
 	}
 	name := passkeyName(r)
 	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
-	if err := svc.FinishRegistration(ctx, state, r, name); err != nil {
+	if err := svc.FinishRegistration(ctx, accounts.OwnerID, state, r, name); err != nil {
 		slog.Warn("setup: finish registration", "err", err)
 		writeError(w, http.StatusBadRequest, "passkey_failed", "De passkey kon niet worden geregistreerd. Probeer het opnieuw.")
 		return

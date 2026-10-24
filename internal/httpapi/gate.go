@@ -53,6 +53,10 @@ func (s *server) gateStart(w http.ResponseWriter, r *http.Request) {
 		bad()
 		return
 	}
+	if !app.Allowed(accountKey(SessionFrom(ctx).UserID)) {
+		writeError(w, http.StatusForbidden, "no_access", "You do not have access to this app.")
+		return
+	}
 	ttl := time.Duration(cfg.Session.DurationHours) * time.Hour
 	tok, err := gatetoken.Issue(ctx, s.d.Valkey, SessionFrom(ctx).ID, ttl)
 	if err != nil {

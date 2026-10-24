@@ -1,5 +1,5 @@
-// Package passkey wraps go-webauthn for Keystone's single owner account and
-// stores credentials in the passkeys table.
+// Package passkey wraps go-webauthn for Keystone's accounts (the owner and
+// the users, package accounts) and stores credentials in the passkeys table.
 package passkey
 
 import (
@@ -74,11 +74,11 @@ func decodeState(state []byte) (webauthn.SessionData, error) {
 	return sd, nil
 }
 
-// BeginRegistration starts registering a new discoverable passkey for the
-// owner. options is the CredentialCreationOptions JSON for the browser; state
-// must be kept server-side and passed to FinishRegistration.
-func (s *Service) BeginRegistration(ctx context.Context) (json.RawMessage, []byte, error) {
-	o, err := s.store.loadOwner(ctx)
+// BeginRegistration starts registering a new discoverable passkey for
+// account id. options is the CredentialCreationOptions JSON for the browser;
+// state must be kept server-side and passed to FinishRegistration.
+func (s *Service) BeginRegistration(ctx context.Context, id string) (json.RawMessage, []byte, error) {
+	o, err := s.store.loadAccount(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -101,26 +101,30 @@ func (s *Service) BeginRegistration(ctx context.Context) (json.RawMessage, []byt
 }
 
 // FinishRegistration verifies the browser's attestation in r's body against
-// state and stores the credential under name.
-func (s *Service) FinishRegistration(ctx context.Context, state []byte, r *http.Request, name string) error {
+// state and stores the credential for account id under name.
+func (s *Service) FinishRegistration(ctx context.Context, id string, state []byte, r *http.Request, name string) error {
 	sd, err := decodeState(state)
 	if err != nil {
 		return err
 	}
-	o, err := s.store.loadOwner(ctx)
+	o, err := s.store.loadAccount(ctx, id)
 	if err != nil {
 		return err
+	}
+	if !bytes.Equal(sd.UserID, o.handle) {
+		return errors.New("passkey: registration began for another account")
 	}
 	cred, err := s.wa.FinishRegistration(o, sd, r)
 	if err != nil {
 		return fmt.Errorf("passkey: finish registration: %w", err)
 	}
-	return s.store.add(ctx, cred, name)
+	return s.store.add(ctx, o.id, cred, name)
 }
 
 // BeginLogin starts an assertion. discoverable lets the authenticator pick the
-// credential (no allowCredentials list); otherwise the owner's credentials are listed.
-func (s *Service) BeginLogin(ctx context.Context, discoverable bool) (json.RawMessage, []byte, error) {
+// credential and account (no allowCredentials list); otherwise account id's
+// credentials are listed.
+func (s *Service) BeginLogin(ctx context.Context, id string, discoverable bool) (json.RawMessage, []byte, error) {
 	var (
 		assertion *protocol.CredentialAssertion
 		sd        *webauthn.SessionData
@@ -130,7 +134,7 @@ func (s *Service) BeginLogin(ctx context.Context, discoverable bool) (json.RawMe
 		assertion, sd, err = s.wa.BeginDiscoverableLogin(webauthn.WithUserVerification(s.uv))
 	} else {
 		var o *owner
-		if o, err = s.store.loadOwner(ctx); err != nil {
+		if o, err = s.store.loadAccount(ctx, id); err != nil {
 			return nil, nil, err
 		}
 		assertion, sd, err = s.wa.BeginLogin(o, webauthn.WithUserVerification(s.uv))
@@ -142,36 +146,35 @@ func (s *Service) BeginLogin(ctx context.Context, discoverable bool) (json.RawMe
 }
 
 // FinishLogin verifies the assertion in r's body against state, then records
-// the new signature counter and last_used_at. A counter that does not move
-// forward is rejected with ErrSignCount and nothing is updated.
-func (s *Service) FinishLogin(ctx context.Context, state []byte, r *http.Request) error {
+// the new signature counter and last_used_at, and returns the account that
+// signed. A counter that does not move forward is rejected with ErrSignCount
+// and nothing is updated.
+func (s *Service) FinishLogin(ctx context.Context, state []byte, r *http.Request) (string, error) {
 	sd, err := decodeState(state)
 	if err != nil {
-		return err
+		return "", err
 	}
-	o, err := s.store.loadOwner(ctx)
-	if err != nil {
-		return err
-	}
+	var o *owner
 	var cred *webauthn.Credential
 	if len(sd.UserID) == 0 {
 		cred, err = s.wa.FinishDiscoverableLogin(func(_, userHandle []byte) (webauthn.User, error) {
-			if !bytes.Equal(userHandle, o.handle) {
-				return nil, errors.New("passkey: unknown user handle")
-			}
-			return o, nil
+			o, err = s.store.loadByHandle(ctx, userHandle)
+			return o, err
 		}, sd, r)
 	} else {
+		if o, err = s.store.loadByHandle(ctx, sd.UserID); err != nil {
+			return "", err
+		}
 		cred, err = s.wa.FinishLogin(o, sd, r)
 	}
 	if err != nil {
-		return fmt.Errorf("passkey: finish login: %w", err)
+		return "", fmt.Errorf("passkey: finish login: %w", err)
 	}
 	if cred.Authenticator.CloneWarning {
-		return ErrSignCount
+		return "", ErrSignCount
 	}
-	return s.store.recordUse(ctx, cred)
+	return o.id, s.store.recordUse(ctx, cred)
 }
 
-// Count returns the number of registered passkeys.
-func (s *Service) Count(ctx context.Context) (int, error) { return s.store.count(ctx) }
+// Count returns the number of passkeys of account id.
+func (s *Service) Count(ctx context.Context, id string) (int, error) { return s.store.count(ctx, id) }

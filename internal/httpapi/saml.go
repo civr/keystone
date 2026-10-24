@@ -12,7 +12,6 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/civr/keystone/internal/apps"
-	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/samlidp"
 	"github.com/civr/keystone/internal/session"
 )
@@ -103,13 +102,16 @@ func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
 		requireSessionOrLogin(nil).ServeHTTP(w, r)
 		return
 	}
-	owner, err := apps.LoadOwner(ctx, s.d.Pool)
+	owner, err := s.account(ctx)
 	if err != nil {
-		errInternal(w, "saml owner", err)
+		errInternal(w, "saml account", err)
 		return
 	}
 	f, a, err := s.samlProvider().Respond(ctx, settingsFrom(ctx).PublicURL, r, req, owner, samlLogin(sess))
 	switch {
+	case err == nil && !a.Allowed(owner.ID):
+		samlFail(w, http.StatusForbidden, "You do not have access to this app.")
+		return
 	case errors.Is(err, samlidp.ErrUnknownSP):
 		samlFail(w, http.StatusBadRequest, "Deze app is niet als SAML-app in Keystone ingesteld.")
 		return
@@ -133,9 +135,13 @@ func (s *server) samlIdPInitiated(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "saml app", err)
 		return
 	}
-	owner, err := apps.LoadOwner(ctx, s.d.Pool)
+	owner, err := s.account(ctx)
 	if err != nil {
-		errInternal(w, "saml owner", err)
+		errInternal(w, "saml account", err)
+		return
+	}
+	if !a.Allowed(owner.ID) {
+		errNotFound(w, r)
 		return
 	}
 	sess := SessionFrom(ctx)
@@ -154,5 +160,5 @@ func samlLogin(sess *session.Session) samlidp.Login {
 
 // appAccess audits a sign-in into an app.
 func (s *server) appAccess(ctx context.Context, a apps.App, protocol string) {
-	s.d.Audit.Log(ctx, audit.ActorOwner, "app.access", clientIP(ctx), map[string]any{"app": a.Name, "id": a.ID, "protocol": protocol})
+	s.d.Audit.Log(ctx, actor(ctx), "app.access", clientIP(ctx), map[string]any{"app": a.Name, "id": a.ID, "protocol": protocol})
 }

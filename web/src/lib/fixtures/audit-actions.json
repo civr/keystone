@@ -1,6 +1,7 @@
 {
 	"_comment": "Every audit action and login method keystone-core writes. internal/httpapi/audit_actions_test.go keeps this list in sync with the Go code; format.test.ts checks each has a Dutch label.",
 	"actions": [
+		"account.password_changed",
 		"ad.changed",
 		"app.access",
 		"app.created",
@@ -38,6 +39,9 @@
 		"setup.unlock_failed",
 		"setup.unlocked",
 		"stepup",
+		"user.created",
+		"user.deleted",
+		"user.updated",
 		"vault.item_created",
 		"vault.item_deleted",
 		"vault.item_updated",

@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
@@ -133,6 +134,54 @@ func gateAllows(r *http.Request) bool {
 
 // --- shared helpers ---
 
+// passkeyCount is the number of passkeys of account user ("" is the owner).
+func (s *server) passkeyCount(ctx context.Context, user string) (int, error) {
+	var n int
+	err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys where user_id is not distinct from $1`, accounts.Ref(user)).Scan(&n)
+	return n, err
+}
+
+// accountKey turns a session's UserID into an account id ("" → owner).
+func accountKey(user string) string {
+	if user == "" {
+		return accounts.OwnerID
+	}
+	return user
+}
+
+// accountRef turns an account id into a session's UserID (owner → "").
+func accountRef(id string) string {
+	if id == accounts.OwnerID {
+		return ""
+	}
+	return id
+}
+
+// actorOf is the audit actor for account user: "owner" or "user:<id>".
+func actorOf(user string) string {
+	if user == "" || user == accounts.OwnerID {
+		return audit.ActorOwner
+	}
+	return "user:" + user
+}
+
+// actor is the audit actor of the signed-in account.
+func actor(ctx context.Context) string {
+	if sess := SessionFrom(ctx); sess != nil {
+		return actorOf(sess.UserID)
+	}
+	return audit.ActorOwner
+}
+
+// account loads the signed-in account.
+func (s *server) account(ctx context.Context) (accounts.Account, error) {
+	var id string
+	if sess := SessionFrom(ctx); sess != nil {
+		id = sess.UserID
+	}
+	return accounts.Load(ctx, s.d.Pool, id)
+}
+
 type ownerInfo struct{ Username, DisplayName, GivenName, Email string }
 
 func (s *server) loadOwner(ctx context.Context) (ownerInfo, error) {
@@ -241,6 +290,8 @@ func errPasswordRequired(w http.ResponseWriter) {
 type pendingLogin struct {
 	token                         string
 	passwordOK, emergency, device bool
+	// user is the account whose password was checked; "" is the owner.
+	user string
 }
 
 func loginKey(token string) string { return "login:" + token }
@@ -252,7 +303,7 @@ func (s *server) newPending(w http.ResponseWriter, r *http.Request, ctx context.
 	}
 	p.token = tok
 	pipe := s.d.Valkey.TxPipeline()
-	pipe.HSet(ctx, loginKey(tok), "password_ok", p.passwordOK, "emergency", p.emergency, "device", p.device)
+	pipe.HSet(ctx, loginKey(tok), "password_ok", p.passwordOK, "emergency", p.emergency, "device", p.device, "user", p.user)
 	pipe.Expire(ctx, loginKey(tok), loginTTL)
 	if _, err := pipe.Exec(ctx); err != nil {
 		return p, err
@@ -270,7 +321,7 @@ func (s *server) loadPending(ctx context.Context, r *http.Request) (pendingLogin
 	if err != nil || len(h) == 0 {
 		return pendingLogin{}, false, err
 	}
-	return pendingLogin{token: tok, passwordOK: h["password_ok"] == "1", emergency: h["emergency"] == "1", device: h["device"] == "1"}, true, nil
+	return pendingLogin{token: tok, passwordOK: h["password_ok"] == "1", emergency: h["emergency"] == "1", device: h["device"] == "1", user: h["user"]}, true, nil
 }
 
 // consumePending deletes the pending state; false when it was already gone
@@ -284,10 +335,11 @@ func (s *server) consumePending(w http.ResponseWriter, r *http.Request, ctx cont
 	return n == 1, nil
 }
 
-// nextStep is the passkey step after a password: register when none exist.
-func (s *server) nextStep(ctx context.Context) (string, error) {
-	var n int
-	if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&n); err != nil {
+// nextStep is the passkey step after a password: register when the account
+// has none.
+func (s *server) nextStep(ctx context.Context, user string) (string, error) {
+	n, err := s.passkeyCount(ctx, user)
+	if err != nil {
 		return "", err
 	}
 	if n == 0 {
@@ -296,14 +348,15 @@ func (s *server) nextStep(ctx context.Context) (string, error) {
 	return "passkey", nil
 }
 
-// startPending creates a password_ok pending login and answers {"next": …}.
-func (s *server) startPending(w http.ResponseWriter, r *http.Request, ctx context.Context, cfg settings.Settings, emergency bool) {
-	next, err := s.nextStep(ctx)
+// startPending creates a password_ok pending login for account user and
+// answers {"next": …}.
+func (s *server) startPending(w http.ResponseWriter, r *http.Request, ctx context.Context, cfg settings.Settings, user string, emergency bool) {
+	next, err := s.nextStep(ctx, user)
 	if err != nil {
 		errInternal(w, "count passkeys", err)
 		return
 	}
-	if _, err := s.newPending(w, r, ctx, cfg, pendingLogin{passwordOK: true, emergency: emergency}); err != nil {
+	if _, err := s.newPending(w, r, ctx, cfg, pendingLogin{passwordOK: true, emergency: emergency, user: user}); err != nil {
 		slog.Error("auth: store pending", "err", err)
 		errUnavailable(w)
 		return
@@ -369,6 +422,19 @@ func (s *server) authPassword(w http.ResponseWriter, r *http.Request) {
 		!s.notLocked(w, ctx, account, ip) {
 		return
 	}
+	// An account an admin added: its Keystone password, never AD.
+	if u, err := accounts.ByUsername(ctx, s.d.Pool, account); err == nil && !u.IsOwner() {
+		ok := crypto.VerifySecret(u.PasswordHash, req.Password)
+		if !ok || u.Disabled {
+			s.loginFailed(w, ctx, cfg, account, "password", ip)
+			return
+		}
+		s.passwordAccepted(w, r, cfg, account, u.ID, ip)
+		return
+	} else if err != nil && !errors.Is(err, accounts.ErrNotFound) {
+		errInternal(w, "load account", err)
+		return
+	}
 	// An owner made in the short setup has a Keystone password: AD is not asked.
 	var localHash string
 	err := s.d.Pool.QueryRow(ctx, `select coalesce(password_hash, '') from owner where id = 1`).Scan(&localHash)
@@ -387,7 +453,7 @@ func (s *server) authPassword(w http.ResponseWriter, r *http.Request) {
 			s.loginFailed(w, ctx, cfg, account, "password", ip)
 			return
 		}
-		s.passwordAccepted(w, r, cfg, account, ip)
+		s.passwordAccepted(w, r, cfg, account, "", ip)
 		return
 	}
 	dir := s.directory()
@@ -425,31 +491,32 @@ func (s *server) authPassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "not_allowed", "Dit account mag niet inloggen bij Keystone.")
 		return
 	}
-	s.passwordAccepted(w, r, cfg, account, ip)
+	s.passwordAccepted(w, r, cfg, account, "", ip)
 }
 
-// passwordAccepted continues a sign-in whose password was right: on to the
-// passkey, or straight in when no passkey is required.
-func (s *server) passwordAccepted(w http.ResponseWriter, r *http.Request, cfg settings.Settings, account string, ip netip.Addr) {
+// passwordAccepted continues a sign-in of account user ("" is the owner)
+// whose password was right: on to the passkey, or straight in when no
+// passkey is required.
+func (s *server) passwordAccepted(w http.ResponseWriter, r *http.Request, cfg settings.Settings, account, user string, ip netip.Addr) {
 	ctx := r.Context()
 	if err := s.d.Limiter.ResetFailures(ctx, account); err != nil {
 		slog.Error("auth: reset failures", "err", err)
 	}
 	if cfg.Login.PasskeyRequired {
-		s.startPending(w, r, ctx, cfg, false)
+		s.startPending(w, r, ctx, cfg, user, false)
 		return
 	}
 	now := time.Now()
-	var passkeys int
-	if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&passkeys); err != nil {
+	passkeys, err := s.passkeyCount(ctx, user)
+	if err != nil {
 		errInternal(w, "count passkeys", err)
 		return
 	}
-	if !s.createSession(w, r, cfg, session.Session{LastFullAuthAt: now, NoPasskey: passkeys == 0}) {
+	if !s.createSession(w, r, cfg, session.Session{UserID: user, LastFullAuthAt: now, NoPasskey: passkeys == 0}) {
 		return
 	}
 	s.markDevice(w, r, cfg, now)
-	s.d.Audit.Log(ctx, audit.ActorOwner, "login.success", ip, map[string]any{"method": "password"})
+	s.d.Audit.Log(ctx, actorOf(user), "login.success", ip, map[string]any{"method": "password"})
 	writeJSON(w, http.StatusOK, map[string]string{"next": "done"})
 }
 
@@ -468,7 +535,7 @@ func (s *server) authPasskeyBegin(w http.ResponseWriter, r *http.Request) {
 	)
 	if sess := SessionFrom(ctx); sess != nil && sess.MustRegisterPasskey {
 		bind, kind = "register:"+sess.ID, ceremonyRegister
-		opts, state, err = svc.BeginRegistration(ctx)
+		opts, state, err = svc.BeginRegistration(ctx, sess.UserID)
 	} else {
 		if !s.allow(w, ctx, "passkey-ip", clientIP(ctx).String(), cfg.BruteForce.LoginPerIPPerMinute) {
 			return
@@ -481,7 +548,7 @@ func (s *server) authPasskeyBegin(w http.ResponseWriter, r *http.Request) {
 		}
 		switch {
 		case ok && p.passwordOK:
-			next, nerr := s.nextStep(ctx)
+			next, nerr := s.nextStep(ctx, p.user)
 			if nerr != nil {
 				errInternal(w, "count passkeys", nerr)
 				return
@@ -489,10 +556,10 @@ func (s *server) authPasskeyBegin(w http.ResponseWriter, r *http.Request) {
 			bind = "login:" + p.token
 			if next == "register_passkey" {
 				kind = ceremonyRegister
-				opts, state, err = svc.BeginRegistration(ctx)
+				opts, state, err = svc.BeginRegistration(ctx, p.user)
 			} else {
 				kind = ceremonyLogin
-				opts, state, err = svc.BeginLogin(ctx, false)
+				opts, state, err = svc.BeginLogin(ctx, p.user, false)
 			}
 		default:
 			if _, _, trusted := s.trustedDevice(r, cfg); !trusted || !cfg.Login.PasskeyOnlyOnTrustedDevice {
@@ -507,7 +574,7 @@ func (s *server) authPasskeyBegin(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			bind, kind = "login:"+p.token, ceremonyLogin
-			opts, state, err = svc.BeginLogin(ctx, true)
+			opts, state, err = svc.BeginLogin(ctx, "", true)
 		}
 	}
 	if err != nil {
@@ -581,11 +648,20 @@ func (s *server) authPasskeyFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	method := "passkey"
+	user := p.user
 	if kind == ceremonyRegister {
 		method = "passkey_register"
-		err = svc.FinishRegistration(ctx, state, r, passkeyName(r))
+		err = svc.FinishRegistration(ctx, p.user, state, r, passkeyName(r))
 	} else {
-		err = svc.FinishLogin(ctx, state, r)
+		var signed string
+		signed, err = svc.FinishLogin(ctx, state, r)
+		switch {
+		case err != nil:
+		case p.passwordOK && signed != accountKey(p.user):
+			err = errors.New("passkey of another account")
+		case !p.passwordOK:
+			user = accountRef(signed) // trusted device: whoever the passkey belongs to
+		}
 	}
 	if err != nil {
 		slog.Warn("auth: passkey", "kind", kind, "err", err)
@@ -607,13 +683,13 @@ func (s *server) authPasskeyFinish(w http.ResponseWriter, r *http.Request) {
 	} else {
 		method = "trusted_device"
 	}
-	if !s.createSession(w, r, cfg, session.Session{LastFullAuthAt: fullAuth, LastPasskeyAt: now, Emergency: p.emergency}) {
+	if !s.createSession(w, r, cfg, session.Session{UserID: user, LastFullAuthAt: fullAuth, LastPasskeyAt: now, Emergency: p.emergency}) {
 		return
 	}
 	if full {
 		s.markDevice(w, r, cfg, now)
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "login.success", ip, map[string]any{"method": method, "emergency": p.emergency})
+	s.d.Audit.Log(ctx, actorOf(user), "login.success", ip, map[string]any{"method": method, "emergency": p.emergency})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -626,7 +702,7 @@ func (s *server) finishForcedRegistration(w http.ResponseWriter, r *http.Request
 		return
 	}
 	name := passkeyName(r)
-	if err := svc.FinishRegistration(ctx, state, r, name); err != nil {
+	if err := svc.FinishRegistration(ctx, sess.UserID, state, r, name); err != nil {
 		slog.Warn("auth: forced registration", "err", err)
 		writeError(w, http.StatusBadRequest, "passkey_failed", "De passkey kon niet worden geregistreerd. Probeer het opnieuw.")
 		return
@@ -639,7 +715,7 @@ func (s *server) finishForcedRegistration(w http.ResponseWriter, r *http.Request
 		return
 	}
 	s.markDevice(w, r, cfg, now)
-	s.d.Audit.Log(ctx, audit.ActorOwner, "passkey.registered", clientIP(ctx), map[string]any{"name": name, "after": "recovery"})
+	s.d.Audit.Log(ctx, actorOf(sess.UserID), "passkey.registered", clientIP(ctx), map[string]any{"name": name, "after": "recovery"})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -664,6 +740,10 @@ func (s *server) authRecovery(w http.ResponseWriter, r *http.Request) {
 	}
 	if !ok || !p.passwordOK {
 		errPasswordRequired(w)
+		return
+	}
+	if p.user != "" {
+		writeError(w, http.StatusForbidden, "not_allowed", "Recovery codes are for the owner. Ask an admin to reset your password.")
 		return
 	}
 	id, err := s.matchRecoveryCode(ctx, strings.ToUpper(strings.TrimSpace(req.Code)))
@@ -785,7 +865,7 @@ func (s *server) authEmergency(w http.ResponseWriter, r *http.Request) {
 		slog.Error("auth: reset failures", "err", err)
 	}
 	s.d.Audit.Log(ctx, audit.ActorAnonymous, "emergency.used", ip, nil)
-	s.startPending(w, r, ctx, cfg, true)
+	s.startPending(w, r, ctx, cfg, "", true)
 }
 
 func (s *server) stepUpBegin(w http.ResponseWriter, r *http.Request) {
@@ -795,7 +875,7 @@ func (s *server) stepUpBegin(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "passkey service", err)
 		return
 	}
-	opts, state, err := svc.BeginLogin(ctx, false)
+	opts, state, err := svc.BeginLogin(ctx, SessionFrom(ctx).UserID, false)
 	if err != nil {
 		errInternal(w, "begin step-up", err)
 		return
@@ -822,9 +902,9 @@ func (s *server) stepUpFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
-	if err := svc.FinishLogin(ctx, state, r); err != nil {
+	if signed, err := svc.FinishLogin(ctx, state, r); err != nil || signed != accountKey(sess.UserID) {
 		slog.Warn("auth: step-up", "err", err)
-		s.d.Audit.Log(ctx, audit.ActorOwner, "login.failure", ip, map[string]any{"method": "stepup"})
+		s.d.Audit.Log(ctx, actorOf(sess.UserID), "login.failure", ip, map[string]any{"method": "stepup"})
 		errPasskeyFailed(w)
 		return
 	}
@@ -834,13 +914,13 @@ func (s *server) stepUpFinish(w http.ResponseWriter, r *http.Request) {
 		errUnavailable(w)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "stepup", ip, nil)
+	s.d.Audit.Log(ctx, actorOf(sess.UserID), "stepup", ip, nil)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-// stepUpPassword confirms a sensitive action with the owner's password while
-// no passkey exists (Keystone used over http, or set up without one). Once a
-// passkey exists, only the passkey confirms.
+// stepUpPassword confirms a sensitive action with the account's password
+// while it has no passkey (Keystone used over http, or set up without one).
+// Once the account has a passkey, only the passkey confirms.
 func (s *server) stepUpPassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cfg := settingsFrom(ctx)
@@ -852,8 +932,8 @@ func (s *server) stepUpPassword(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
-	var passkeys int
-	if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&passkeys); err != nil {
+	passkeys, err := s.passkeyCount(ctx, sess.UserID)
+	if err != nil {
 		errInternal(w, "count passkeys", err)
 		return
 	}
@@ -861,17 +941,17 @@ func (s *server) stepUpPassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "passkey_required", "Bevestig dit met je passkey.")
 		return
 	}
-	owner, err := s.loadOwner(ctx)
+	acct, err := s.account(ctx)
 	if err != nil {
-		errInternal(w, "load owner", err)
+		errInternal(w, "load account", err)
 		return
 	}
 	if !s.allow(w, ctx, "login-ip", ip.String(), cfg.BruteForce.LoginPerIPPerMinute) ||
-		!s.allow(w, ctx, "login-account", owner.Username, cfg.BruteForce.LoginPerAccountPerMinute) ||
-		!s.notLocked(w, ctx, owner.Username, ip) {
+		!s.allow(w, ctx, "login-account", acct.Username, cfg.BruteForce.LoginPerAccountPerMinute) ||
+		!s.notLocked(w, ctx, acct.Username, ip) {
 		return
 	}
-	ok, err := s.ownerPassword(ctx, owner.Username, req.Password)
+	ok, err := s.accountPassword(ctx, acct, req.Password)
 	switch {
 	case errors.Is(err, ad.ErrUnavailable):
 		s.adUnavailable(w, ctx)
@@ -880,7 +960,7 @@ func (s *server) stepUpPassword(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "check password", err)
 		return
 	case !ok:
-		s.loginFailed(w, ctx, cfg, owner.Username, "stepup", ip)
+		s.loginFailed(w, ctx, cfg, acct.Username, "stepup", ip)
 		return
 	}
 	sess.NoPasskey, sess.LastFullAuthAt = true, time.Now()
@@ -889,20 +969,18 @@ func (s *server) stepUpPassword(w http.ResponseWriter, r *http.Request) {
 		errUnavailable(w)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "stepup", ip, map[string]any{"method": "password"})
+	s.d.Audit.Log(ctx, actorOf(sess.UserID), "stepup", ip, map[string]any{"method": "password"})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-// ownerPassword checks password against the owner's Keystone password, or
-// against AD when the owner has none.
-func (s *server) ownerPassword(ctx context.Context, username, password string) (bool, error) {
-	var localHash string
-	err := s.d.Pool.QueryRow(ctx, `select coalesce(password_hash, '') from owner where id = 1`).Scan(&localHash)
-	if err != nil {
-		return false, err
+// accountPassword checks password against the account's Keystone password,
+// or against AD for an owner without one.
+func (s *server) accountPassword(ctx context.Context, acct accounts.Account, password string) (bool, error) {
+	if acct.PasswordHash != "" {
+		return crypto.VerifySecret(acct.PasswordHash, password), nil
 	}
-	if localHash != "" {
-		return crypto.VerifySecret(localHash, password), nil
+	if !acct.IsOwner() {
+		return false, nil
 	}
 	dir := s.directory()
 	if dir == nil {
@@ -910,7 +988,7 @@ func (s *server) ownerPassword(ctx context.Context, username, password string) (
 	}
 	actx, cancel := s.adContext(ctx)
 	defer cancel()
-	_, err = dir.Authenticate(actx, username, password)
+	_, err := dir.Authenticate(actx, acct.Username, password)
 	if errors.Is(err, ad.ErrInvalidCredentials) || errors.Is(err, ad.ErrNotFound) {
 		return false, nil
 	}
@@ -929,26 +1007,31 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("auth: revoke gate tokens", "err", err) // they die with the session anyway
 	}
 	setCookie(w, r, cfg, SessionCookie, "", 0)
-	s.d.Audit.Log(ctx, audit.ActorOwner, "logout", clientIP(ctx), nil)
+	s.d.Audit.Log(ctx, actor(ctx), "logout", clientIP(ctx), nil)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (s *server) me(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	o, err := s.loadOwner(ctx)
+	acct, err := s.account(ctx)
 	if err != nil {
-		errInternal(w, "load owner", err)
+		errInternal(w, "load account", err)
 		return
 	}
 	sess := SessionFrom(ctx)
-	var passkeys int
-	if err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&passkeys); err != nil {
+	passkeys, err := s.passkeyCount(ctx, sess.UserID)
+	if err != nil {
 		errInternal(w, "count passkeys", err)
 		return
 	}
+	role := acct.Role
+	if acct.IsOwner() {
+		role = "owner"
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
+		"id": acct.ID, "role": role, "admin": acct.IsAdmin(),
 		"passkey_missing": passkeys == 0,
-		"username":        o.Username, "display_name": o.DisplayName, "given_name": o.GivenName, "email": o.Email,
+		"username":        acct.Username, "display_name": acct.DisplayName, "given_name": acct.GivenName, "email": acct.Email,
 		"emergency": sess.Emergency, "must_register_passkey": sess.MustRegisterPasskey,
 		"needs_stepup": needsStepUp(*sess, settingsFrom(ctx), time.Now()),
 		"client_ip":    clientIP(ctx).String(),

@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/civr/keystone/internal/apps"
-	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
 )
 
@@ -34,6 +33,10 @@ func (s *server) vaultApp(w http.ResponseWriter, r *http.Request) (apps.App, boo
 	}
 	if a.Protocol != apps.Vault {
 		writeInvalid(w, "protocol", "Alleen kluis-apps hebben opgeslagen inloggegevens.")
+		return a, false
+	}
+	if !a.Allowed(accountKey(SessionFrom(r.Context()).UserID)) {
+		errNotFound(w, r)
 		return a, false
 	}
 	return a, true
@@ -93,7 +96,7 @@ func (s *server) putVault(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "vault put", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "vault.updated", clientIP(ctx), map[string]any{"id": a.ID, "app": a.Name, "password_changed": in.Password != nil})
+	s.d.Audit.Log(ctx, actor(ctx), "vault.updated", clientIP(ctx), map[string]any{"id": a.ID, "app": a.Name, "password_changed": in.Password != nil})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -125,7 +128,7 @@ func (s *server) vaultPassword(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "vault open", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "vault.revealed", clientIP(ctx), map[string]any{"id": a.ID, "app": a.Name})
+	s.d.Audit.Log(ctx, actor(ctx), "vault.revealed", clientIP(ctx), map[string]any{"id": a.ID, "app": a.Name})
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]string{"password": string(pw)})
 }

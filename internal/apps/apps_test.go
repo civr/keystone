@@ -1,6 +1,10 @@
 package apps
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/civr/keystone/internal/accounts"
+)
 
 func TestConfigValidate(t *testing.T) {
 	cases := []struct {
@@ -51,7 +55,7 @@ func TestValidateDropsOtherProtocols(t *testing.T) {
 }
 
 func TestMappedFallsBackToOwner(t *testing.T) {
-	o := Owner{Username: "thijs", DisplayName: "Thijs Willems", Email: "thijs@home.lan"}
+	o := Owner{ID: accounts.OwnerID, Username: "thijs", DisplayName: "Thijs Willems", Email: "thijs@home.lan"}
 	a := App{Config: Config{Account: Account{Username: "t.willems"}}}
 	got := a.Mapped(o)
 	want := Account{Username: "t.willems", Email: "thijs@home.lan", DisplayName: "Thijs Willems"}
@@ -60,5 +64,13 @@ func TestMappedFallsBackToOwner(t *testing.T) {
 	}
 	if (App{}).Mapped(o).Username != "thijs" {
 		t.Fatal("empty mapping should use owner")
+	}
+	// The overrides are the owner's: another account keeps its own name.
+	anna := Owner{ID: "u1", Username: "anna", Email: "anna@home.lan"}
+	if m := a.Mapped(anna); m.Username != "anna" || m.Email != "anna@home.lan" {
+		t.Fatalf("other account = %+v", m)
+	}
+	if !(App{}).Allowed("u1") || (App{Access: []string{accounts.OwnerID}}).Allowed("u1") || !(App{Access: []string{"u1"}}).Allowed("u1") {
+		t.Fatal("access")
 	}
 }

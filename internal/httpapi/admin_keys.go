@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/keys"
 )
 
@@ -50,6 +49,6 @@ func (s *server) rotateKey(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "rotate key", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "keys.rotated", clientIP(ctx), map[string]any{"use": use, "id": k.ID})
+	s.d.Audit.Log(ctx, actor(ctx), "keys.rotated", clientIP(ctx), map[string]any{"use": use, "id": k.ID})
 	writeJSON(w, http.StatusOK, map[string]string{"id": k.ID})
 }

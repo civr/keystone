@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/branding"
 )
 
@@ -80,7 +79,7 @@ func (s *server) putBranding(w http.ResponseWriter, r *http.Request) {
 		changed["logo"] = next.Logo != ""
 	}
 	if len(changed) > 0 {
-		s.d.Audit.Log(ctx, audit.ActorOwner, "branding.changed", clientIP(ctx), changed)
+		s.d.Audit.Log(ctx, actor(ctx), "branding.changed", clientIP(ctx), changed)
 	}
 	writeJSON(w, http.StatusOK, next)
 }

@@ -11,13 +11,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/civr/keystone/internal/audit"
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/crypto"
 )
 
 // The vault's own items (Kluis): sign-in details for anything, not tied to an
-// app tile. Password and note are sealed with vault_key; the list shows only
-// what is safe to show, and revealing follows the vault's reconfirm window.
+// app tile, private to the account that adds them. Password and note are
+// sealed with vault_key; the list shows only what is safe to show, and
+// revealing follows the vault's reconfirm window.
 
 const (
 	maxVaultTitle = 100
@@ -94,9 +95,13 @@ func (s *server) seal(v string) (*string, error) {
 	return &sealed, err
 }
 
+// vaultOwner is the vault_items.user_id of the signed-in account (nil: the owner).
+func vaultOwner(r *http.Request) *string { return accounts.Ref(SessionFrom(r.Context()).UserID) }
+
 func (s *server) listVaultItems(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.d.Pool.Query(r.Context(), `select id, title, url, username, password_sealed is not null,
-		note_sealed is not null, updated_at from vault_items order by lower(title), id`)
+		note_sealed is not null, updated_at from vault_items where user_id is not distinct from $1
+		order by lower(title), id`, vaultOwner(r))
 	if err != nil {
 		errInternal(w, "vault list", err)
 		return
@@ -130,14 +135,14 @@ func (s *server) createVaultItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var it vaultItem
-	err = s.d.Pool.QueryRow(ctx, `insert into vault_items (title, url, username, password_sealed, note_sealed)
-		values ($1, $2, $3, $4, $5) returning id, title, url, username, password_sealed is not null, note_sealed is not null, updated_at`,
-		in.Title, in.URL, in.Username, pw, note).Scan(&it.ID, &it.Title, &it.URL, &it.Username, &it.HasPassword, &it.HasNote, &it.UpdatedAt)
+	err = s.d.Pool.QueryRow(ctx, `insert into vault_items (title, url, username, password_sealed, note_sealed, user_id)
+		values ($1, $2, $3, $4, $5, $6) returning id, title, url, username, password_sealed is not null, note_sealed is not null, updated_at`,
+		in.Title, in.URL, in.Username, pw, note, vaultOwner(r)).Scan(&it.ID, &it.Title, &it.URL, &it.Username, &it.HasPassword, &it.HasNote, &it.UpdatedAt)
 	if err != nil {
 		errInternal(w, "vault create", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "vault.item_created", clientIP(ctx), map[string]any{"id": it.ID, "title": it.Title})
+	s.d.Audit.Log(ctx, actor(ctx), "vault.item_created", clientIP(ctx), map[string]any{"id": it.ID, "title": it.Title})
 	writeJSON(w, http.StatusCreated, it)
 }
 
@@ -167,9 +172,9 @@ func (s *server) updateVaultItem(w http.ResponseWriter, r *http.Request) {
 		password_sealed = case when $5 then $6 else password_sealed end,
 		note_sealed = case when $7 then $8 else note_sealed end,
 		updated_at = now()
-		where id = $1
+		where id = $1 and user_id is not distinct from $9
 		returning id, title, url, username, password_sealed is not null, note_sealed is not null, updated_at`,
-		id, in.Title, in.URL, in.Username, in.Password != nil, pw, in.Note != nil, note).
+		id, in.Title, in.URL, in.Username, in.Password != nil, pw, in.Note != nil, note, vaultOwner(r)).
 		Scan(&it.ID, &it.Title, &it.URL, &it.Username, &it.HasPassword, &it.HasNote, &it.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		errNotFound(w, r)
@@ -179,7 +184,7 @@ func (s *server) updateVaultItem(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "vault update", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "vault.item_updated", clientIP(ctx), map[string]any{"id": it.ID, "title": it.Title, "password_changed": in.Password != nil})
+	s.d.Audit.Log(ctx, actor(ctx), "vault.item_updated", clientIP(ctx), map[string]any{"id": it.ID, "title": it.Title, "password_changed": in.Password != nil})
 	writeJSON(w, http.StatusOK, it)
 }
 
@@ -190,7 +195,8 @@ func (s *server) deleteVaultItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var title string
-	err := s.d.Pool.QueryRow(ctx, `delete from vault_items where id = $1 returning title`, id).Scan(&title)
+	err := s.d.Pool.QueryRow(ctx, `delete from vault_items where id = $1 and user_id is not distinct from $2 returning title`,
+		id, vaultOwner(r)).Scan(&title)
 	if errors.Is(err, pgx.ErrNoRows) {
 		errNotFound(w, r)
 		return
@@ -199,7 +205,7 @@ func (s *server) deleteVaultItem(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "vault delete", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "vault.item_deleted", clientIP(ctx), map[string]any{"id": id, "title": title})
+	s.d.Audit.Log(ctx, actor(ctx), "vault.item_deleted", clientIP(ctx), map[string]any{"id": id, "title": title})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -218,7 +224,8 @@ func (s *server) revealVaultItem(w http.ResponseWriter, r *http.Request) {
 	}
 	var title string
 	var pw, note *string
-	err := s.d.Pool.QueryRow(ctx, `select title, password_sealed, note_sealed from vault_items where id = $1`, id).Scan(&title, &pw, &note)
+	err := s.d.Pool.QueryRow(ctx, `select title, password_sealed, note_sealed from vault_items
+		where id = $1 and user_id is not distinct from $2`, id, vaultOwner(r)).Scan(&title, &pw, &note)
 	if errors.Is(err, pgx.ErrNoRows) {
 		errNotFound(w, r)
 		return
@@ -239,7 +246,7 @@ func (s *server) revealVaultItem(w http.ResponseWriter, r *http.Request) {
 		}
 		out[k] = string(plain)
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "vault.revealed", clientIP(ctx), map[string]any{"id": id, "title": title})
+	s.d.Audit.Log(ctx, actor(ctx), "vault.revealed", clientIP(ctx), map[string]any{"id": id, "title": title})
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, out)
 }

@@ -46,7 +46,9 @@ return 1`)
 
 // Session is the server-side state behind the ks_session cookie.
 type Session struct {
-	ID                  string
+	ID string
+	// UserID is the signed-in account (package accounts); "" is the owner.
+	UserID              string
 	CreatedAt           time.Time
 	LastSeenAt          time.Time
 	LastFullAuthAt      time.Time
@@ -235,6 +237,22 @@ func (s *Store) List(ctx context.Context) ([]Session, error) {
 		_ = s.rdb.SRem(ctx, sessIndex, stale...).Err()
 	}
 	return out, nil
+}
+
+// RevokeUser deletes every session of account userID ("" is the owner).
+func (s *Store) RevokeUser(ctx context.Context, userID string) error {
+	all, err := s.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, sess := range all {
+		if sess.UserID == userID {
+			if err := s.Revoke(ctx, sess.ID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // Revoke deletes one session.

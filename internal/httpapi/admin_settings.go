@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/civr/keystone/internal/ad"
-	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/settings"
 )
@@ -64,7 +63,7 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if changes := diffJSON(old, next); len(changes) > 0 {
-		s.d.Audit.Log(ctx, audit.ActorOwner, "settings.changed", ip, map[string]any{"changes": changes})
+		s.d.Audit.Log(ctx, actor(ctx), "settings.changed", ip, map[string]any{"changes": changes})
 	}
 	writeJSON(w, http.StatusOK, next)
 }
@@ -241,7 +240,7 @@ func (s *server) putAD(w http.ResponseWriter, r *http.Request) {
 	if hadPrev {
 		oldTree = redactedAD(prev)
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "ad.changed", clientIP(ctx), map[string]any{
+	s.d.Audit.Log(ctx, actor(ctx), "ad.changed", clientIP(ctx), map[string]any{
 		"changes":          diffJSON(oldTree, redactedAD(cfg)),
 		"password_changed": !hadPrev || prev.BindPasswordSealed != cfg.BindPasswordSealed,
 	})

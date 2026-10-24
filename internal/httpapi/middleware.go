@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/realip"
 	"github.com/civr/keystone/internal/session"
 	"github.com/civr/keystone/internal/settings"
@@ -224,6 +225,10 @@ func (s *server) loadSession(next http.Handler) http.Handler {
 		case err != nil:
 			slog.Error("http: load session", "err", err)
 			errUnavailable(w)
+		case sess.UserID != "" && !s.accountActive(r.Context(), sess.UserID):
+			// The account was deleted or disabled: its sessions end with it.
+			_ = s.d.Sessions.Revoke(r.Context(), sess.ID)
+			next.ServeHTTP(w, r)
 		default:
 			if cfg.Session.Sliding && !now.Truncate(time.Hour).Equal(prevSeen.Truncate(time.Hour)) {
 				setCookie(w, r, cfg, SessionCookie, sess.ID, time.Duration(cfg.Session.DurationHours)*time.Hour)
@@ -242,6 +247,44 @@ func requireSession(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// accountActive reports whether user still exists and is enabled.
+func (s *server) accountActive(ctx context.Context, user string) bool {
+	a, err := accounts.Load(ctx, s.d.Pool, user)
+	if err != nil && !errors.Is(err, accounts.ErrNotFound) {
+		slog.Warn("http: load account", "err", err)
+		return true // a database hiccup does not sign anyone out
+	}
+	return err == nil && !a.Disabled
+}
+
+// requireAdmin lets only admins (the owner or an admin account) through.
+func (s *server) requireAdmin(next http.Handler) http.Handler {
+	return requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		acct, err := s.account(r.Context())
+		if err != nil {
+			errInternal(w, "load account", err)
+			return
+		}
+		if !acct.IsAdmin() {
+			writeError(w, http.StatusForbidden, "admin_required", "Only an admin can do this.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
+}
+
+// requireOwner lets only the owner through: recovery codes, the emergency
+// account and AD are the owner's.
+func requireOwner(next http.Handler) http.Handler {
+	return requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if SessionFrom(r.Context()).UserID != "" {
+			writeError(w, http.StatusForbidden, "owner_required", "Only the owner can do this.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
 }
 
 // parsePrefixes parses CIDRs, skipping invalid entries (settings validation

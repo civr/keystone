@@ -59,13 +59,15 @@ func start(t *testing.T) *fixture {
 		}
 		return h
 	}
+	owner := apps.Owner{ID: "owner", Username: "thijs", DisplayName: "Thijs Willems", Email: "thijs@home.lan"}
 	cfg := settings.Defaults()
 	cfg.LDAP.RequireTLS = false
 	cfg.LDAP.BindPerIPPerMinute = 1000
 	f := &fixture{
 		view: &fixedView{runtime.View{
 			Settings: cfg,
-			Owner:    apps.Owner{Username: "thijs", DisplayName: "Thijs Willems", Email: "thijs@home.lan"},
+			Owner:    owner,
+			Accounts: []apps.Owner{owner},
 			Apps: []apps.App{
 				{ID: "1", Name: "Jellyfin", Protocol: apps.LDAPP, Config: apps.Config{
 					Account: apps.Account{Username: "t.willems"},
@@ -159,9 +161,9 @@ func TestLDAP(t *testing.T) {
 	})
 
 	t.Run("LocalOwnerPasswordWithoutAD", func(t *testing.T) {
-		saved := f.view.v.Owner
-		f.view.v.Owner.PasswordHash = hash("keystone-only password")
-		defer func() { f.view.v.Owner = saved }()
+		saved := f.view.v.Accounts[0]
+		f.view.v.Accounts[0].PasswordHash = hash("keystone-only password")
+		defer func() { f.view.v.Accounts[0] = saved }()
 		down := f.dir.Down
 		f.dir.Down = true
 		defer func() { f.dir.Down = down }()

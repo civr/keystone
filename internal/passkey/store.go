@@ -8,12 +8,14 @@ import (
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/civr/keystone/internal/accounts"
 )
 
-// owner is the single Keystone account as a WebAuthn user.
+// owner is a Keystone account (the owner or a user) as a WebAuthn user.
 type owner struct {
+	id                    string
 	username, displayName string
 	handle                []byte
 	creds                 []webauthn.Credential
@@ -27,23 +29,37 @@ func (o *owner) WebAuthnCredentials() []webauthn.Credential { return o.creds }
 // store reads and writes the owner and passkeys tables.
 type store struct{ pool *pgxpool.Pool }
 
-// loadOwner returns the owner with all registered credentials.
-func (s store) loadOwner(ctx context.Context) (*owner, error) {
-	var o owner
-	var display *string
-	err := s.pool.QueryRow(ctx, `select username, display_name, user_handle from owner where id = 1`).
-		Scan(&o.username, &display, &o.handle)
-	if errors.Is(err, pgx.ErrNoRows) {
+// loadAccount returns account id with all its registered credentials.
+func (s store) loadAccount(ctx context.Context, id string) (*owner, error) {
+	a, err := accounts.Load(ctx, s.pool, id)
+	if errors.Is(err, accounts.ErrNotFound) {
 		return nil, ErrNoOwner
 	}
 	if err != nil {
-		return nil, fmt.Errorf("passkey: load owner: %w", err)
+		return nil, fmt.Errorf("passkey: load account: %w", err)
 	}
-	o.displayName = o.username
-	if display != nil && *display != "" {
-		o.displayName = *display
+	return s.withCreds(ctx, a)
+}
+
+// loadByHandle returns the account whose user handle is h, with its credentials.
+func (s store) loadByHandle(ctx context.Context, h []byte) (*owner, error) {
+	a, err := accounts.ByHandle(ctx, s.pool, h)
+	if errors.Is(err, accounts.ErrNotFound) {
+		return nil, errors.New("passkey: unknown user handle")
 	}
-	rows, err := s.pool.Query(ctx, `select id, public_key, sign_count, aaguid, coalesce(transports, '{}'), flags from passkeys order by created_at`)
+	if err != nil {
+		return nil, fmt.Errorf("passkey: load account: %w", err)
+	}
+	if a.Disabled {
+		return nil, errors.New("passkey: account disabled")
+	}
+	return s.withCreds(ctx, a)
+}
+
+func (s store) withCreds(ctx context.Context, a accounts.Account) (*owner, error) {
+	o := owner{id: a.ID, username: a.Username, displayName: a.Name(), handle: a.UserHandle}
+	rows, err := s.pool.Query(ctx, `select id, public_key, sign_count, aaguid, coalesce(transports, '{}'), flags from passkeys
+		where user_id is not distinct from $1 order by created_at`, accounts.Ref(a.ID))
 	if err != nil {
 		return nil, fmt.Errorf("passkey: load credentials: %w", err)
 	}
@@ -69,15 +85,15 @@ func (s store) loadOwner(ctx context.Context) (*owner, error) {
 	return &o, nil
 }
 
-func (s store) add(ctx context.Context, c *webauthn.Credential, name string) error {
+func (s store) add(ctx context.Context, accountID string, c *webauthn.Credential, name string) error {
 	transports := make([]string, 0, len(c.Transport))
 	for _, t := range c.Transport {
 		transports = append(transports, string(t))
 	}
-	_, err := s.pool.Exec(ctx, `insert into passkeys (id, name, public_key, sign_count, aaguid, transports, flags, created_at)
-		values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+	_, err := s.pool.Exec(ctx, `insert into passkeys (id, name, public_key, sign_count, aaguid, transports, flags, created_at, user_id)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		c.ID, name, c.PublicKey, int64(c.Authenticator.SignCount), c.Authenticator.AAGUID, transports,
-		int16(c.Flags.ProtocolValue()), time.Now())
+		int16(c.Flags.ProtocolValue()), time.Now(), accounts.Ref(accountID))
 	if err != nil {
 		return fmt.Errorf("passkey: store credential: %w", err)
 	}
@@ -101,9 +117,9 @@ func (s store) recordUse(ctx context.Context, c *webauthn.Credential) error {
 	return nil
 }
 
-func (s store) count(ctx context.Context) (int, error) {
+func (s store) count(ctx context.Context, accountID string) (int, error) {
 	var n int
-	if err := s.pool.QueryRow(ctx, `select count(*) from passkeys`).Scan(&n); err != nil {
+	if err := s.pool.QueryRow(ctx, `select count(*) from passkeys where user_id is not distinct from $1`, accounts.Ref(accountID)).Scan(&n); err != nil {
 		return 0, fmt.Errorf("passkey: count: %w", err)
 	}
 	return n, nil

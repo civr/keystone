@@ -8,10 +8,13 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/civr/keystone/internal/accounts"
 )
 
 // Protocols an app can use.
@@ -76,18 +79,23 @@ type App struct {
 	URL      string
 	Protocol string
 	Config   Config
+	// Access lists the account ids that may use the app; nil is everyone.
+	Access []string
 }
 
-// Owner is the Keystone user.
-type Owner struct {
-	Username    string
-	DisplayName string
-	Email       string
-	UserHandle  []byte
-	// PasswordHash is the Keystone password of an owner made in the short
-	// setup (argon2); empty when the owner signs in with AD.
-	PasswordHash string
+// Allowed reports whether account id may use a.
+func (a App) Allowed(id string) bool {
+	if a.Access == nil {
+		return true
+	}
+	if id == "" {
+		id = accounts.OwnerID
+	}
+	return slices.Contains(a.Access, id)
 }
+
+// Owner is a Keystone account: the owner or a user (package accounts).
+type Owner = accounts.Account
 
 var (
 	slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
@@ -189,7 +197,12 @@ func (c *Config) Validate(protocol string) (field, msg string) {
 
 // Mapped returns the account to send, filling empty fields from the owner.
 func (a App) Mapped(o Owner) Account {
+	// The per-app overrides name the owner's account at the app; everyone
+	// else is known there by their own name.
 	m := a.Config.Account
+	if !o.IsOwner() {
+		m = Account{}
+	}
 	if m.Username == "" {
 		m.Username = o.Username
 	}
@@ -208,11 +221,11 @@ type Querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-const cols = `id::text, name, url, protocol, config`
+const cols = `id::text, name, url, protocol, config, access`
 
 func scan(r pgx.CollectableRow) (App, error) {
 	var a App
-	return a, r.Scan(&a.ID, &a.Name, &a.URL, &a.Protocol, &a.Config)
+	return a, r.Scan(&a.ID, &a.Name, &a.URL, &a.Protocol, &a.Config, &a.Access)
 }
 
 // Load returns every app in tile order.
@@ -242,9 +255,9 @@ func ByID(ctx context.Context, q Querier, id string) (App, error) {
 
 // LoadOwner returns the owner chosen during setup.
 func LoadOwner(ctx context.Context, q Querier) (Owner, error) {
-	var o Owner
-	err := q.QueryRow(ctx, `select username, coalesce(display_name, ''), coalesce(email, ''), user_handle,
-		coalesce(password_hash, '') from owner where id = 1`).
-		Scan(&o.Username, &o.DisplayName, &o.Email, &o.UserHandle, &o.PasswordHash)
+	o, err := accounts.Owner(ctx, q)
+	if errors.Is(err, accounts.ErrNotFound) {
+		err = pgx.ErrNoRows
+	}
 	return o, err
 }

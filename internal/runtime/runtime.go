@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/db"
@@ -106,6 +107,21 @@ type View struct {
 	Settings settings.Settings
 	Apps     []apps.App
 	Owner    apps.Owner
+	// Accounts is everyone who can sign in: the owner first, then the users.
+	Accounts []apps.Owner
+}
+
+// Account returns the account of a session (UserID; "" is the owner).
+func (v View) Account(userID string) (apps.Owner, bool) {
+	if userID == "" {
+		userID = accounts.OwnerID
+	}
+	for _, a := range v.Accounts {
+		if a.ID == userID {
+			return a, !a.Disabled
+		}
+	}
+	return apps.Owner{}, false
 }
 
 // Snapshot caches a View for TTL, so hot paths (gate checks, LDAP binds) do
@@ -148,6 +164,9 @@ func load(ctx context.Context, pool *pgxpool.Pool) (View, error) {
 		return v, err
 	}
 	if v.Apps, err = apps.Load(ctx, pool); err != nil {
+		return v, err
+	}
+	if v.Accounts, err = accounts.List(ctx, pool); err != nil {
 		return v, err
 	}
 	v.Owner, err = apps.LoadOwner(ctx, pool)

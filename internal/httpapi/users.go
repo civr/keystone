@@ -1,0 +1,296 @@
+package httpapi
+
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+	"net/mail"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/civr/keystone/internal/accounts"
+	"github.com/civr/keystone/internal/crypto"
+)
+
+// Accounts (Settings › Users): admins add people who sign in with a Keystone
+// password. The owner is listed but managed in setup and Settings.
+
+const (
+	minPassword = 12
+	maxName     = 100
+)
+
+type userView struct {
+	ID          string    `json:"id"`
+	Username    string    `json:"username"`
+	DisplayName string    `json:"display_name"`
+	Email       string    `json:"email"`
+	Role        string    `json:"role"` // owner, admin or member
+	Disabled    bool      `json:"disabled"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func viewOf(a accounts.Account) userView {
+	role := a.Role
+	if a.IsOwner() {
+		role = "owner"
+	}
+	return userView{ID: a.ID, Username: a.Username, DisplayName: a.DisplayName, Email: a.Email, Role: role, Disabled: a.Disabled, CreatedAt: a.CreatedAt}
+}
+
+func (s *server) listUsers(w http.ResponseWriter, r *http.Request) {
+	list, err := accounts.List(r.Context(), s.d.Pool)
+	if err != nil {
+		errInternal(w, "list users", err)
+		return
+	}
+	out := make([]userView, 0, len(list))
+	for _, a := range list {
+		out = append(out, viewOf(a))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"users": out})
+}
+
+// passwordError is the message for an unacceptable new password, or "".
+func passwordError(pw string) string {
+	if utf8.RuneCountInString(pw) < minPassword {
+		return "Choose a password of at least 12 characters."
+	}
+	if len(pw) > maxVaultField {
+		return "The password may be at most 1024 characters."
+	}
+	return ""
+}
+
+// profileError checks a display name, e-mail address and role; field and
+// message, or "" when fine.
+func profileError(display, email, role string) (string, string) {
+	switch {
+	case utf8.RuneCountInString(display) > maxName:
+		return "display_name", "The name may be at most 100 characters."
+	case email != "" && !validEmail(email):
+		return "email", "Enter a valid e-mail address."
+	case role != accounts.Admin && role != accounts.Member:
+		return "role", "Choose admin or member."
+	}
+	return "", ""
+}
+
+func validEmail(e string) bool {
+	a, err := mail.ParseAddress(e)
+	return err == nil && a.Address == e
+}
+
+func (s *server) createUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var in struct {
+		Username    string `json:"username"`
+		DisplayName string `json:"display_name"`
+		Email       string `json:"email"`
+		Password    string `json:"password"`
+		Role        string `json:"role"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	in.Username = strings.ToLower(strings.TrimSpace(in.Username))
+	in.DisplayName, in.Email = strings.TrimSpace(in.DisplayName), strings.TrimSpace(in.Email)
+	if !accounts.ValidUsername(in.Username) {
+		writeInvalid(w, "username", "Use lowercase letters, digits, dot, dash or underscore (at most 64).")
+		return
+	}
+	if f, msg := profileError(in.DisplayName, in.Email, in.Role); f != "" {
+		writeInvalid(w, f, msg)
+		return
+	}
+	if msg := passwordError(in.Password); msg != "" {
+		writeInvalid(w, "password", msg)
+		return
+	}
+	hash, err := crypto.HashSecret(in.Password)
+	if err != nil {
+		errInternal(w, "hash password", err)
+		return
+	}
+	a, err := accounts.Create(ctx, s.d.Pool, accounts.New{Username: in.Username, DisplayName: in.DisplayName, Email: in.Email, PasswordHash: hash, Role: in.Role})
+	if errors.Is(err, accounts.ErrTaken) {
+		writeInvalid(w, "username", "This username is already in use.")
+		return
+	}
+	if err != nil {
+		errInternal(w, "create user", err)
+		return
+	}
+	s.d.Audit.Log(ctx, actor(ctx), "user.created", clientIP(ctx), map[string]any{"id": a.ID, "username": a.Username, "role": a.Role})
+	writeJSON(w, http.StatusCreated, viewOf(a))
+}
+
+func (s *server) updateUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+	if id == accounts.OwnerID {
+		writeError(w, http.StatusForbidden, "owner", "The owner is changed under Settings › General.")
+		return
+	}
+	if _, ok := appID(w, r); !ok {
+		return
+	}
+	var in struct {
+		DisplayName *string `json:"display_name"`
+		Email       *string `json:"email"`
+		Role        *string `json:"role"`
+		Disabled    *bool   `json:"disabled"`
+		Password    *string `json:"password"` // set: an admin's reset
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	cur, err := accounts.Load(ctx, s.d.Pool, id)
+	if errors.Is(err, accounts.ErrNotFound) {
+		errNotFound(w, r)
+		return
+	}
+	if err != nil {
+		errInternal(w, "load user", err)
+		return
+	}
+	display, email, role := cur.DisplayName, cur.Email, cur.Role
+	if in.DisplayName != nil {
+		v := strings.TrimSpace(*in.DisplayName)
+		in.DisplayName, display = &v, v
+	}
+	if in.Email != nil {
+		v := strings.TrimSpace(*in.Email)
+		in.Email, email = &v, v
+	}
+	if in.Role != nil {
+		role = *in.Role
+	}
+	if f, msg := profileError(display, email, role); f != "" {
+		writeInvalid(w, f, msg)
+		return
+	}
+	change := accounts.Change{DisplayName: in.DisplayName, Email: in.Email, Role: in.Role, Disabled: in.Disabled}
+	if in.Password != nil {
+		if msg := passwordError(*in.Password); msg != "" {
+			writeInvalid(w, "password", msg)
+			return
+		}
+		hash, err := crypto.HashSecret(*in.Password)
+		if err != nil {
+			errInternal(w, "hash password", err)
+			return
+		}
+		change.PasswordHash = &hash
+	}
+	a, err := accounts.Update(ctx, s.d.Pool, id, change)
+	if err != nil {
+		errInternal(w, "update user", err)
+		return
+	}
+	// A new password or a disabled account signs out everywhere.
+	if in.Password != nil || a.Disabled {
+		if err := s.d.Sessions.RevokeUser(ctx, a.ID); err != nil {
+			slog.Error("users: revoke sessions", "err", err)
+		}
+	}
+	s.d.Audit.Log(ctx, actor(ctx), "user.updated", clientIP(ctx), map[string]any{
+		"id": a.ID, "username": a.Username, "role": a.Role, "disabled": a.Disabled, "password_reset": in.Password != nil,
+	})
+	writeJSON(w, http.StatusOK, viewOf(a))
+}
+
+func (s *server) deleteUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+	if id == accounts.OwnerID {
+		writeError(w, http.StatusForbidden, "owner", "The owner cannot be deleted.")
+		return
+	}
+	if _, ok := appID(w, r); !ok {
+		return
+	}
+	if id == SessionFrom(ctx).UserID {
+		writeError(w, http.StatusConflict, "self", "You cannot delete your own account.")
+		return
+	}
+	a, err := accounts.Load(ctx, s.d.Pool, id)
+	if errors.Is(err, accounts.ErrNotFound) {
+		errNotFound(w, r)
+		return
+	}
+	if err != nil {
+		errInternal(w, "load user", err)
+		return
+	}
+	if err := accounts.Delete(ctx, s.d.Pool, id); err != nil {
+		errInternal(w, "delete user", err)
+		return
+	}
+	if _, err := s.d.Pool.Exec(ctx, `update apps set access = array_remove(access, $1) where $1 = any(access)`, id); err != nil {
+		slog.Error("users: drop from app access", "err", err)
+	}
+	if err := s.d.Sessions.RevokeUser(ctx, id); err != nil {
+		slog.Error("users: revoke sessions", "err", err)
+	}
+	s.d.Audit.Log(ctx, actor(ctx), "user.deleted", clientIP(ctx), map[string]any{"id": id, "username": a.Username})
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// changeOwnPassword sets the signed-in account's password after checking the
+// current one. An owner who signs in with AD changes it in AD.
+func (s *server) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cfg := settingsFrom(ctx)
+	ip := clientIP(ctx)
+	var in struct {
+		Current string `json:"current"`
+		New     string `json:"new"`
+	}
+	if !readJSON(w, r, &in) {
+		return
+	}
+	acct, err := s.account(ctx)
+	if err != nil {
+		errInternal(w, "load account", err)
+		return
+	}
+	if acct.PasswordHash == "" {
+		writeError(w, http.StatusConflict, "ad_password", "You sign in with your Active Directory password; change it there.")
+		return
+	}
+	if msg := passwordError(in.New); msg != "" {
+		writeInvalid(w, "new", msg)
+		return
+	}
+	if !s.allow(w, ctx, "login-account", acct.Username, cfg.BruteForce.LoginPerAccountPerMinute) {
+		return
+	}
+	if !crypto.VerifySecret(acct.PasswordHash, in.Current) {
+		writeInvalid(w, "current", "That is not your current password.")
+		return
+	}
+	hash, err := crypto.HashSecret(in.New)
+	if err != nil {
+		errInternal(w, "hash password", err)
+		return
+	}
+	if err := accounts.SetPassword(ctx, s.d.Pool, acct.ID, hash); err != nil {
+		errInternal(w, "set password", err)
+		return
+	}
+	// Other sessions of this account end; this one stays.
+	list, err := s.d.Sessions.List(ctx)
+	if err == nil {
+		for _, x := range list {
+			if x.UserID == SessionFrom(ctx).UserID && x.ID != SessionFrom(ctx).ID {
+				_ = s.d.Sessions.Revoke(ctx, x.ID)
+			}
+		}
+	}
+	s.d.Audit.Log(ctx, actor(ctx), "account.password_changed", ip, nil)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}

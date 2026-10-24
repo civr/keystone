@@ -125,9 +125,14 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if c, err := r.Cookie(gatetoken.Cookie); err == nil {
-		_, err := gatetoken.Resolve(ctx, s.Valkey, s.Sessions, v.Settings, c.Value, time.Now())
+		sess, err := gatetoken.Resolve(ctx, s.Valkey, s.Sessions, v.Settings, c.Value, time.Now())
 		if err == nil {
-			acct := app.Mapped(v.Owner)
+			who, ok := v.Account(sess.UserID)
+			if !ok || !app.Allowed(who.ID) {
+				http.Error(w, "no access to this app", http.StatusForbidden)
+				return
+			}
+			acct := app.Mapped(who)
 			h := w.Header()
 			h.Set("X-Keystone-User", acct.Username)
 			h.Set("X-Keystone-Email", acct.Email)

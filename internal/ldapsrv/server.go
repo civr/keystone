@@ -229,41 +229,69 @@ func (cn *conn) bind(ctx context.Context, id int64, op *ber.Packet) {
 		}
 		cn.who = bound{slug: slug}
 		reply(resultSuccess, "")
-	case attr == "uid" && strings.EqualFold(val, a.Mapped(v.Owner).Username):
-		cn.userBind(ctx, reply, v, a, name, password)
+	case attr == "uid":
+		who, ok := member(v, a, val)
+		if !ok {
+			cn.failed(ctx, name, "unknown user")
+			reply(resultInvalidCredentials, "")
+			return
+		}
+		cn.userBind(ctx, reply, v, a, who, name, password)
 	default:
 		cn.failed(ctx, name, "unknown user")
 		reply(resultInvalidCredentials, "")
 	}
 }
 
-func (cn *conn) userBind(ctx context.Context, reply func(int, string), v runtime.View, a apps.App, dn, password string) {
-	account := "ldap:" + a.Config.LDAP.Slug
+// member returns the account known at app a as uid: one that may use a.
+func member(v runtime.View, a apps.App, uid string) (apps.Owner, bool) {
+	for _, acct := range members(v, a) {
+		if strings.EqualFold(uid, a.Mapped(acct).Username) {
+			return acct, true
+		}
+	}
+	return apps.Owner{}, false
+}
+
+// members are the enabled accounts that may use app a.
+func members(v runtime.View, a apps.App) []apps.Owner {
+	var out []apps.Owner
+	for _, acct := range v.Accounts {
+		if !acct.Disabled && a.Allowed(acct.ID) {
+			out = append(out, acct)
+		}
+	}
+	return out
+}
+
+func (cn *conn) userBind(ctx context.Context, reply func(int, string), v runtime.View, a apps.App, who apps.Owner, dn, password string) {
+	account := "ldap:" + a.Config.LDAP.Slug + ":" + who.Username
 	if locked, _, err := cn.s.Limiter.Locked(ctx, account); err != nil || locked {
 		reply(resultUnwilling, "account temporarily locked")
 		return
 	}
 	var err error
-	if v.Owner.PasswordHash != "" {
-		// Owner from the short setup: the Keystone password, no AD.
-		if !crypto.VerifySecret(v.Owner.PasswordHash, password) {
+	if who.PasswordHash != "" {
+		// A Keystone password (an added account, or an owner from the short
+		// setup): no AD.
+		if !crypto.VerifySecret(who.PasswordHash, password) {
 			err = ad.ErrInvalidCredentials
 		}
 	} else {
 		dir := cn.s.Dir()
-		if dir == nil || v.Owner.Username == "" {
+		if dir == nil || who.Username == "" {
 			reply(resultUnavailable, "directory not configured")
 			return
 		}
 		actx, cancel := context.WithTimeout(ctx, opTimeout)
 		defer cancel()
-		_, err = dir.Authenticate(actx, v.Owner.Username, password)
+		_, err = dir.Authenticate(actx, who.Username, password)
 	}
 	switch {
 	case err == nil:
 		_ = cn.s.Limiter.ResetFailures(ctx, account)
 		cn.who = bound{slug: a.Config.LDAP.Slug, user: true}
-		cn.audit(ctx, "app.access", map[string]any{"app": a.Name, "id": a.ID, "protocol": "ldap"})
+		cn.audit(ctx, "app.access", map[string]any{"app": a.Name, "id": a.ID, "protocol": "ldap", "username": who.Username})
 		reply(resultSuccess, "")
 	case errors.Is(err, ad.ErrInvalidCredentials), errors.Is(err, ad.ErrNotFound):
 		_, _ = cn.s.Limiter.Fail(ctx, account, v.Settings)
@@ -288,39 +316,46 @@ func (cn *conn) audit(ctx context.Context, action string, detail map[string]any)
 	}
 }
 
-// entries returns the objects of the app subtree slug.
+// entries returns the objects of the app subtree slug: the ou, one person per
+// account that may use the app, and the users group with them all.
 func entries(v runtime.View, a apps.App) []entry {
-	acct := a.Mapped(v.Owner)
 	ou := "ou=" + a.Config.LDAP.Slug + "," + BaseDN
-	user := "uid=" + acct.Username + "," + ou
 	group := "cn=users," + ou
-	sn := acct.DisplayName
-	given := ""
-	if i := strings.LastIndexByte(sn, ' '); i > 0 {
-		given, sn = sn[:i], sn[i+1:]
+	out := []entry{{DN: ou, Attrs: map[string][]string{"objectClass": {"top", "organizationalUnit"}, "ou": {a.Config.LDAP.Slug}}}}
+	var memberDNs []string
+	for _, who := range members(v, a) {
+		acct := a.Mapped(who)
+		user := "uid=" + acct.Username + "," + ou
+		memberDNs = append(memberDNs, user)
+		sn := acct.DisplayName
+		given := ""
+		if i := strings.LastIndexByte(sn, ' '); i > 0 {
+			given, sn = sn[:i], sn[i+1:]
+		}
+		if sn == "" {
+			sn = acct.Username
+		}
+		u := entry{DN: user, Attrs: map[string][]string{
+			"objectClass": {"top", "person", "organizationalPerson", "inetOrgPerson"},
+			"uid":         {acct.Username},
+			"cn":          {acct.Username},
+			"sn":          {sn},
+			"displayName": {acct.DisplayName},
+			"memberOf":    {group},
+		}}
+		if acct.Email != "" {
+			u.Attrs["mail"] = []string{acct.Email}
+		}
+		if given != "" {
+			u.Attrs["givenName"] = []string{given}
+		}
+		out = append(out, u)
 	}
-	if sn == "" {
-		sn = acct.Username
+	g := entry{DN: group, Attrs: map[string][]string{"objectClass": {"top", "groupOfNames"}, "cn": {"users"}}}
+	if len(memberDNs) > 0 {
+		g.Attrs["member"] = memberDNs
 	}
-	u := entry{DN: user, Attrs: map[string][]string{
-		"objectClass": {"top", "person", "organizationalPerson", "inetOrgPerson"},
-		"uid":         {acct.Username},
-		"cn":          {acct.Username},
-		"sn":          {sn},
-		"displayName": {acct.DisplayName},
-		"memberOf":    {group},
-	}}
-	if acct.Email != "" {
-		u.Attrs["mail"] = []string{acct.Email}
-	}
-	if given != "" {
-		u.Attrs["givenName"] = []string{given}
-	}
-	return []entry{
-		{DN: ou, Attrs: map[string][]string{"objectClass": {"top", "organizationalUnit"}, "ou": {a.Config.LDAP.Slug}}},
-		u,
-		{DN: group, Attrs: map[string][]string{"objectClass": {"top", "groupOfNames"}, "cn": {"users"}, "member": {user}}},
-	}
+	return append(out, g)
 }
 
 func rootDSE() entry {

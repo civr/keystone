@@ -15,9 +15,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/appicon"
 	"github.com/civr/keystone/internal/apps"
-	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
 )
 
@@ -43,6 +43,8 @@ type appInput struct {
 	Icon     string      `json:"icon"`
 	Protocol string      `json:"protocol"`
 	Config   apps.Config `json:"config"`
+	// Access lists the account ids that may use the app; null is everyone.
+	Access []string `json:"access"`
 }
 
 // validate trims and checks the input; it returns the offending field and a
@@ -144,17 +146,18 @@ type appOut struct {
 	Icon      string      `json:"icon"`
 	Protocol  string      `json:"protocol"`
 	Config    apps.Config `json:"config"`
+	Access    []string    `json:"access"`
 	HasSecret bool        `json:"has_secret"`
 	Sort      int         `json:"sort"`
 	CreatedAt time.Time   `json:"created_at"`
 }
 
-const appCols = `id::text, name, url, color, coalesce(icon, ''), protocol, config, sort, created_at`
+const appCols = `id::text, name, url, color, coalesce(icon, ''), protocol, config, access, sort, created_at`
 
 // scanApp reads a row and strips secret hashes from the config.
 func scanApp(r pgx.CollectableRow) (appOut, error) {
 	var a appOut
-	if err := r.Scan(&a.ID, &a.Name, &a.URL, &a.Color, &a.Icon, &a.Protocol, &a.Config, &a.Sort, &a.CreatedAt); err != nil {
+	if err := r.Scan(&a.ID, &a.Name, &a.URL, &a.Color, &a.Icon, &a.Protocol, &a.Config, &a.Access, &a.Sort, &a.CreatedAt); err != nil {
 		return a, err
 	}
 	if o := a.Config.OIDC; o != nil {
@@ -254,12 +257,22 @@ func (s *server) appSecret(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "app secret", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "app.secret_created", clientIP(ctx), map[string]any{"id": id, "name": a.Name})
+	s.d.Audit.Log(ctx, actor(ctx), "app.secret_created", clientIP(ctx), map[string]any{"id": id, "name": a.Name})
 	writeJSON(w, http.StatusOK, map[string]string{"secret": secret})
 }
 
+// listApps lists the apps. Members, and anyone asking with ?mine=1 (the home
+// page), get only the apps they may use; admins managing apps get all.
 func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.d.Pool.Query(r.Context(), `select `+appCols+` from apps order by sort, created_at, id`)
+	ctx := r.Context()
+	acct, err := s.account(ctx)
+	if err != nil {
+		errInternal(w, "load account", err)
+		return
+	}
+	all := acct.IsAdmin() && r.URL.Query().Get("mine") == ""
+	rows, err := s.d.Pool.Query(ctx, `select `+appCols+` from apps where $1 or access is null or $2 = any(access)
+		order by sort, created_at, id`, all, acct.ID)
 	if err != nil {
 		errInternal(w, "list apps", err)
 		return
@@ -287,12 +300,12 @@ func (s *server) readApp(w http.ResponseWriter, r *http.Request) (appInput, bool
 func (s *server) createApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, ok := s.readApp(w, r)
-	if !ok || !s.prepareConfig(ctx, w, "", &in) {
+	if !ok || !s.prepareConfig(ctx, w, "", &in) || !s.checkAccess(ctx, w, in.Access) {
 		return
 	}
-	rows, err := s.d.Pool.Query(ctx, `insert into apps (id, name, url, color, icon, protocol, config, sort, created_at)
-		values ($1, $2, $3, $4, nullif($5, ''), $6, $7, (select coalesce(max(sort) + 1, 0) from apps), now())
-		returning `+appCols, uuid.NewString(), in.Name, in.URL, in.Color, in.Icon, in.Protocol, in.Config)
+	rows, err := s.d.Pool.Query(ctx, `insert into apps (id, name, url, color, icon, protocol, config, access, sort, created_at)
+		values ($1, $2, $3, $4, nullif($5, ''), $6, $7, $8, (select coalesce(max(sort) + 1, 0) from apps), now())
+		returning `+appCols, uuid.NewString(), in.Name, in.URL, in.Color, in.Icon, in.Protocol, in.Config, in.Access)
 	if err != nil {
 		errInternal(w, "create app", err)
 		return
@@ -302,8 +315,32 @@ func (s *server) createApp(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "create app", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "app.created", clientIP(ctx), map[string]any{"id": a.ID, "name": a.Name})
+	s.d.Audit.Log(ctx, actor(ctx), "app.created", clientIP(ctx), map[string]any{"id": a.ID, "name": a.Name})
 	writeJSON(w, http.StatusCreated, a)
+}
+
+// checkAccess checks that every id in access is an account; false when an
+// answer was written. nil (everyone) is always fine.
+func (s *server) checkAccess(ctx context.Context, w http.ResponseWriter, access []string) bool {
+	if access == nil {
+		return true
+	}
+	list, err := accounts.List(ctx, s.d.Pool)
+	if err != nil {
+		errInternal(w, "list accounts", err)
+		return false
+	}
+	known := map[string]bool{}
+	for _, a := range list {
+		known[a.ID] = true
+	}
+	for _, id := range access {
+		if !known[id] {
+			writeInvalid(w, "access", "Choose people who have an account.")
+			return false
+		}
+	}
+	return true
 }
 
 func appID(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -322,11 +359,11 @@ func (s *server) updateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in, ok := s.readApp(w, r)
-	if !ok || !s.prepareConfig(ctx, w, id, &in) {
+	if !ok || !s.prepareConfig(ctx, w, id, &in) || !s.checkAccess(ctx, w, in.Access) {
 		return
 	}
-	rows, err := s.d.Pool.Query(ctx, `update apps set name = $2, url = $3, color = $4, icon = nullif($5, ''), protocol = $6, config = $7
-		where id = $1 returning `+appCols, id, in.Name, in.URL, in.Color, in.Icon, in.Protocol, in.Config)
+	rows, err := s.d.Pool.Query(ctx, `update apps set name = $2, url = $3, color = $4, icon = nullif($5, ''), protocol = $6, config = $7,
+		access = $8 where id = $1 returning `+appCols, id, in.Name, in.URL, in.Color, in.Icon, in.Protocol, in.Config, in.Access)
 	if err != nil {
 		errInternal(w, "update app", err)
 		return
@@ -347,7 +384,7 @@ func (s *server) updateApp(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "app.updated", clientIP(ctx), map[string]any{"id": a.ID, "name": a.Name})
+	s.d.Audit.Log(ctx, actor(ctx), "app.updated", clientIP(ctx), map[string]any{"id": a.ID, "name": a.Name})
 	writeJSON(w, http.StatusOK, a)
 }
 
@@ -367,7 +404,7 @@ func (s *server) deleteApp(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "delete app", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "app.deleted", clientIP(ctx), map[string]any{"id": id, "name": name})
+	s.d.Audit.Log(ctx, actor(ctx), "app.deleted", clientIP(ctx), map[string]any{"id": id, "name": name})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -426,6 +463,6 @@ func (s *server) reorderApps(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "reorder apps", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "app.reordered", clientIP(ctx), nil)
+	s.d.Audit.Log(ctx, actor(ctx), "app.reordered", clientIP(ctx), nil)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

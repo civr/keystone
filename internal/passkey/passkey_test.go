@@ -1,6 +1,8 @@
 package passkey
 
 import (
+	"fmt"
+
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/db"
 	"github.com/civr/keystone/internal/passkey/passkeytest"
 	"github.com/civr/keystone/internal/testutil"
@@ -45,7 +48,7 @@ func newPool(t *testing.T) *pgxpool.Pool {
 func register(t *testing.T, svc *Service, a *passkeytest.TestAuthenticator, name string) {
 	t.Helper()
 	ctx := context.Background()
-	opts, state, err := svc.BeginRegistration(ctx)
+	opts, state, err := svc.BeginRegistration(ctx, accounts.OwnerID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,14 +57,14 @@ func register(t *testing.T, svc *Service, a *passkeytest.TestAuthenticator, name
 		t.Fatal(err)
 	}
 	r := httptest.NewRequest("POST", "/", bytes.NewReader(cred))
-	if err := svc.FinishRegistration(ctx, state, r, name); err != nil {
+	if err := svc.FinishRegistration(ctx, accounts.OwnerID, state, r, name); err != nil {
 		t.Fatalf("FinishRegistration: %v", err)
 	}
 }
 
 func login(svc *Service, a *passkeytest.TestAuthenticator, discoverable bool) error {
 	ctx := context.Background()
-	opts, state, err := svc.BeginLogin(ctx, discoverable)
+	opts, state, err := svc.BeginLogin(ctx, accounts.OwnerID, discoverable)
 	if err != nil {
 		return err
 	}
@@ -69,7 +72,11 @@ func login(svc *Service, a *passkeytest.TestAuthenticator, discoverable bool) er
 	if err != nil {
 		return err
 	}
-	return svc.FinishLogin(ctx, state, httptest.NewRequest("POST", "/", bytes.NewReader(cred)))
+	id, err := svc.FinishLogin(ctx, state, httptest.NewRequest("POST", "/", bytes.NewReader(cred)))
+	if err == nil && id != accounts.OwnerID {
+		return fmt.Errorf("signed as %q", id)
+	}
+	return err
 }
 
 func TestPasskeyRegisterAndLogin(t *testing.T) {
@@ -80,12 +87,12 @@ func TestPasskeyRegisterAndLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n, err := svc.Count(ctx); err != nil || n != 0 {
+	if n, err := svc.Count(ctx, accounts.OwnerID); err != nil || n != 0 {
 		t.Fatalf("Count = %d, %v", n, err)
 	}
 	a := passkeytest.NewTestAuthenticator(testOrigin)
 	register(t, svc, a, "MacBook")
-	if n, err := svc.Count(ctx); err != nil || n != 1 {
+	if n, err := svc.Count(ctx, accounts.OwnerID); err != nil || n != 1 {
 		t.Fatalf("Count after register = %d, %v", n, err)
 	}
 	var name string
@@ -98,7 +105,7 @@ func TestPasskeyRegisterAndLogin(t *testing.T) {
 	}
 
 	// Registering the same authenticator again is excluded / rejected.
-	opts, _, err := svc.BeginRegistration(ctx)
+	opts, _, err := svc.BeginRegistration(ctx, accounts.OwnerID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +166,7 @@ func TestPasskeyBeginRegistrationWithoutOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := svc.BeginRegistration(context.Background()); !errors.Is(err, ErrNoOwner) {
+	if _, _, err := svc.BeginRegistration(context.Background(), accounts.OwnerID); !errors.Is(err, ErrNoOwner) {
 		t.Fatalf("err = %v, want ErrNoOwner", err)
 	}
 }

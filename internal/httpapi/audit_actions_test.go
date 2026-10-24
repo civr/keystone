@@ -41,7 +41,7 @@ func TestAuditActionsFixture(t *testing.T) {
 		slices.Sort(out)
 		return out
 	}
-	actions := collect(regexp.MustCompile(`\.Log\(ctx, audit\.Actor\w+, "([a-z_.]+)"`))
+	actions := collect(regexp.MustCompile(`\.Log\(ctx, (?:audit\.Actor\w+|actor\(ctx\)|actorOf\([^)]*\)), "([a-z_.]+)"`))
 	methods := collect(
 		regexp.MustCompile(`"method": "([a-z_]+)"`),
 		regexp.MustCompile(`method :?= "([a-z_]+)"`),

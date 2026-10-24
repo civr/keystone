@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/oidc"
@@ -20,7 +22,10 @@ func issuer(r *http.Request) string {
 }
 
 func (s *server) oidcProvider() *oidc.Provider {
-	return &oidc.Provider{Keys: s.keys, Valkey: s.d.Valkey, Sessions: s.d.Sessions}
+	return &oidc.Provider{Keys: s.keys, Valkey: s.d.Valkey, Sessions: s.d.Sessions,
+		Account: func(ctx context.Context, userID string) (apps.Owner, error) {
+			return accounts.Load(ctx, s.d.Pool, userID)
+		}}
 }
 
 func (s *server) oidcRoutes(r chi.Router) {
@@ -76,6 +81,10 @@ func (s *server) oidcAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 	if oerr != nil {
 		back(url.Values{"error": {oerr.Code}, "error_description": {oerr.Description}})
+		return
+	}
+	if !ar.App.Allowed(accountKey(SessionFrom(ctx).UserID)) {
+		back(url.Values{"error": {"access_denied"}, "error_description": {"You do not have access to this app."}})
 		return
 	}
 	code, err := s.oidcProvider().IssueCode(ctx, ar, SessionFrom(ctx).ID, randomToken)
@@ -136,18 +145,13 @@ func (s *server) oidcToken(w http.ResponseWriter, r *http.Request) {
 		oauthError(w, http.StatusUnauthorized, "invalid_client", "Clientauthenticatie mislukt.")
 		return
 	}
-	owner, err := apps.LoadOwner(ctx, s.d.Pool)
-	if err != nil {
-		errInternal(w, "oidc owner", err)
-		return
-	}
 	cfg, f := settingsFrom(ctx), r.PostForm
 	var t oidc.Tokens
 	switch f.Get("grant_type") {
 	case "authorization_code":
-		t, err = s.oidcProvider().Exchange(ctx, cfg, issuer(r), client, owner, f.Get("code"), f.Get("redirect_uri"), f.Get("code_verifier"), randomToken)
+		t, err = s.oidcProvider().Exchange(ctx, cfg, issuer(r), client, f.Get("code"), f.Get("redirect_uri"), f.Get("code_verifier"), randomToken)
 	case "refresh_token":
-		t, err = s.oidcProvider().Refresh(ctx, cfg, issuer(r), client, owner, f.Get("refresh_token"), randomToken)
+		t, err = s.oidcProvider().Refresh(ctx, cfg, issuer(r), client, f.Get("refresh_token"), randomToken)
 	default:
 		oauthError(w, http.StatusBadRequest, "unsupported_grant_type", "Onbekend grant_type.")
 		return
@@ -178,12 +182,7 @@ func (s *server) oidcUserinfo(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "oidc apps", err)
 		return
 	}
-	owner, err := apps.LoadOwner(ctx, s.d.Pool)
-	if err != nil {
-		errInternal(w, "oidc owner", err)
-		return
-	}
-	claims, err := s.oidcProvider().Userinfo(ctx, settingsFrom(ctx), issuer(r), strings.TrimSpace(bearer), list, owner)
+	claims, err := s.oidcProvider().Userinfo(ctx, settingsFrom(ctx), issuer(r), strings.TrimSpace(bearer), list)
 	var oe *oidc.Error
 	if errors.As(err, &oe) {
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)

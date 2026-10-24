@@ -17,7 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/civr/keystone/internal/audit"
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/crypto"
 )
 
@@ -34,6 +34,9 @@ func (s *server) listSessions(w http.ResponseWriter, r *http.Request) {
 	own := sessionHandle(SessionFrom(ctx).ID)
 	out := make([]map[string]any, 0, len(list))
 	for _, x := range list {
+		if x.UserID != SessionFrom(ctx).UserID {
+			continue // each account sees its own sessions
+		}
 		out = append(out, map[string]any{
 			"id": sessionHandle(x.ID), "created_at": x.CreatedAt, "last_seen_at": x.LastSeenAt, "ip": x.IP,
 			"user_agent": x.UserAgent, "emergency": x.Emergency, "current": sessionHandle(x.ID) == own,
@@ -59,7 +62,7 @@ func (s *server) deleteSession(w http.ResponseWriter, r *http.Request) {
 	}
 	var target string
 	for _, x := range list {
-		if subtle.ConstantTimeCompare([]byte(sessionHandle(x.ID)), []byte(handle)) == 1 {
+		if x.UserID == SessionFrom(ctx).UserID && subtle.ConstantTimeCompare([]byte(sessionHandle(x.ID)), []byte(handle)) == 1 {
 			target = x.ID
 			break
 		}
@@ -76,7 +79,7 @@ func (s *server) deleteSession(w http.ResponseWriter, r *http.Request) {
 	if own {
 		setCookie(w, r, settingsFrom(ctx), SessionCookie, "", 0)
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "session.revoked", clientIP(ctx), map[string]any{"own": own})
+	s.d.Audit.Log(ctx, actor(ctx), "session.revoked", clientIP(ctx), map[string]any{"own": own})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -85,7 +88,8 @@ func (s *server) deleteSession(w http.ResponseWriter, r *http.Request) {
 const ceremonyAddPasskey = "addpk:"
 
 func (s *server) listPasskeys(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.d.Pool.Query(r.Context(), `select id, name, created_at, last_used_at from passkeys order by created_at, id`)
+	rows, err := s.d.Pool.Query(r.Context(), `select id, name, created_at, last_used_at from passkeys
+		where user_id is not distinct from $1 order by created_at, id`, accounts.Ref(SessionFrom(r.Context()).UserID))
 	if err != nil {
 		errInternal(w, "list passkeys", err)
 		return
@@ -114,7 +118,7 @@ func (s *server) passkeyAddBegin(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "passkey service", err)
 		return
 	}
-	opts, state, err := svc.BeginRegistration(ctx)
+	opts, state, err := svc.BeginRegistration(ctx, SessionFrom(ctx).UserID)
 	if err != nil {
 		errInternal(w, "begin registration", err)
 		return
@@ -139,7 +143,7 @@ func (s *server) passkeyAddFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	name := passkeyName(r)
 	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
-	if err := svc.FinishRegistration(ctx, state, r, name); err != nil {
+	if err := svc.FinishRegistration(ctx, SessionFrom(ctx).UserID, state, r, name); err != nil {
 		writeError(w, http.StatusBadRequest, "passkey_failed", "De passkey kon niet worden geregistreerd. Probeer het opnieuw.")
 		return
 	}
@@ -151,7 +155,7 @@ func (s *server) passkeyAddFinish(w http.ResponseWriter, r *http.Request) {
 			slog.Error("passkey: update session", "err", err)
 		}
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "passkey.registered", clientIP(ctx), map[string]any{"name": name})
+	s.d.Audit.Log(ctx, actor(ctx), "passkey.registered", clientIP(ctx), map[string]any{"name": name})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -179,7 +183,8 @@ func (s *server) renamePasskey(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, r)
 		return
 	}
-	tag, err := s.d.Pool.Exec(ctx, `update passkeys set name = $2 where id = $1`, id, name)
+	tag, err := s.d.Pool.Exec(ctx, `update passkeys set name = $2 where id = $1 and user_id is not distinct from $3`,
+		id, name, accounts.Ref(SessionFrom(ctx).UserID))
 	if err != nil {
 		errInternal(w, "rename passkey", err)
 		return
@@ -188,7 +193,7 @@ func (s *server) renamePasskey(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, r)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "passkey.renamed", clientIP(ctx), map[string]any{"name": name})
+	s.d.Audit.Log(ctx, actor(ctx), "passkey.renamed", clientIP(ctx), map[string]any{"name": name})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -206,7 +211,7 @@ func (s *server) deletePasskey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	rows, err := tx.Query(ctx, `select id from passkeys for update`)
+	rows, err := tx.Query(ctx, `select id from passkeys where user_id is not distinct from $1 for update`, accounts.Ref(SessionFrom(ctx).UserID))
 	if err != nil {
 		errInternal(w, "delete passkey", err)
 		return
@@ -236,7 +241,7 @@ func (s *server) deletePasskey(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "delete passkey", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "passkey.removed", clientIP(ctx), nil)
+	s.d.Audit.Log(ctx, actor(ctx), "passkey.removed", clientIP(ctx), nil)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -277,7 +282,7 @@ func (s *server) regenerateRecovery(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "regenerate recovery codes", err)
 		return
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "recovery.regenerated", clientIP(ctx), nil)
+	s.d.Audit.Log(ctx, actor(ctx), "recovery.regenerated", clientIP(ctx), nil)
 	writeJSON(w, http.StatusOK, map[string]any{"recovery_codes": codes})
 }
 
@@ -339,7 +344,7 @@ func (s *server) putEmergency(w http.ResponseWriter, r *http.Request) {
 	if !enabled || hash != nil {
 		s.revokeEmergencySessions(ctx)
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "emergency.changed", clientIP(ctx),
+	s.d.Audit.Log(ctx, actor(ctx), "emergency.changed", clientIP(ctx),
 		map[string]any{"old_enabled": wasEnabled, "new_enabled": enabled, "password_changed": hash != nil})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -458,5 +463,5 @@ func (s *server) exportAudit(w http.ResponseWriter, r *http.Request) {
 			_ = rc.Flush()
 		}
 	}
-	s.d.Audit.Log(ctx, audit.ActorOwner, "audit.exported", clientIP(ctx), map[string]any{"rows": n})
+	s.d.Audit.Log(ctx, actor(ctx), "audit.exported", clientIP(ctx), map[string]any{"rows": n})
 }

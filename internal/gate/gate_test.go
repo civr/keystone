@@ -41,9 +41,11 @@ func setup(t *testing.T) (*Server, string, *session.Store, session.Session) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	owner := apps.Owner{ID: "owner", Username: "thijs", DisplayName: "Thijs Willems", Email: "thijs@home.lan"}
 	s := &Server{
 		View: &fixedView{runtime.View{Settings: cfg,
-			Owner: apps.Owner{Username: "thijs", DisplayName: "Thijs Willems", Email: "thijs@home.lan"},
+			Owner:    owner,
+			Accounts: []apps.Owner{owner},
 			Apps: []apps.App{{ID: "1", Name: "Home Assistant", Protocol: apps.GateP, Config: apps.Config{
 				Account: apps.Account{Username: "thijs_ha"},
 				Gate:    &apps.Gate{Host: "ha.home.lan", BypassPaths: []string{"/api/", "/auth/token"}}}}}}},

@@ -20,6 +20,7 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/keys"
 	"github.com/civr/keystone/internal/session"
@@ -141,7 +142,10 @@ type Provider struct {
 	Keys     *keys.Store
 	Valkey   *redis.Client
 	Sessions *session.Store
-	Now      func() time.Time
+	// Account loads the account a session belongs to (session.UserID; "" is
+	// the owner).
+	Account func(ctx context.Context, userID string) (apps.Owner, error)
+	Now     func() time.Time
 }
 
 func (p *Provider) now() time.Time {
@@ -182,7 +186,7 @@ type Tokens struct {
 var errGrant = &Error{Code: "invalid_grant", Description: "De code of het token is ongeldig of verlopen."}
 
 // Exchange redeems an authorization code.
-func (p *Provider) Exchange(ctx context.Context, cfg settings.Settings, issuer string, client apps.App, owner apps.Owner,
+func (p *Provider) Exchange(ctx context.Context, cfg settings.Settings, issuer string, client apps.App,
 	code, redirectURI, verifier string, random func() (string, error)) (Tokens, error) {
 	raw, err := p.Valkey.GetDel(ctx, hashKey("oidccode:", code)).Bytes()
 	if errors.Is(err, redis.Nil) {
@@ -201,11 +205,11 @@ func (p *Provider) Exchange(ctx context.Context, cfg settings.Settings, issuer s
 		subtle.ConstantTimeCompare([]byte(want), []byte(g.Challenge)) != 1 {
 		return Tokens{}, errGrant
 	}
-	return p.issue(ctx, cfg, issuer, client, owner, g, true, random)
+	return p.issue(ctx, cfg, issuer, client, g, true, random)
 }
 
 // Refresh redeems (and rotates) a refresh token.
-func (p *Provider) Refresh(ctx context.Context, cfg settings.Settings, issuer string, client apps.App, owner apps.Owner,
+func (p *Provider) Refresh(ctx context.Context, cfg settings.Settings, issuer string, client apps.App,
 	token string, random func() (string, error)) (Tokens, error) {
 	raw, err := p.Valkey.GetDel(ctx, hashKey("oidcrt:", token)).Bytes()
 	if errors.Is(err, redis.Nil) {
@@ -222,16 +226,20 @@ func (p *Provider) Refresh(ctx context.Context, cfg settings.Settings, issuer st
 		return Tokens{}, errGrant
 	}
 	g.Nonce = ""
-	return p.issue(ctx, cfg, issuer, client, owner, g, false, random)
+	return p.issue(ctx, cfg, issuer, client, g, false, random)
 }
 
-func (p *Provider) issue(ctx context.Context, cfg settings.Settings, issuer string, client apps.App, owner apps.Owner,
+func (p *Provider) issue(ctx context.Context, cfg settings.Settings, issuer string, client apps.App,
 	g grant, withID bool, random func() (string, error)) (Tokens, error) {
 	now := p.now()
 	sess, err := p.Sessions.Peek(ctx, g.SessionID, cfg, now)
 	if errors.Is(err, session.ErrNotFound) {
 		return Tokens{}, errGrant
 	}
+	if err != nil {
+		return Tokens{}, err
+	}
+	owner, err := p.account(ctx, sess.UserID, client)
 	if err != nil {
 		return Tokens{}, err
 	}
@@ -299,6 +307,16 @@ func (p *Provider) issue(ctx context.Context, cfg settings.Settings, issuer stri
 	return t, nil
 }
 
+// account loads the session's account and checks it may use client; a gone
+// or excluded account is an invalid grant.
+func (p *Provider) account(ctx context.Context, userID string, client apps.App) (apps.Owner, error) {
+	o, err := p.Account(ctx, userID)
+	if errors.Is(err, accounts.ErrNotFound) || (err == nil && (o.Disabled || !client.Allowed(o.ID))) {
+		return o, errGrant
+	}
+	return o, err
+}
+
 // JWKS returns the published OIDC public keys.
 func (p *Provider) JWKS(ctx context.Context) (jose.JSONWebKeySet, error) {
 	pub, err := p.Keys.Published(ctx, keys.OIDC)
@@ -313,7 +331,7 @@ func (p *Provider) JWKS(ctx context.Context) (jose.JSONWebKeySet, error) {
 }
 
 // Userinfo verifies a bearer access token and returns the claims for its app.
-func (p *Provider) Userinfo(ctx context.Context, cfg settings.Settings, issuer, bearer string, list []apps.App, owner apps.Owner) (map[string]any, error) {
+func (p *Provider) Userinfo(ctx context.Context, cfg settings.Settings, issuer, bearer string, list []apps.App) (map[string]any, error) {
 	tok, err := jwt.ParseSigned(bearer, []jose.SignatureAlgorithm{jose.RS256})
 	if err != nil {
 		return nil, errToken
@@ -345,12 +363,20 @@ func (p *Provider) Userinfo(ctx context.Context, cfg settings.Settings, issuer, 
 	if json.Unmarshal(raw, &g) != nil || g.ClientID != extra.ClientID {
 		return nil, errToken
 	}
-	if _, err := p.Sessions.Peek(ctx, g.SessionID, cfg, p.now()); err != nil {
+	sess, err := p.Sessions.Peek(ctx, g.SessionID, cfg, p.now())
+	if err != nil {
 		return nil, errToken
 	}
 	client, ok := clientByID(list, g.ClientID)
 	if !ok {
 		return nil, errToken
+	}
+	owner, err := p.account(ctx, sess.UserID, client)
+	if err == errGrant {
+		return nil, errToken
+	}
+	if err != nil {
+		return nil, err
 	}
 	acct := client.Mapped(owner)
 	out := map[string]any{"sub": c.Subject}
