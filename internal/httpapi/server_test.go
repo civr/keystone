@@ -348,3 +348,13 @@ func TestSessionLoaderAndRequireSession(t *testing.T) {
 		t.Fatalf("revoked session: %d", w.Code)
 	}
 }
+
+// awayFromMinuteEdge waits for a fresh minute when fewer than 15 s are left in
+// the current one: the rate limiter counts per fixed minute, so a test that
+// straddles the boundary would see its counter reset halfway.
+func awayFromMinuteEdge(t *testing.T) {
+	t.Helper()
+	if s := time.Now().Second(); s >= 45 {
+		time.Sleep(time.Duration(61-s) * time.Second)
+	}
+}

@@ -192,6 +192,7 @@ func TestSAML(t *testing.T) {
 
 	t.Run("StashRateLimited", func(t *testing.T) {
 		anon := newClient(t, l.env, "192.168.1.25")
+		awayFromMinuteEdge(t)
 		limited := false
 		for range 40 {
 			path, _ := redirectRequest(t, sp)

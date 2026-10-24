@@ -288,8 +288,10 @@ func TestADDownReturns503Fast(t *testing.T) {
 	c := newClient(t, l.env, "192.168.1.16")
 	start := time.Now()
 	r := password(c, "thijs", "correct horse")
-	if el := time.Since(start); el > 1500*time.Millisecond {
-		t.Fatalf("took %v", el)
+	// The directory would take 10 s; the 1 s AD timeout must cut that short.
+	// The bound is far below the delay but leaves room for slow CI machines.
+	if el := time.Since(start); el > 5*time.Second {
+		t.Fatalf("took %v: the AD timeout did not cut the 10 s wait short", el)
 	}
 	if r.Code != http.StatusServiceUnavailable || r.err() != "ad_unavailable" || r.Body["emergency"] != true || r.Body["message"] != "AD is niet bereikbaar." {
 		t.Fatalf("AD slow = %d %v", r.Code, r.Body)

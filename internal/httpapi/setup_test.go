@@ -184,6 +184,7 @@ func TestWrongSetupCodeRateLimited(t *testing.T) {
 	t.Parallel()
 	s := newSetupEnv(t)
 	c := newClient(t, s.env, "192.168.1.30")
+	awayFromMinuteEdge(t)
 	// Successful unlocks do not count towards the limit.
 	for i := 0; i < 6; i++ {
 		c.must("POST", "/api/setup/unlock", map[string]string{"code": s.code}, 200)
