@@ -2,21 +2,15 @@
 	import { onMount } from 'svelte';
 	import { api, ApiError, type Me } from '$lib/api';
 	import { filterApps, safeHref, type App } from '$lib/apps';
-	import { firstName, greeting } from '$lib/greeting';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import AppGrid from '$lib/components/AppGrid.svelte';
 
-	let now = $state(new Date());
 	let me = $state<Me | null>(null);
 	let apps = $state<App[] | null>(null);
 	let loadError = $state<string | null>(null);
 	let query = $state('');
 
 	const matches = $derived(apps ? filterApps(apps, query) : []);
-	const hello = $derived(greeting(now));
-	const today = $derived(
-		new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' }).format(now)
-	);
 
 	async function load() {
 		loadError = null;
@@ -37,9 +31,6 @@
 		// Arriving from the search on another page: /?q=…
 		query = new URLSearchParams(location.search).get('q') ?? '';
 		load();
-		// Keep the greeting right if the page stays open across a boundary.
-		const t = setInterval(() => (now = new Date()), 60_000);
-		return () => clearInterval(t);
 	});
 
 	function openFirst() {
@@ -80,10 +71,7 @@
 		</div>
 	{/if}
 
-	<header class="page-head">
-		<p class="sub">{today}</p>
-		<h1>{hello}{#if me}<span class="name">, {firstName(me)}</span>{/if}</h1>
-	</header>
+	<h1 class="visually-hidden">Mijn apps</h1>
 
 	{#if loadError}
 		<div class="surface state">
@@ -114,33 +102,6 @@
 </AppShell>
 
 <style>
-	/* A large title with the date above it, as in Today views. */
-	.page-head {
-		margin: 8px 0 32px;
-	}
-	h1 {
-		margin: 0;
-		font-size: 2.125rem;
-		font-weight: 700;
-		line-height: 1.12;
-		letter-spacing: -0.025em;
-		text-wrap: balance;
-	}
-	.name {
-		animation: appear var(--dur-3) var(--ease-out) both;
-	}
-	.sub {
-		margin: 0 0 4px;
-		color: var(--color-text-muted);
-		font-size: 0.8125rem;
-		font-weight: 600;
-		letter-spacing: 0.01em;
-		text-transform: uppercase;
-	}
-	.sub::first-letter {
-		text-transform: uppercase;
-	}
-
 	.banner {
 		display: flex;
 		gap: 10px;
@@ -186,8 +147,8 @@
 		padding: 10px 4px 6px;
 	}
 	.skeleton .icon {
-		width: 76px;
-		height: 76px;
+		width: 64px;
+		height: 64px;
 		border-radius: var(--radius-icon);
 	}
 	.skeleton .line {

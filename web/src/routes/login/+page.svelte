@@ -297,7 +297,6 @@
 					{/if}
 
 					{#if mode === 'password'}
-						<p class="lede">Log in met je AD-account.</p>
 						<form class="form" onsubmit={submitPassword} novalidate>
 							{#if trusted}
 								<button type="button" class="btn btn-primary block" onclick={passkeyOnly} disabled={busy}>

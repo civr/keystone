@@ -159,6 +159,22 @@
 		sheetOpen = true;
 	}
 
+	let fetchingIcon = $state(false);
+
+	/** Asks Keystone for the icon the app offers itself; quiet when asked to be. */
+	async function fetchIcon(quiet = false): Promise<void> {
+		if (fetchingIcon || !/^https?:\/\/./i.test(form.url.trim())) return;
+		fetchingIcon = true;
+		try {
+			form.icon = (await api.send<{ icon: string }>('POST', '/apps/icon', { url: form.url.trim() })).icon;
+			delete fieldErrors.icon;
+		} catch (e) {
+			if (!quiet) fieldErrors.icon = e instanceof ApiError ? e.message : 'Het icoon kon niet worden opgehaald.';
+		} finally {
+			fetchingIcon = false;
+		}
+	}
+
 	function pickIcon(e: Event & { currentTarget: HTMLInputElement }) {
 		const file = e.currentTarget.files?.[0];
 		e.currentTarget.value = '';
@@ -190,6 +206,8 @@
 		protoErrors = pbad ? { [pbad.field]: pbad.message } : {};
 		if (pbad) return void document.getElementById(pbad.field)?.focus();
 		saving = true;
+		// A new app without an icon gets the one it offers itself, if any.
+		if (!editing && !form.icon) await fetchIcon(true);
 		const body = {
 			name: form.name.trim(),
 			url: form.url.trim(),
@@ -398,8 +416,12 @@
 		<div class="field">
 			<span class="field-label">Icoon</span>
 			<div class="icon-row">
+				<button type="button" class="btn btn-secondary btn-sm" onclick={() => fetchIcon()} disabled={fetchingIcon}>
+					{#if fetchingIcon}<span class="spinner" aria-hidden="true"></span>{/if}
+					Van de app ophalen
+				</button>
 				<button type="button" class="btn btn-secondary btn-sm" onclick={() => fileInput?.click()}>
-					{form.icon ? 'Ander icoon kiezen' : 'Icoon kiezen'}
+					{form.icon ? 'Ander bestand' : 'Bestand kiezen'}
 				</button>
 				{#if form.icon}
 					<button type="button" class="btn btn-secondary btn-sm danger-ink" onclick={() => (form.icon = null)}>Verwijder icoon</button>
@@ -417,7 +439,7 @@
 			{#if fieldErrors.icon}
 				<small class="field-error" role="alert">{fieldErrors.icon}</small>
 			{:else}
-				<small>PNG, SVG of WebP, maximaal 64 kB. Zonder icoon toont de tegel de eerste letter.</small>
+				<small>Keystone haalt het icoon van de app zelf op als je een nieuwe app toevoegt. Of kies een PNG, SVG of WebP (maximaal 64 kB).</small>
 			{/if}
 		</div>
 
@@ -586,7 +608,7 @@
 		cursor: not-allowed;
 	}
 
-	/* The app's icon, as on the start page: its colour lit from above, a white initial. */
+	/* The app's icon, as on the start page: a flat tile in its colour, a white initial. */
 	.tile {
 		flex: none;
 		display: grid;
@@ -594,7 +616,7 @@
 		width: var(--size);
 		height: var(--size);
 		border-radius: 22.5%;
-		background: linear-gradient(180deg, color-mix(in oklch, var(--tile-color) 78%, white), var(--tile-color));
+		background: var(--tile-color);
 		color: #fff;
 		font-family: var(--font-display);
 		font-size: calc(var(--size) * 0.45);

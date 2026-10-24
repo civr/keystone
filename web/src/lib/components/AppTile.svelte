@@ -65,23 +65,18 @@
 		position: relative;
 		display: grid;
 		place-items: center;
-		width: 76px;
-		height: 76px;
+		width: 64px;
+		height: 64px;
 		border-radius: var(--radius-icon);
-		/* The app's colour with light falling from above, as Apple's icons. */
-		background: linear-gradient(180deg, color-mix(in oklch, var(--tile-color, #8e8e93) 78%, white), var(--tile-color, #8e8e93));
+		/* Without its own icon an app gets a flat tile in its colour. */
+		background: var(--tile-color, #8e8e93);
 		color: #fff;
 		font-family: var(--font-display);
-		font-size: 2.125rem;
-		font-weight: 600;
+		font-size: 1.75rem;
+		font-weight: 500;
 		letter-spacing: -0.02em;
-		box-shadow:
-			0 1px 2px rgba(0, 0, 0, 0.1),
-			0 4px 12px -4px color-mix(in srgb, var(--tile-color, #8e8e93) 45%, transparent),
-			inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
-		transition:
-			transform var(--dur-3) var(--ease-out),
-			box-shadow var(--dur-3) var(--ease-out);
+		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+		transition: transform var(--dur-1) var(--ease);
 	}
 	.icon.image {
 		background: #fff;
@@ -126,19 +121,9 @@
 		stroke-linecap: round;
 		stroke-linejoin: round;
 	}
-	@media (hover: hover) {
-		.tile:hover .icon {
-			transform: translateY(-2px) scale(1.04);
-			box-shadow:
-				0 2px 4px rgba(0, 0, 0, 0.1),
-				0 12px 24px -8px color-mix(in srgb, var(--tile-color, #8e8e93) 55%, transparent),
-				inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
-		}
-	}
-	/* Pressed: the icon sinks a little, at once. */
+	/* Pressed: the icon darkens a touch, as in Launchpad. */
 	.tile:active .icon {
-		transform: scale(0.94);
-		transition-duration: 80ms;
+		filter: brightness(0.85);
 	}
 	/* The first search match (Enter opens it) gets the focus-ring look. */
 	.highlighted .icon,
@@ -160,9 +145,9 @@
 	}
 	@media (max-width: 520px) {
 		.icon {
-			width: 64px;
-			height: 64px;
-			font-size: 1.75rem;
+			width: 58px;
+			height: 58px;
+			font-size: 1.5rem;
 		}
 	}
 </style>

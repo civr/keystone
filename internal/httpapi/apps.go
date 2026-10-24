@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/civr/keystone/internal/appicon"
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
@@ -66,22 +67,54 @@ func (a *appInput) validate() (field, msg string) {
 		return "color", "De kleur moet de vorm #RRGGBB hebben."
 	}
 	if a.Icon != "" {
-		if len(a.Icon) > maxIconLen {
-			return "icon", "Het icoon mag maximaal 64 kB zijn."
-		}
-		m := iconRe.FindStringSubmatch(a.Icon)
-		if m == nil {
-			return "icon", "Het icoon moet een base64 data-URL zijn (png, svg of webp)."
-		}
-		raw, err := base64.StdEncoding.DecodeString(m[2])
-		if err != nil {
-			return "icon", "Het icoon is geen geldige base64."
-		}
-		if m[1] == "svg+xml" && unsafeSVG(string(raw)) {
-			return "icon", "Het SVG-icoon bevat scripts of gevaarlijke attributen."
+		if msg := iconError(a.Icon); msg != "" {
+			return "icon", msg
 		}
 	}
 	return "", ""
+}
+
+// iconError checks an icon data URL; it returns a Dutch message or "".
+func iconError(icon string) string {
+	if len(icon) > maxIconLen {
+		return "Het icoon mag maximaal 64 kB zijn."
+	}
+	m := iconRe.FindStringSubmatch(icon)
+	if m == nil {
+		return "Het icoon moet een base64 data-URL zijn (png, svg of webp)."
+	}
+	raw, err := base64.StdEncoding.DecodeString(m[2])
+	if err != nil {
+		return "Het icoon is geen geldige base64."
+	}
+	if m[1] == "svg+xml" && unsafeSVG(string(raw)) {
+		return "Het SVG-icoon bevat scripts of gevaarlijke attributen."
+	}
+	return ""
+}
+
+// fetchAppIcon fetches the icon an app offers on its own address, vetted
+// like an uploaded icon.
+func (s *server) fetchAppIcon(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		URL string `json:"url"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	u, err := url.Parse(strings.TrimSpace(req.URL))
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		writeInvalid(w, "url", "De URL moet absoluut zijn en met http:// of https:// beginnen.")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	icon, err := appicon.Fetch(ctx, u.String(), func(d string) bool { return iconError(d) == "" })
+	if err != nil {
+		writeError(w, http.StatusNotFound, "no_icon", "Deze app biedt geen bruikbaar icoon aan. Kies er zelf een.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"icon": icon})
 }
 
 // unsafeSVG is a defence-in-depth blacklist. The real protection is that icons

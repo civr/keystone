@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -89,4 +91,37 @@ func TestAppProtocols(t *testing.T) {
 		in["config"] = map[string]any{"oidc": map[string]any{"redirect_uris": []string{}}}
 		c.must("POST", "/api/apps", in, 400)
 	})
+}
+
+func TestFetchAppIcon(t *testing.T) {
+	t.Parallel()
+	_, c := adminClient(t, "192.168.1.20")
+	png := "\x89PNG\r\n\x1a\n" + strings.Repeat("\x00", 32)
+	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			w.Write([]byte(`<link rel="apple-touch-icon" href="/t.png">`))
+		case "/t.png":
+			w.Write([]byte(png))
+		case "/evil/":
+			w.Write([]byte(`<link rel="icon" href="/evil.svg">`))
+		case "/evil.svg":
+			w.Write([]byte(`<svg onload="alert(1)"></svg>`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer app.Close()
+
+	var res struct {
+		Icon string `json:"icon"`
+	}
+	body(t, c.must("POST", "/api/apps/icon", map[string]string{"url": app.URL + "/"}, 200).Body, &res)
+	if !strings.HasPrefix(res.Icon, "data:image/png;base64,") {
+		t.Fatalf("icon = %.40s", res.Icon)
+	}
+	if w := c.do("POST", "/api/apps/icon", map[string]string{"url": app.URL + "/evil/"}); w.Code != 404 {
+		t.Fatalf("unsafe svg = %d %s", w.Code, w.Body.String())
+	}
+	c.must("POST", "/api/apps/icon", map[string]string{"url": "javascript:alert(1)"}, 400)
 }

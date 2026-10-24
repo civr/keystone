@@ -45,6 +45,7 @@ func (s *server) appRoutes(r chi.Router) {
 	g.Get("/", s.listApps)
 	w.Post("/", s.createApp)
 	w.Put("/order", s.reorderApps)
+	w.Post("/icon", s.fetchAppIcon)
 	w.Put("/{id}", s.updateApp)
 	w.Delete("/{id}", s.deleteApp)
 	w.Post("/{id}/secret", s.appSecret)

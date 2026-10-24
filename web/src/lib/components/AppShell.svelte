@@ -107,7 +107,9 @@
 							title={collapsed ? item.label : undefined}
 							onclick={onpick}
 						>
-							<svg viewBox="0 0 20 20" aria-hidden="true"><path d={item.icon} /></svg>
+							<span class="glyph" style:--tint={item.tint} aria-hidden="true">
+								<svg viewBox="0 0 20 20"><path d={item.icon} /></svg>
+							</span>
 							{#if !collapsed}<span>{item.label}</span>{/if}
 						</a>
 					</li>
@@ -349,8 +351,8 @@
 		gap: 9px;
 		margin: 1px 10px;
 		padding: 0 10px;
-		height: 32px;
-		border-radius: var(--radius-sm);
+		height: 30px;
+		border-radius: 7px;
 		color: var(--nav-ink);
 		font-size: 0.875rem;
 		font-weight: 400;
@@ -365,16 +367,26 @@
 	.nav-link:active {
 		background: var(--press);
 	}
-	.nav-link svg {
-		color: var(--primary);
+	/* Each item has a small coloured tile with a white symbol, as in System Settings. */
+	.glyph {
+		display: grid;
+		place-items: center;
+		flex: none;
+		width: 22px;
+		height: 22px;
+		border-radius: 6px;
+		background: var(--tint);
+		color: #fff;
+	}
+	.nav-link .glyph svg {
+		width: 14px;
+		height: 14px;
+		stroke-width: 2;
 	}
 	.nav-link.active,
 	.nav-link.active:hover {
 		background: var(--nav-active);
 		color: var(--nav-active-ink);
-	}
-	.nav-link.active svg {
-		color: inherit;
 	}
 	.nav-link.icon-only {
 		justify-content: center;

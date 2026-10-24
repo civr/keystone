@@ -4,6 +4,8 @@ export interface NavItem {
 	label: string;
 	/** SVG path data on a 20×20 grid, stroked in currentColor. */
 	icon: string;
+	/** Colour of the item's icon tile, as in System Settings. */
+	tint: string;
 }
 export interface NavGroup {
 	/** Group heading; null for the ungrouped top items. */
@@ -14,21 +16,21 @@ export interface NavGroup {
 export const NAV: NavGroup[] = [
 	{
 		title: null,
-		items: [{ href: '/', label: 'Mijn apps', icon: 'M3.5 3.5h5v5h-5zM11.5 3.5h5v5h-5zM3.5 11.5h5v5h-5zM11.5 11.5h5v5h-5z' }]
+		items: [{ href: '/', tint: '#007aff', label: 'Mijn apps', icon: 'M3.5 3.5h5v5h-5zM11.5 3.5h5v5h-5zM3.5 11.5h5v5h-5zM11.5 11.5h5v5h-5z' }]
 	},
 	{
 		title: 'Instellingen',
 		items: [
 			{
-				href: '/instellingen',
+				href: '/instellingen', tint: '#8e8e93',
 				label: 'Algemeen',
 				icon: 'M10 2.8v2M10 15.2v2M2.8 10h2M15.2 10h2M4.9 4.9l1.4 1.4M13.7 13.7l1.4 1.4M4.9 15.1l1.4-1.4M13.7 6.3l1.4-1.4M10 6.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4z'
 			},
-			{ href: '/instellingen/ad', label: 'Active Directory', icon: 'M3 4.5h14v5H3zM3 10.5h14v5H3zM6 7h.01M6 13h.01' },
-			{ href: '/instellingen/apps', label: 'Apps', icon: 'M4 4h12v12H4zM4 8.5h12M8.5 8.5V16' },
-			{ href: '/instellingen/beveiliging', label: 'Beveiliging', icon: 'M10 2.5 16 5v4.6c0 3.7-2.6 6.6-6 7.9-3.4-1.3-6-4.2-6-7.9V5z' },
-			{ href: '/instellingen/apparaten', label: 'Apparaten', icon: 'M2.5 4.5h11v8h-11zM6 15.5h4M15 7.5h3v8.5h-3z' },
-			{ href: '/instellingen/activiteit', label: 'Activiteit', icon: 'M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM10 6.5V10l2.5 1.5' }
+			{ href: '/instellingen/ad', tint: '#5856d6', label: 'Active Directory', icon: 'M3 4.5h14v5H3zM3 10.5h14v5H3zM6 7h.01M6 13h.01' },
+			{ href: '/instellingen/apps', tint: '#ff9500', label: 'Apps', icon: 'M4 4h12v12H4zM4 8.5h12M8.5 8.5V16' },
+			{ href: '/instellingen/beveiliging', tint: '#34c759', label: 'Beveiliging', icon: 'M10 2.5 16 5v4.6c0 3.7-2.6 6.6-6 7.9-3.4-1.3-6-4.2-6-7.9V5z' },
+			{ href: '/instellingen/apparaten', tint: '#007aff', label: 'Apparaten', icon: 'M2.5 4.5h11v8h-11zM6 15.5h4M15 7.5h3v8.5h-3z' },
+			{ href: '/instellingen/activiteit', tint: '#af52de', label: 'Activiteit', icon: 'M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM10 6.5V10l2.5 1.5' }
 		]
 	}
 ];

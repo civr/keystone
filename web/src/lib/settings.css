@@ -5,23 +5,23 @@
  * a footnote below. Cards are never nested.
  */
 
-/* Large title with the actions on its baseline. */
+/* Page title with the actions beside it. */
 .pane-head {
 	display: flex;
-	align-items: flex-end;
+	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
-	margin: 8px 0 6px;
+	margin: 4px 0 4px;
 }
 .pane-title {
 	margin: 0;
-	font-size: 2.125rem;
+	font-size: 1.625rem;
 	font-weight: 700;
-	line-height: 1.12;
-	letter-spacing: -0.025em;
+	line-height: 1.2;
+	letter-spacing: -0.02em;
 }
 .pane-intro {
-	margin: 0 0 28px;
+	margin: 0 0 24px;
 	max-width: 64ch;
 	color: var(--color-text-muted);
 	font-size: 0.9375rem;
@@ -29,21 +29,20 @@
 	text-wrap: pretty;
 }
 
-/* A section: header, card, footnote. */
+/* A section: a short bold title, the box, a footnote — as macOS Settings. */
 .group {
-	margin: 0 0 30px;
+	margin: 0 0 26px;
 }
 .group h2,
 .group .group-head h2 {
-	margin: 0 0 7px;
-	padding: 0 16px;
+	margin: 0 0 8px;
+	padding: 0 2px;
 	font-family: var(--font);
-	font-size: 0.8125rem;
-	font-weight: 400;
+	font-size: 0.875rem;
+	font-weight: 600;
 	line-height: 1.4;
-	letter-spacing: 0;
-	color: var(--color-text-muted);
-	text-transform: uppercase;
+	letter-spacing: -0.005em;
+	color: var(--color-text);
 }
 .group-head {
 	display: flex;
@@ -57,7 +56,7 @@
 }
 .group > .foot {
 	margin: 7px 0 0;
-	padding: 0 16px;
+	padding: 0 2px;
 	font-size: 0.8125rem;
 	line-height: 1.4;
 	color: var(--color-text-muted);
@@ -67,13 +66,14 @@
 	user-select: all;
 }
 
-/* The inset grouped card; separators start at the text, as in iOS. */
+/* The box: white, a hairline edge, no shadow; separators start at the text. */
 .card,
 .group.empty {
 	margin: 0;
 	padding: 0;
 	list-style: none;
-	border-radius: var(--radius-card);
+	border: 1px solid var(--c-border);
+	border-radius: 10px;
 	background: var(--c-bg-card);
 	overflow: hidden;
 }
@@ -86,8 +86,8 @@
 	top: 0;
 	left: 16px;
 	right: 0;
-	height: 0.5px;
-	background: #c6c6c8;
+	height: 1px;
+	background: var(--c-border2);
 }
 .form-card {
 	padding: 16px;
@@ -140,8 +140,11 @@
 }
 /* Values sit right-aligned in the row, in the accent-free value colour. */
 .srow .input.num {
-	width: 96px;
+	width: 76px;
 	max-width: 30vw;
+	height: 30px;
+	padding: 0 8px;
+	border-radius: 7px;
 	text-align: right;
 	font-variant-numeric: tabular-nums;
 }
@@ -257,7 +260,8 @@
 	font-size: 0.9375rem;
 }
 .empty-note {
-	border-radius: var(--radius-card);
+	border: 1px solid var(--c-border);
+	border-radius: 10px;
 	background: var(--c-bg-card);
 }
 .empty-note p,

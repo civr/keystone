@@ -68,8 +68,10 @@ Op verzoek van Thijs (23-10-2026: "ik wil dat het thema is zoals Apple zou ontwe
 - Eén licht thema. Systeemlettertype (SF Pro op Apple-apparaten, Segoe UI op Windows), geen eigen webfont. Grote titels met negatieve tracking, body 15px.
 - Kleuren van Apple: canvas `#f2f2f7` (grouped background), witte kaarten, accent systemBlue `#007aff`, schakelaars groen `#34c759`, rood `#ff3b30`.
 - App-venster als macOS: een doorschijnende zijbalk over de volle hoogte met het app-icoon en "Keystone", en een doorschijnende werkbalk boven de inhoud met een Spotlight-achtig zoekveld en het gebruikersmenu. Op een telefoon wordt de zijbalk een paneel vanuit de werkbalk.
-- Startpagina: de datum klein boven een grote titel ("Goedemiddag, Thijs"), daaronder de apps als app-iconen zoals op het beginscherm (afgerond vierkant in de app-kleur, naam eronder). Zoeken filtert zoals voorheen.
-- Instellingen zoals de Instellingen-app: grote titel, ingesprongen gegroepeerde secties (kop boven een witte kaart, rijen van 44px, scheidingslijnen die bij de tekst beginnen), iOS-schakelaars en segmented controls.
+- Startpagina: alleen de apps, als app-iconen zoals in Launchpad, met het echte icoon van elke app (Keystone haalt het `apple-touch-icon` of favicon van de app zelf op; zonder icoon een vlakke tegel in de app-kleur met de eerste letter). Geen begroeting, geen datum. Zoeken filtert zoals voorheen.
+- Zijbalk zoals Systeeminstellingen: elk onderdeel met een klein gekleurd icoon met wit symbool.
+- Instellingen zoals macOS Systeeminstellingen: paginatitel, per groep een korte vetgedrukte titel in zinsnotatie boven een witte box met haarlijnrand (geen schaduw), rijen met scheidingslijnen, compacte velden, schakelaars en segmented controls.
+- Geen kleurverlopen, geen schaduwen onder vlakken, geen labels in kapitalen.
 - Dialogen als sheets: gecentreerd op grote schermen, van onderen op telefoons; meldingen als doorschijnende capsule bovenaan.
 - Beweging kort en zonder vering (Apple's ease en de iOS-sheetcurve); `prefers-reduced-motion`, `prefers-reduced-transparency` en `prefers-contrast` worden gevolgd.
 - Inloggen en installatie zoals Apple ID: groot app-icoon, grote titel, witte kaart met velden van 46px; installatiestappen als paginapuntjes.

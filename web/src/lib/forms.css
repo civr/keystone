@@ -16,11 +16,9 @@
 .auth-card {
 	width: min(440px, 100%);
 	padding: 36px 36px 32px;
-	border-radius: 18px;
+	border: 1px solid var(--c-border);
+	border-radius: 14px;
 	background: var(--c-bg-card);
-	box-shadow:
-		0 0 0 0.5px rgba(0, 0, 0, 0.05),
-		0 12px 40px rgba(0, 0, 0, 0.08);
 	animation: auth-settle var(--dur-4) var(--ease-out) both;
 }
 .auth-card.wide {
@@ -33,7 +31,7 @@
 	}
 	.auth-card {
 		padding: 12px 4px 24px;
-		box-shadow: none;
+		border: 0;
 	}
 }
 @keyframes auth-settle {
@@ -58,9 +56,6 @@
 	width: 64px;
 	height: 64px;
 	border-radius: 22.5%;
-	box-shadow:
-		0 2px 4px rgba(0, 0, 0, 0.1),
-		0 8px 20px -6px rgba(0, 98, 224, 0.45);
 }
 
 /* Steps overlap during a transition instead of stacking. */
@@ -94,6 +89,11 @@
 	display: flex;
 	flex-direction: column;
 	gap: 14px;
+}
+/* A title straight above the form (no subtitle) keeps its distance. */
+.auth-card h1 + .form,
+.auth-card h1 + form {
+	margin-top: 22px;
 }
 .auth-card .input {
 	height: 46px;

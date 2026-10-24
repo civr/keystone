@@ -29,7 +29,7 @@
 	--primary-pressed: #0055b3;
 
 	/* ── Labels, fills and separators (iOS light) ── */
-	--color-bg: #f2f2f7; /* systemGroupedBackground */
+	--color-bg: #f5f5f7; /* Apple's web grey */
 	--color-surface: #ffffff;
 	--color-border: #d1d1d6; /* systemGray4: field strokes */
 	--color-text: #1d1d1f; /* label */
@@ -39,12 +39,12 @@
 	--c-400: #aeaeb2; /* systemGray2: disabled ink */
 	--c-border: #e5e5ea; /* systemGray5 */
 	--c-border2: #ececf0; /* separators inside cards */
-	--c-border3: #f2f2f7;
+	--c-border3: #f5f5f7;
 	--c-bg-card: #ffffff;
 	--c-bg-section: #f9f9fb;
 	--c-bg-sunken: rgba(118, 118, 128, 0.12); /* tertiarySystemFill: search fields, segmented tracks */
 	--c-hover: rgba(0, 0, 0, 0.04);
-	--c-bg-page: #f2f2f7;
+	--c-bg-page: #f5f5f7;
 
 	/* ── Status: system colours, with darker ink for text ── */
 	--color-success: #34c759;
@@ -100,7 +100,7 @@
 	--radius-pill: 9999px;
 
 	/* ── Depth: soft, neutral, larger surfaces cast longer shadows ── */
-	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+	--shadow-sm: none; /* surfaces are separated by a hairline, not a shadow */
 	--shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
 	--shadow-md: 0 10px 30px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
 	--shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -592,14 +592,14 @@ select.input {
 	color: var(--color-danger-text);
 }
 
-/* ── Card: an inset grouped section ── */
+/* ── A plain white surface with a hairline edge ── */
 .surface {
 	background: var(--c-bg-card);
+	border: 1px solid var(--c-border);
 	border-radius: var(--radius-card);
-	box-shadow: var(--shadow-sm);
 }
 
-/* Avatar: initials on a grey gradient disc, as Contacts does. */
+/* Avatar: initials on a grey disc. */
 .avatar {
 	display: grid;
 	place-items: center;
@@ -607,7 +607,7 @@ select.input {
 	width: 32px;
 	height: 32px;
 	border-radius: var(--radius-full);
-	background: linear-gradient(180deg, #a5abb8, #858994);
+	background: #8e8e93;
 	color: #fff;
 	font-size: 0.8125rem;
 	font-weight: 600;
