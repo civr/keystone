@@ -74,7 +74,7 @@ func (s *server) deleteSession(w http.ResponseWriter, r *http.Request) {
 	}
 	own := target == SessionFrom(ctx).ID
 	if own {
-		setCookie(w, settingsFrom(ctx), SessionCookie, "", 0)
+		setCookie(w, r, settingsFrom(ctx), SessionCookie, "", 0)
 	}
 	s.d.Audit.Log(ctx, audit.ActorOwner, "session.revoked", clientIP(ctx), map[string]any{"own": own})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})

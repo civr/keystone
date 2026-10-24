@@ -76,6 +76,50 @@ func TestSetupAccountOverridesEarlierAddress(t *testing.T) {
 	}
 }
 
+// Keystone opened on another address than the one setup ran on — the
+// server's IP, a new domain behind a proxy — still signs in, with a cookie
+// the browser keeps there. A page on a foreign origin is still refused.
+func TestSignInOnAnotherAddress(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	c := newClient(t, s.env, "192.168.1.10")
+	s.unlock(c)
+	c.must("POST", "/api/setup/account", map[string]string{"username": "thijs", "password": "long enough secret"}, 200)
+	s.deps.Dir = nil
+	s.h = New(s.deps)
+
+	for _, tc := range []struct {
+		host, origin string
+		secure       bool
+	}{
+		{"192.168.1.5:8080", "http://192.168.1.5:8080", false},
+		{"auth.home.lan", "https://auth.home.lan", true},
+	} {
+		b := newClient(t, s.env, "192.168.1.20")
+		b.host, b.origin = tc.host, tc.origin
+		w := b.must("POST", "/api/auth/password", map[string]string{"username": "thijs", "password": "long enough secret"}, 200)
+		var session bool
+		for _, ck := range w.Result().Cookies() {
+			if ck.Name == SessionCookie {
+				session = true
+				if ck.Secure != tc.secure {
+					t.Fatalf("%s: session cookie Secure = %v", tc.origin, ck.Secure)
+				}
+			}
+		}
+		if !session {
+			t.Fatalf("%s: no session cookie", tc.origin)
+		}
+		b.must("GET", "/api/me", nil, 200)
+	}
+
+	evil := newClient(t, s.env, "192.168.1.21")
+	evil.host, evil.origin = "192.168.1.5:8080", "http://evil.example"
+	if w := evil.do("POST", "/api/auth/password", map[string]string{"username": "thijs", "password": "long enough secret"}); w.Code != 403 || errCode(t, w) != "bad_origin" {
+		t.Fatalf("foreign origin = %d %s", w.Code, w.Body.String())
+	}
+}
+
 // Passkeys from an abandoned run of the old wizard must not block the
 // account step: setup never finished, so nobody can be using them.
 func TestSetupAccountAfterAbandonedPasskey(t *testing.T) {

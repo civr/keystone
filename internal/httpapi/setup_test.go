@@ -172,7 +172,8 @@ func TestSetupRequiresUnlock(t *testing.T) {
 
 	w := c.must("POST", "/api/setup/unlock", map[string]string{"code": strings.ToLower(s.code)}, 200)
 	ck := w.Result().Cookies()
-	if len(ck) != 1 || ck[0].Name != PendingCookie || !ck[0].HttpOnly || ck[0].SameSite != http.SameSiteLaxMode || ck[0].Secure {
+	// The client's page is https (setupOrigin), so the cookie is Secure.
+	if len(ck) != 1 || ck[0].Name != PendingCookie || !ck[0].HttpOnly || ck[0].SameSite != http.SameSiteLaxMode || !ck[0].Secure {
 		t.Fatalf("pending cookie = %+v", ck)
 	}
 	if needed, step := status(t, c); !needed || step != "domain" {
@@ -515,9 +516,9 @@ func TestSetupGoneAfterFinish(t *testing.T) {
 	}
 }
 
-// A wrong public_url must not lock the operator out of the wizard: until
-// setup is complete, /api/setup accepts an Origin whose host equals the
-// request Host (the unlock cookie is still required).
+// A wrong public_url must not lock the operator out of the wizard: an Origin
+// whose host equals the request Host is accepted (the unlock cookie is still
+// required).
 func TestSetupDomainRedoFromHostOrigin(t *testing.T) {
 	t.Parallel()
 	s := newSetupEnv(t)
@@ -530,10 +531,6 @@ func TestSetupDomainRedoFromHostOrigin(t *testing.T) {
 	cfg, err := s.deps.Settings.Get(context.Background())
 	if err != nil || cfg.PublicURL != setupOrigin {
 		t.Fatalf("public_url = %q, %v", cfg.PublicURL, err)
-	}
-	// The relaxation is limited to /api/setup: other APIs still need public_url.
-	if w := c.do("POST", "/api/auth/password", map[string]string{"username": "thijs", "password": "x"}); w.Code != http.StatusForbidden || errCode(t, w) != "bad_origin" {
-		t.Fatalf("auth from host origin = %d %s", w.Code, w.Body.String())
 	}
 	// Another Origin than the Host is still rejected.
 	c.origin = "http://evil.example"
@@ -555,13 +552,13 @@ func TestSetupDomainRedoFromHostOrigin(t *testing.T) {
 	}
 }
 
-func TestSetupHostOriginRejectedAfterFinish(t *testing.T) {
+func TestSetupHostOriginClosedAfterFinish(t *testing.T) {
 	t.Parallel()
 	s := newSetupEnv(t)
 	c := newClient(t, s.env, "192.168.1.92")
 	completeSetup(t, s, c)
 	c.host, c.origin = "192.168.1.5:8080", "http://192.168.1.5:8080"
-	if w := c.do("POST", "/api/setup/domain", map[string]string{"domain": "home.lan", "public_url": setupOrigin}); w.Code != http.StatusForbidden || errCode(t, w) != "bad_origin" {
+	if w := c.do("POST", "/api/setup/domain", map[string]string{"domain": "home.lan", "public_url": setupOrigin}); w.Code != http.StatusGone || errCode(t, w) != "setup_done" {
 		t.Fatalf("setup from host origin after finish = %d %s", w.Code, w.Body.String())
 	}
 }

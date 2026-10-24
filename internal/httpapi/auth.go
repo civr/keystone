@@ -240,7 +240,7 @@ type pendingLogin struct {
 
 func loginKey(token string) string { return "login:" + token }
 
-func (s *server) newPending(w http.ResponseWriter, ctx context.Context, cfg settings.Settings, p pendingLogin) (pendingLogin, error) {
+func (s *server) newPending(w http.ResponseWriter, r *http.Request, ctx context.Context, cfg settings.Settings, p pendingLogin) (pendingLogin, error) {
 	tok, err := randomToken()
 	if err != nil {
 		return p, err
@@ -252,7 +252,7 @@ func (s *server) newPending(w http.ResponseWriter, ctx context.Context, cfg sett
 	if _, err := pipe.Exec(ctx); err != nil {
 		return p, err
 	}
-	setCookie(w, cfg, PendingCookie, loginKind+"."+tok, loginTTL)
+	setCookie(w, r, cfg, PendingCookie, loginKind+"."+tok, loginTTL)
 	return p, nil
 }
 
@@ -270,12 +270,12 @@ func (s *server) loadPending(ctx context.Context, r *http.Request) (pendingLogin
 
 // consumePending deletes the pending state; false when it was already gone
 // (used by a concurrent request).
-func (s *server) consumePending(w http.ResponseWriter, ctx context.Context, cfg settings.Settings, p pendingLogin) (bool, error) {
+func (s *server) consumePending(w http.ResponseWriter, r *http.Request, ctx context.Context, cfg settings.Settings, p pendingLogin) (bool, error) {
 	n, err := s.d.Valkey.Del(ctx, loginKey(p.token)).Result()
 	if err != nil {
 		return false, err
 	}
-	setCookie(w, cfg, PendingCookie, "", 0)
+	setCookie(w, r, cfg, PendingCookie, "", 0)
 	return n == 1, nil
 }
 
@@ -292,13 +292,13 @@ func (s *server) nextStep(ctx context.Context) (string, error) {
 }
 
 // startPending creates a password_ok pending login and answers {"next": …}.
-func (s *server) startPending(w http.ResponseWriter, ctx context.Context, cfg settings.Settings, emergency bool) {
+func (s *server) startPending(w http.ResponseWriter, r *http.Request, ctx context.Context, cfg settings.Settings, emergency bool) {
 	next, err := s.nextStep(ctx)
 	if err != nil {
 		errInternal(w, "count passkeys", err)
 		return
 	}
-	if _, err := s.newPending(w, ctx, cfg, pendingLogin{passwordOK: true, emergency: emergency}); err != nil {
+	if _, err := s.newPending(w, r, ctx, cfg, pendingLogin{passwordOK: true, emergency: emergency}); err != nil {
 		slog.Error("auth: store pending", "err", err)
 		errUnavailable(w)
 		return
@@ -317,7 +317,7 @@ func (s *server) createSession(w http.ResponseWriter, r *http.Request, cfg setti
 		errUnavailable(w)
 		return false
 	}
-	setCookie(w, cfg, SessionCookie, created.ID, time.Duration(cfg.Session.DurationHours)*time.Hour)
+	setCookie(w, r, cfg, SessionCookie, created.ID, time.Duration(cfg.Session.DurationHours)*time.Hour)
 	return true
 }
 
@@ -341,7 +341,7 @@ func (s *server) markDevice(w http.ResponseWriter, r *http.Request, cfg settings
 			return
 		}
 	}
-	setCookie(w, cfg, DeviceCookie, session.SignDevice(s.d.Secrets.SessionKey, id, fullAuth),
+	setCookie(w, r, cfg, DeviceCookie, session.SignDevice(s.d.Secrets.SessionKey, id, fullAuth),
 		time.Duration(cfg.Session.TrustedDeviceDays)*24*time.Hour)
 }
 
@@ -431,7 +431,7 @@ func (s *server) passwordAccepted(w http.ResponseWriter, r *http.Request, cfg se
 		slog.Error("auth: reset failures", "err", err)
 	}
 	if cfg.Login.PasskeyRequired {
-		s.startPending(w, ctx, cfg, false)
+		s.startPending(w, r, ctx, cfg, false)
 		return
 	}
 	now := time.Now()
@@ -495,7 +495,7 @@ func (s *server) authPasskeyBegin(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if !ok || !p.device {
-				if p, err = s.newPending(w, ctx, cfg, pendingLogin{device: true}); err != nil {
+				if p, err = s.newPending(w, r, ctx, cfg, pendingLogin{device: true}); err != nil {
 					slog.Error("auth: store pending", "err", err)
 					errUnavailable(w)
 					return
@@ -588,7 +588,7 @@ func (s *server) authPasskeyFinish(w http.ResponseWriter, r *http.Request) {
 		errPasskeyFailed(w)
 		return
 	}
-	if fresh, err := s.consumePending(w, ctx, cfg, p); err != nil || !fresh {
+	if fresh, err := s.consumePending(w, r, ctx, cfg, p); err != nil || !fresh {
 		if err != nil {
 			slog.Error("auth: consume pending", "err", err)
 		}
@@ -674,7 +674,7 @@ func (s *server) authRecovery(w http.ResponseWriter, r *http.Request) {
 		invalid()
 		return
 	}
-	if fresh, err := s.consumePending(w, ctx, cfg, p); err != nil || !fresh {
+	if fresh, err := s.consumePending(w, r, ctx, cfg, p); err != nil || !fresh {
 		if err != nil {
 			slog.Error("auth: consume pending", "err", err)
 		}
@@ -780,7 +780,7 @@ func (s *server) authEmergency(w http.ResponseWriter, r *http.Request) {
 		slog.Error("auth: reset failures", "err", err)
 	}
 	s.d.Audit.Log(ctx, audit.ActorAnonymous, "emergency.used", ip, nil)
-	s.startPending(w, ctx, cfg, true)
+	s.startPending(w, r, ctx, cfg, true)
 }
 
 func (s *server) stepUpBegin(w http.ResponseWriter, r *http.Request) {
@@ -844,7 +844,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	if err := gatetoken.RevokeSession(ctx, s.d.Valkey, SessionFrom(ctx).ID); err != nil {
 		slog.Warn("auth: revoke gate tokens", "err", err) // they die with the session anyway
 	}
-	setCookie(w, cfg, SessionCookie, "", 0)
+	setCookie(w, r, cfg, SessionCookie, "", 0)
 	s.d.Audit.Log(ctx, audit.ActorOwner, "logout", clientIP(ctx), nil)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

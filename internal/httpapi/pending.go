@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -25,14 +26,14 @@ func randomToken() (string, error) {
 }
 
 // setCookie writes an HttpOnly cookie with SameSite from settings, Secure when
-// public_url is https. maxAge <= 0 deletes the cookie.
-func setCookie(w http.ResponseWriter, cfg settings.Settings, name, value string, maxAge time.Duration) {
+// r came in over https (cookieSecure). maxAge <= 0 deletes the cookie.
+func setCookie(w http.ResponseWriter, r *http.Request, cfg settings.Settings, name, value string, maxAge time.Duration) {
 	c := &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   strings.HasPrefix(strings.ToLower(cfg.PublicURL), "https://"),
+		Secure:   cookieSecure(r, cfg),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(maxAge / time.Second),
 	}
@@ -43,6 +44,18 @@ func setCookie(w http.ResponseWriter, cfg settings.Settings, name, value string,
 		c.Value, c.MaxAge = "", -1
 	}
 	http.SetCookie(w, c)
+}
+
+// cookieSecure reports whether r reached Keystone over https: by its Origin
+// when the browser sent one, else by arriving on an https public_url's host.
+// On another address (the server's IP over http) a Secure cookie would be
+// dropped and the sign-in would never stick.
+func cookieSecure(r *http.Request, cfg settings.Settings) bool {
+	if o := r.Header.Get("Origin"); o != "" {
+		return strings.HasPrefix(strings.ToLower(o), "https://")
+	}
+	p, err := url.Parse(cfg.PublicURL)
+	return err == nil && strings.EqualFold(p.Scheme, "https") && normHost("https", r.Host) == normHost("https", p.Host)
 }
 
 // pendingToken returns the token of the ks_pending cookie if it has kind.

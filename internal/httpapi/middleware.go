@@ -151,29 +151,14 @@ func cidrCheck(next http.Handler) http.Handler {
 	})
 }
 
-// originCheck is the CSRF guard: state-changing requests must carry an Origin
-// equal to the origin of public_url, or — while public_url is unset during
-// setup — whose host equals the request Host. Until setup is complete,
-// /api/setup also accepts the request Host as origin, so a wrong or
-// unreachable public_url saved in the domain step cannot lock the operator
-// out of the wizard (the setup unlock cookie is still required there).
+// originCheck is the CSRF guard: state-changing requests must come from a
+// Keystone page — an Origin on the request's own host or on public_url (see
+// originAllowed).
 func (s *server) originCheck(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isSafeMethod(r.Method) || crossSiteEndpoint(r) || originAllowed(r, settingsFrom(r.Context()).PublicURL) {
 			next.ServeHTTP(w, r)
 			return
-		}
-		if pathUnder(r, "/api/setup") && originAllowed(r, "") {
-			done, err := s.setupDone(r.Context())
-			if err != nil {
-				slog.Error("http: setup state", "err", err)
-				errUnavailable(w)
-				return
-			}
-			if !done {
-				next.ServeHTTP(w, r)
-				return
-			}
 		}
 		writeError(w, http.StatusForbidden, "bad_origin", "Verzoek geweigerd: het komt niet van deze Keystone-pagina.")
 	})
@@ -188,8 +173,11 @@ func crossSiteEndpoint(r *http.Request) bool {
 	return (p == "/saml/sso" || p == "/oidc/token") && (r.URL.RawPath == "" || r.URL.RawPath == p)
 }
 
-// originAllowed reports whether the request Origin equals the origin of
-// publicURL, or — when publicURL is empty — whose host equals the request Host.
+// originAllowed reports whether the request Origin is the page's own origin:
+// its host equals the request Host — so Keystone opened on any address, the
+// server's IP or a new domain, works — or it equals the origin of publicURL,
+// for a proxy that rewrites Host. A cross-site page cannot set Origin, and a
+// host of its own (DNS rebinding) only ever carries that host's cookies.
 func originAllowed(r *http.Request, publicURL string) bool {
 	o, err := url.Parse(r.Header.Get("Origin"))
 	if err != nil || o.Host == "" || (o.Scheme != "http" && o.Scheme != "https") {
@@ -197,11 +185,11 @@ func originAllowed(r *http.Request, publicURL string) bool {
 	}
 	scheme := strings.ToLower(o.Scheme)
 	got := normHost(scheme, o.Host)
-	if publicURL == "" {
-		return got == normHost(scheme, r.Host)
+	if got == normHost(scheme, r.Host) {
+		return true
 	}
 	p, err := url.Parse(publicURL)
-	if err != nil || p.Host == "" {
+	if publicURL == "" || err != nil || p.Host == "" {
 		return false
 	}
 	return scheme == strings.ToLower(p.Scheme) && got == normHost(scheme, p.Host)
@@ -238,7 +226,7 @@ func (s *server) loadSession(next http.Handler) http.Handler {
 			errUnavailable(w)
 		default:
 			if cfg.Session.Sliding && !now.Truncate(time.Hour).Equal(prevSeen.Truncate(time.Hour)) {
-				setCookie(w, cfg, SessionCookie, sess.ID, time.Duration(cfg.Session.DurationHours)*time.Hour)
+				setCookie(w, r, cfg, SessionCookie, sess.ID, time.Duration(cfg.Session.DurationHours)*time.Hour)
 			}
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keySession, &sess)))
 		}
