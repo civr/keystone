@@ -445,15 +445,12 @@
 		padding: 0;
 		list-style: none;
 	}
-	/* Apps sit in one card; each is a data row. */
-	.apps-group {
-		padding-top: 8px;
-	}
+	/* Apps sit in one inset grouped card; each is a row. */
 	.app-row {
 		display: flex;
 		align-items: center;
 		gap: 4px;
-		min-height: 64px;
+		min-height: 60px;
 		padding: 0 4px 0 0;
 		background: var(--c-bg-card);
 		transition:
@@ -533,30 +530,28 @@
 		flex-direction: column;
 	}
 	.label {
-		font-size: 0.875rem;
-		font-weight: 600;
-		line-height: 1.45;
+		font-size: 0.9375rem;
+		font-weight: 400;
+		line-height: 1.35;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		transition: color var(--dur-2) var(--ease);
-	}
-	.open:hover .label,
-	.open:focus-visible .label {
-		color: var(--primary);
 	}
 	.host {
 		font-size: 0.8125rem;
-		color: var(--color-text-faint);
+		color: var(--color-text-muted);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+	/* Disclosure chevron in the tertiary grey, as in Settings. */
 	.chev {
 		flex: none;
-		color: var(--color-text-faint);
-		width: 16px;
-		height: 16px;
+		color: #c4c4c7;
+		width: 14px;
+		height: 14px;
+		stroke-width: 2.4;
+		margin-right: 8px;
 	}
 
 	/* Move buttons: for keyboard and switch users; appear when the row has focus. */

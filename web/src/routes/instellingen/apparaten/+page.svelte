@@ -270,16 +270,6 @@
 		stroke-linecap: round;
 		stroke-linejoin: round;
 	}
-	.group-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		margin: 0 0 4px;
-	}
-	.group-head h2 {
-		margin: 0;
-	}
 	.rename {
 		display: flex;
 		gap: 8px;

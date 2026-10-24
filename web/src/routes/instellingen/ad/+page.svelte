@@ -277,10 +277,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
-		padding: 12px 0 16px;
-	}
-	.card.form-card > * + * {
-		border-top: 0;
+		padding: 16px;
 	}
 	.actions {
 		display: flex;
