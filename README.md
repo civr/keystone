@@ -162,8 +162,13 @@ secrets-volume, niet leesbaar in de database.
 ## Updaten
 
 ```sh
+git pull
 docker compose pull && docker compose up -d
 ```
+
+De images worden bij elke push naar `main` op GitHub gebouwd; de server hoeft dan niets te compileren.
+Bouw je zelf (`docker compose up -d --build`), dan bewaart BuildKit de Go- en npm-cache tussen builds, zodat
+alleen de eerste build lang duurt.
 
 ## Buitengesloten? Netwerkbeperkingen herstellen
 

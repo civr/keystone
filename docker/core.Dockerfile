@@ -6,7 +6,7 @@ FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 ARG KEYSTONE_VERSION=dev
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 COPY web/ ./
 RUN KEYSTONE_VERSION="$KEYSTONE_VERSION" npm run build
 
@@ -16,11 +16,12 @@ ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 # The Go binary embeds the SPA shell: replace the placeholder with the real build.
 COPY --from=web /src/web/build/200.html internal/httpapi/shell/200.html
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/keystone-core ./cmd/keystone-core
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+	CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/keystone-core ./cmd/keystone-core
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/keystone-core /usr/local/bin/keystone-core

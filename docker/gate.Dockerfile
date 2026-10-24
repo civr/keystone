@@ -5,9 +5,10 @@ ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/keystone-gate ./cmd/keystone-gate
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+	CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/keystone-gate ./cmd/keystone-gate
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/keystone-gate /usr/local/bin/keystone-gate

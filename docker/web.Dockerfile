@@ -6,7 +6,7 @@ FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 ARG KEYSTONE_VERSION=dev
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 COPY web/ ./
 RUN KEYSTONE_VERSION="$KEYSTONE_VERSION" npm run build
 
