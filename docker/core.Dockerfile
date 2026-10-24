@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # The SPA build is platform independent: run it natively on the build host.
-FROM --platform=$BUILDPLATFORM node:22-alpine AS web
+FROM --platform=$BUILDPLATFORM node:25-alpine AS web
 # Must equal the value web.Dockerfile is built with, so the embedded shell
 # references exactly the assets keystone-web serves.
 ARG KEYSTONE_VERSION=dev
