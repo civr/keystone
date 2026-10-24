@@ -142,6 +142,7 @@
 	<div class="loading-note" aria-label="Loading"><span class="spinner"></span></div>
 {:else}
 	<form onsubmit={save} novalidate>
+		<div class="cols">
 		<section class="group" aria-labelledby="g-conn">
 			<h2 id="g-conn">Connection</h2>
 			<div class="card form-card">
@@ -245,6 +246,8 @@
 			</div>
 		</section>
 
+		</div>
+
 		{#if test}
 			<p class={test.ok ? 'notice ok' : 'error'} role="status">
 				{#if test.ok}
@@ -273,6 +276,13 @@
 <Confirm bind:this={confirmer} />
 
 <style>
+	.cols {
+		columns: 2 380px;
+		column-gap: 20px;
+	}
+	.cols > .group {
+		break-inside: avoid;
+	}
 	.form-card {
 		display: flex;
 		flex-direction: column;

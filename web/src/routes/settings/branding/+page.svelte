@@ -76,6 +76,7 @@
 	<p class="loading-note" role="status">Loading…</p>
 {:else}
 	<form onsubmit={save} novalidate>
+		<div class="cols">
 		<section class="group" aria-labelledby="b-identity">
 			<h2 id="b-identity">Name and logo</h2>
 			<div class="card">
@@ -129,6 +130,8 @@
 			</div>
 		</section>
 
+		</div>
+
 		<div class="actions">
 			{#if !isDefault}
 				<button type="button" class="btn btn-secondary" onclick={() => ((form = { ...DEFAULT_BRAND }), (errors = {}))}>Reset to default</button>
@@ -163,6 +166,13 @@
 {/snippet}
 
 <style>
+	.cols {
+		columns: 2 380px;
+		column-gap: 20px;
+	}
+	.cols > .group {
+		break-inside: avoid;
+	}
 	.logo {
 		flex: none;
 		width: 48px;

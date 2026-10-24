@@ -36,7 +36,7 @@
 
 <style>
 	.pane {
-		max-width: 760px;
+		max-width: 1000px;
 		margin: 0 auto;
 	}
 </style>

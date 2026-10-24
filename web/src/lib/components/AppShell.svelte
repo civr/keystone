@@ -180,14 +180,15 @@
 </dialog>
 
 <style>
-	/* A white sidebar the full height on the left and a white bar on top,
-	   each edged by a hairline; the content sits on the canvas. */
+	/* A window, as a Mac app: the sidebar and the bar stay put and only the
+	   content pane scrolls, and only when it must. The page never scrolls. */
 	.shell {
 		--menu-w: var(--nav-w);
 		--bar-h: 52px;
 		display: grid;
 		grid-template-columns: var(--menu-w) minmax(0, 1fr);
-		min-height: 100dvh;
+		height: 100dvh;
+		overflow: hidden;
 		background: var(--color-bg);
 	}
 	.shell.icons {
@@ -195,14 +196,14 @@
 	}
 	.main {
 		min-width: 0;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
 	}
 
 	/* ── Toolbar ── */
 	.topbar {
-		position: sticky;
-		top: 0;
+		flex: none;
 		z-index: var(--z-sticky);
 		display: flex;
 		align-items: center;
@@ -278,9 +279,7 @@
 	.rail-inner {
 		display: flex;
 		flex-direction: column;
-		position: sticky;
-		top: 0;
-		height: 100dvh;
+		height: 100%;
 		overflow-y: auto;
 		overflow-x: hidden;
 		padding: 0 0 8px;
@@ -425,8 +424,12 @@
 	}
 
 	.content {
+		flex: 1;
 		min-width: 0;
-		padding: 28px 40px 72px;
+		min-height: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding: 20px 40px 20px;
 	}
 	.inner {
 		max-width: 1080px;

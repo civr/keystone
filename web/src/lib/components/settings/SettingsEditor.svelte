@@ -20,10 +20,13 @@
 
 	let {
 		groups,
+		visible,
 		after
 	}: {
 		/** Groups of settings paths to edit, in display order. */
 		groups: SettingsGroup[];
+		/** Ids of the groups shown now (a tab); all when absent. Hidden groups keep their edits. */
+		visible?: string[];
 		/** Extra content below the groups (e.g. Recovery on Security). */
 		after?: Snippet;
 	} = $props();
@@ -144,7 +147,8 @@
 	<div class="loading-note" aria-label="Loading"><span class="spinner"></span></div>
 {:else}
 	<form onsubmit={(e) => (e.preventDefault(), save())} novalidate>
-		{#each groups as g (g.id)}
+		<div class="cols">
+		{#each groups.filter((g) => !visible || visible.includes(g.id)) as g (g.id)}
 			<section class="group" aria-labelledby="g-{g.id}">
 				<h2 id="g-{g.id}">{g.title}</h2>
 				<div class="card">
@@ -166,6 +170,8 @@
 			</section>
 		{/each}
 
+		</div>
+
 		{#if dirty.length}
 			<div class="savebar" transition:rise={{ y: 8, duration: 200 }}>
 				<span class="count">{dirty.length === 1 ? '1 change' : `${dirty.length} changes`}</span>
@@ -182,3 +188,14 @@
 {@render after?.()}
 
 <Confirm bind:this={confirmer} />
+
+<style>
+	/* Groups flow into two columns on a wide pane, so a page fits the window. */
+	.cols {
+		columns: 2 380px;
+		column-gap: 20px;
+	}
+	.cols > :global(.group) {
+		break-inside: avoid;
+	}
+</style>

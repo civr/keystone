@@ -392,6 +392,15 @@ export interface SettingsGroup {
 	showClientIP?: boolean;
 }
 
+/** The Security page's tabs: each fits one screen. */
+export const securityTabs: { id: string; label: string; groups: string[] }[] = [
+	{ id: 'sign-in', label: 'Sign-in', groups: ['sessions', 'sign-in', 'brute-force'] },
+	{ id: 'network', label: 'Network', groups: ['network', 'headers'] },
+	{ id: 'apps', label: 'Apps', groups: ['tokens', 'ldap', 'gate', 'vault'] },
+	{ id: 'audit', label: 'Audit', groups: ['audit'] },
+	{ id: 'keys', label: 'Keys & recovery', groups: [] }
+];
+
 export const securityGroups: SettingsGroup[] = [
 	{
 		id: 'sessions',
