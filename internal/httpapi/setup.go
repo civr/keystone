@@ -119,7 +119,7 @@ var (
 	condADTest  = func(p setupProgress) string { return ifThen(!p.domain, msgPrevious) }
 	condPasskey = func(p setupProgress) string { return ifThen(!(p.domain && p.ad && p.owner), msgPrevious) }
 	condAfterPK = func(p setupProgress) string { return ifThen(!p.passkeyDone(), msgPrevious) }
-	condAccount = func(p setupProgress) string { return ifThen(p.passkeys > 0, msgFrozen) }
+	condAccount = func(setupProgress) string { return "" }
 )
 
 func ifThen(c bool, msg string) string {
@@ -596,7 +596,10 @@ func (s *server) setupAccount(w http.ResponseWriter, r *http.Request, token stri
 		errInternal(w, "hash password", err)
 		return
 	}
-	if o, err := url.Parse(r.Header.Get("Origin")); err == nil && o.Host != "" && cfg.PublicURL == "" {
+	// The address the browser is on becomes the public one — also over a
+	// value an earlier, unfinished wizard saved — so the session cookie and
+	// the next sign-in work right here. It can be changed in Instellingen.
+	if o, err := url.Parse(r.Header.Get("Origin")); err == nil && o.Host != "" {
 		cfg.PublicURL = strings.ToLower(o.Scheme) + "://" + o.Host
 		if h := o.Hostname(); net.ParseIP(h) == nil && strings.Count(h, ".") >= 2 && cfg.Domain == "" {
 			cfg.Domain = h[strings.IndexByte(h, '.')+1:]
@@ -610,6 +613,12 @@ func (s *server) setupAccount(w http.ResponseWriter, r *http.Request, token stri
 	handle := make([]byte, 64)
 	if _, err := rand.Read(handle); err != nil {
 		errInternal(w, "user handle", err)
+		return
+	}
+	// Passkeys left by an abandoned run of the AD wizard belong to a setup
+	// that never finished: nobody can sign in with them.
+	if _, err := s.d.Pool.Exec(ctx, `delete from passkeys`); err != nil {
+		errInternal(w, "clear passkeys", err)
 		return
 	}
 	if _, err := s.d.Pool.Exec(ctx, `insert into owner (id, username, display_name, user_handle, password_hash, created_at)

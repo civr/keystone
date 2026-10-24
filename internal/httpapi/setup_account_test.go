@@ -46,3 +46,50 @@ func TestSetupLocalAccount(t *testing.T) {
 		t.Fatalf("password login = %d %v", r.Code, r.Body)
 	}
 }
+
+// An earlier, unfinished wizard may have saved an https public address the
+// browser is not on. The account step makes the address in use the public
+// one, so the session cookie sticks and the next sign-in is accepted.
+func TestSetupAccountOverridesEarlierAddress(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	c := newClient(t, s.env, "192.168.1.10")
+	s.unlock(c)
+	s.domain(c) // saves public_url https://keystone.home.lan
+
+	c.host, c.origin = "192.168.1.10:8080", "http://192.168.1.10:8080"
+	s.unlock(c)
+	w := c.must("POST", "/api/setup/account", map[string]string{"username": "thijs", "password": "long enough secret"}, 200)
+	for _, ck := range w.Result().Cookies() {
+		if ck.Name == SessionCookie && ck.Secure {
+			t.Fatal("session cookie is Secure on an http address: the browser drops it")
+		}
+	}
+	c.must("GET", "/api/me", nil, 200)
+	c.must("POST", "/api/auth/logout", nil, 200)
+
+	c2 := newClient(t, s.env, "192.168.1.11")
+	c2.host, c2.origin = "192.168.1.10:8080", "http://192.168.1.10:8080"
+	if r := password(c2, "thijs", "long enough secret"); r.Code != 200 || r.Body["next"] != "done" {
+		t.Fatalf("sign-in on the setup address = %d %v", r.Code, r.Body)
+	}
+}
+
+// Passkeys from an abandoned run of the old wizard must not block the
+// account step: setup never finished, so nobody can be using them.
+func TestSetupAccountAfterAbandonedPasskey(t *testing.T) {
+	t.Parallel()
+	s := newSetupEnv(t)
+	c := newClient(t, s.env, "192.168.1.10")
+	s.unlock(c)
+	s.domain(c)
+	s.ad(c)
+	s.owner(c)
+	s.passkey(c)
+	c.must("POST", "/api/setup/account", map[string]string{"username": "thijs", "password": "long enough secret"}, 200)
+	var me map[string]any
+	body(t, c.must("GET", "/api/me", nil, 200).Body, &me)
+	if me["passkey_missing"] != true {
+		t.Fatalf("passkeys of the abandoned setup kept: %v", me)
+	}
+}
