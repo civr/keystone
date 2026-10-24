@@ -73,6 +73,18 @@ func TestVault(t *testing.T) {
 		c.must("PUT", "/api/apps/"+link.ID+"/vault", map[string]any{"username": "x", "password": "y"}, 400)
 	})
 
+	t.Run("ClearedWhenProtocolChanges", func(t *testing.T) {
+		var other protoApp
+		body(t, c.must("POST", "/api/apps", map[string]any{"name": "NAS", "url": "https://nas.lan", "color": "#111111", "protocol": "vault"}, 201).Body, &other)
+		c.must("PUT", "/api/apps/"+other.ID+"/vault", map[string]any{"username": "admin", "password": "pw"}, 200)
+		c.must("PUT", "/api/apps/"+other.ID, map[string]any{"name": "NAS", "url": "https://nas.lan", "color": "#111111", "protocol": "link"}, 200)
+		var n int
+		_ = l.deps.Pool.QueryRow(context.Background(), `select count(*) from vault_entries where app_id = $1`, other.ID).Scan(&n)
+		if n != 0 {
+			t.Fatal("vault entry kept after the app stopped using the vault")
+		}
+	})
+
 	t.Run("DeletedWithApp", func(t *testing.T) {
 		c.must("DELETE", "/api/apps/"+a.ID, nil, 200)
 		var n int

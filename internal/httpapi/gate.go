@@ -25,6 +25,13 @@ func (s *server) gateStart(w http.ResponseWriter, r *http.Request) {
 		bad()
 		return
 	}
+	secure := strings.HasPrefix(strings.ToLower(cfg.PublicURL), "https://")
+	if secure && u.Scheme == "http" {
+		// The cookie below is Secure: a browser on http:// never sends it
+		// back, and would bounce between the gate and Keystone forever.
+		writeError(w, http.StatusBadRequest, "insecure_app", "Deze app draait op http, maar Keystone op https. Zet de app ook achter https.")
+		return
+	}
 	host := strings.ToLower(u.Hostname())
 	domain := strings.ToLower(cfg.Domain)
 	if host != domain && !strings.HasSuffix(host, "."+domain) {
@@ -54,7 +61,7 @@ func (s *server) gateStart(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: gatetoken.Cookie, Value: tok, Domain: domain, Path: "/", MaxAge: int(ttl / time.Second),
-		HttpOnly: true, Secure: strings.HasPrefix(strings.ToLower(cfg.PublicURL), "https://"), SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
 	})
 	s.appAccess(ctx, *app, "gate")
 	w.Header().Set("Cache-Control", "no-store")

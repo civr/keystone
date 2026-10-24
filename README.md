@@ -136,9 +136,17 @@ location = /_keystone { internal; proxy_pass http://keystone-host:8081/verify?mo
   proxy_set_header X-Original-URL $scheme://$http_host$request_uri; proxy_pass_request_body off; proxy_set_header Content-Length ""; }
 location @keystone_login { proxy_pass http://keystone-host:8081/login-redirect?rd=$scheme://$http_host$request_uri; }
 location / { auth_request /_keystone; error_page 401 = @keystone_login;
-  auth_request_set $ks_user $upstream_http_x_keystone_user; proxy_set_header X-Keystone-User $ks_user;
+  auth_request_set $ks_user $upstream_http_x_keystone_user;
+  auth_request_set $ks_email $upstream_http_x_keystone_email;
+  auth_request_set $ks_name $upstream_http_x_keystone_name;
+  proxy_set_header X-Keystone-User $ks_user;
+  proxy_set_header X-Keystone-Email $ks_email;
+  proxy_set_header X-Keystone-Name $ks_name;
   proxy_pass http://homeassistant:8123; }
 ```
+
+Alle drie de `proxy_set_header`-regels zijn nodig: nginx vervangt zo wat een bezoeker zelf meestuurt, en
+laat de header weg als de poortwachter hem niet zet (bij een uitzondering).
 
 Laat alleen je reverse proxy bij poort 8081 en zorg dat hij `X-Keystone-*` van bezoekers nooit doorgeeft
 (Traefik vervangt ze vanzelf; bij Caddy doet `request_header -X-Keystone-*` dat). Voor automatisch inloggen

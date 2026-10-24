@@ -307,6 +307,13 @@ func (s *server) updateApp(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "update app", err)
 		return
 	}
+	if a.Protocol != apps.Vault {
+		// A stored password must not outlive the app's use of the vault.
+		if _, err := s.d.Pool.Exec(ctx, `delete from vault_entries where app_id = $1`, a.ID); err != nil {
+			errInternal(w, "clear vault", err)
+			return
+		}
+	}
 	s.d.Audit.Log(ctx, audit.ActorOwner, "app.updated", clientIP(ctx), map[string]any{"id": a.ID, "name": a.Name})
 	writeJSON(w, http.StatusOK, a)
 }

@@ -48,6 +48,15 @@ func TestGateStart(t *testing.T) {
 		}
 	})
 
+	t.Run("HTTPAppRefusedWithSecureCookie", func(t *testing.T) {
+		// public_url is https, so ks_gate is Secure: a browser on http://
+		// never sends it back and would loop between the gate and Keystone.
+		w := c.do("GET", start("http://ha.home.lan/"), nil)
+		if w.Code != 400 || w.Header().Get("Location") != "" {
+			t.Fatalf("http rd = %d %q", w.Code, w.Header().Get("Location"))
+		}
+	})
+
 	t.Run("NoSessionGoesToLogin", func(t *testing.T) {
 		anon := newClient(t, l.env, "192.168.1.23")
 		w := anon.must("GET", start("https://ha.home.lan/"), nil, 302)
