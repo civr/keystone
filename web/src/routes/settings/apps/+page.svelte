@@ -134,6 +134,15 @@
 	let proto = $state<ProtocolForm>(protocolForm(null));
 	let protoErrors = $state<Record<string, string>>({});
 	let vault = $state({ username: '', password: '', hasPassword: false });
+	// Who can use the app: null is everyone.
+	let access = $state<string[] | null>(null);
+	let people = $state<{ id: string; username: string; display_name: string }[]>([]);
+	onMount(() => {
+		api.get<{ users: { id: string; username: string; display_name: string }[] }>('/admin/users').then(
+			(r) => (people = r.users),
+			() => {}
+		);
+	});
 
 	async function loadVault(app: App) {
 		try {
@@ -149,6 +158,7 @@
 		proto = protocolForm(app);
 		protoErrors = {};
 		vault = { username: '', password: '', hasPassword: false };
+		access = app?.access ? [...app.access] : null;
 		if (app?.protocol === 'vault') loadVault(app);
 		form = app
 			? { name: app.name, url: app.url, color: app.color, icon: app.icon || null }
@@ -213,6 +223,7 @@
 			url: form.url.trim(),
 			color: form.color.toLowerCase(),
 			icon: form.icon ?? '',
+			access,
 			...protocolPayload(proto)
 		};
 		try {
@@ -442,6 +453,31 @@
 				<small>Keystone haalt het icoon van de app zelf op als je een nieuwe app toevoegt. Of kies een PNG, SVG of WebP (maximaal 64 kB).</small>
 			{/if}
 		</div>
+
+		{#if people.length > 1}
+			<fieldset class="field">
+				<legend class="field-label">Who can use it</legend>
+				<div class="segmented">
+					<label><input type="radio" checked={access === null} onchange={() => (access = null)} /><span>Everyone</span></label>
+					<label><input type="radio" checked={access !== null} onchange={() => (access = ['owner'])} /><span>Only…</span></label>
+				</div>
+				{#if access !== null}
+					<div class="people">
+						{#each people as p (p.id)}
+							<label class="check">
+								<input
+									type="checkbox"
+									checked={access.includes(p.id)}
+									onchange={(e) =>
+										(access = e.currentTarget.checked ? [...(access ?? []), p.id] : (access ?? []).filter((x) => x !== p.id))}
+								/>
+								<span>{p.display_name || p.username}</span>
+							</label>
+						{/each}
+					</div>
+				{/if}
+			</fieldset>
+		{/if}
 
 		<AppProtocol bind:form={proto} bind:vault app={editing} name={form.name} errors={protoErrors} />
 
@@ -737,6 +773,12 @@
 	}
 	.swatch.custom:not([style*='transparent'])::after {
 		content: none;
+	}
+	.people {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+		gap: 8px 16px;
+		margin-top: 10px;
 	}
 	.icon-row {
 		display: flex;

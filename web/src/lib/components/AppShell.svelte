@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError, type Me } from '$lib/api';
 	import { firstName } from '$lib/greeting';
-	import { NAV, isActive, searchHref } from '$lib/nav';
+	import { navFor, isActive, searchHref } from '$lib/nav';
 	import { toast } from '$lib/toast.svelte';
 	import { brand, logoSrc } from '$lib/brand.svelte';
 	import TopbarSearch from './TopbarSearch.svelte';
@@ -86,7 +86,7 @@
 
 {#snippet menu(collapsed: boolean, id: string, onpick?: () => void)}
 	<nav aria-label="Hoofdmenu">
-		{#each NAV as g, gi (gi)}
+		{#each navFor(me?.admin ?? false) as g, gi (gi)}
 			{#if g.title}
 				{#if collapsed}
 					<div class="nav-rule" role="presentation"></div>
@@ -152,7 +152,7 @@
 				<TopbarSearch bind:value={query} onsubmit={search} />
 			</div>
 			{#if me}
-				<UserMenu name={me.display_name?.trim() || firstName(me)} username={me.username} onlogout={logout} />
+				<UserMenu name={me.display_name?.trim() || firstName(me)} username={me.username} settingsHref={me.admin ? '/settings' : '/settings/account'} onlogout={logout} />
 			{:else}
 				<div class="user-ghost" aria-hidden="true"><span class="ghost"></span></div>
 			{/if}

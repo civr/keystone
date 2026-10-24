@@ -7,8 +7,9 @@
 	let {
 		name,
 		username,
+		settingsHref,
 		onlogout
-	}: { name: string; username: string; onlogout: () => void } = $props();
+	}: { name: string; username: string; settingsHref: string; onlogout: () => void } = $props();
 
 	let open = $state(false);
 	let root: HTMLDivElement;
@@ -92,14 +93,14 @@
 				<strong>{name}</strong>
 				<span>{username}</span>
 			</div>
-			<a role="menuitem" href="/instellingen" onclick={() => close(false)}>
+			<a role="menuitem" href={settingsHref} onclick={() => close(false)}>
 				<svg viewBox="0 0 20 20" aria-hidden="true">
 					<circle cx="10" cy="10" r="2.6" />
 					<path
 						d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4"
 					/>
 				</svg>
-				Instellingen
+				Settings
 			</a>
 			<button
 				role="menuitem"

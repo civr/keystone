@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { NAV, initials, isActive, searchHref, safeNext } from './nav';
+import { NAV, initials, isActive, navFor, searchHref, safeNext } from './nav';
 
 describe('isActive', () => {
 	it.each([
 		['/', '/', true],
-		['/instellingen', '/instellingen', true],
-		['/instellingen/', '/instellingen', true],
-		['/instellingen/ad', '/instellingen', false],
-		['/instellingen/ad/', '/instellingen/ad', true],
-		['/instellingen', '/', false],
+		['/settings', '/settings', true],
+		['/settings/', '/settings', true],
+		['/settings/ad', '/settings', false],
+		['/settings/ad/', '/settings/ad', true],
+		['/settings', '/', false],
 		['/login', '/', false]
 	])('%s on %s → %s', (path, href, want) => {
 		expect(isActive(path, href)).toBe(want);
@@ -16,21 +16,27 @@ describe('isActive', () => {
 });
 
 describe('NAV', () => {
-	it('has Mijn apps first, then the Instellingen group in order', () => {
-		expect(NAV.map((g) => g.title)).toEqual([null, 'Instellingen']);
+	it('has My apps and Vault first, then the Settings group in order', () => {
+		expect(NAV.map((g) => g.title)).toEqual([null, 'Settings']);
 		expect(NAV[0].items.map((i) => [i.label, i.href])).toEqual([
-			['Mijn apps', '/'],
-			['Kluis', '/kluis']
+			['My apps', '/'],
+			['Vault', '/vault']
 		]);
-		expect(NAV[1].items.map((i) => [i.label, i.href])).toEqual([
-			['Algemeen', '/instellingen'],
-			['Huisstijl', '/instellingen/huisstijl'],
-			['Active Directory', '/instellingen/ad'],
-			['Apps', '/instellingen/apps'],
-			['Beveiliging', '/instellingen/beveiliging'],
-			['Apparaten', '/instellingen/apparaten'],
-			['Activiteit', '/instellingen/activiteit']
+		expect(NAV[1].items.map((i) => i.href)).toEqual([
+			'/settings',
+			'/settings/account',
+			'/settings/devices',
+			'/settings/users',
+			'/settings/apps',
+			'/settings/branding',
+			'/settings/security',
+			'/settings/ad',
+			'/settings/activity'
 		]);
+	});
+	it('shows members only their own sections', () => {
+		expect(navFor(false)[1].items.map((i) => i.label)).toEqual(['Account', 'Devices']);
+		expect(navFor(true)[1].items).toHaveLength(9);
 	});
 });
 
@@ -63,7 +69,7 @@ describe('safeNext', () => {
 		expect(safeNext('/api/gate/start?rd=https%3A%2F%2Fha.home.lan%2F')).toBe('/api/gate/start?rd=https%3A%2F%2Fha.home.lan%2F');
 	});
 	it('rejects everything else', () => {
-		for (const bad of [null, '', '//evil.com/oidc/authorize', 'https://evil.com', '/instellingen', '/\\evil.com', '/oidc/authorizex', '/saml/../instellingen', ' /saml/sso']) {
+		for (const bad of [null, '', '//evil.com/oidc/authorize', 'https://evil.com', '/settings', '/\\evil.com', '/oidc/authorizex', '/saml/../instellingen', ' /saml/sso']) {
 			expect(safeNext(bad)).toBe('/');
 		}
 	});

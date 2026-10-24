@@ -261,7 +261,7 @@ func TestOriginMismatchRejected(t *testing.T) {
 func TestShellServedForUnknownPath(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t, false)
-	for _, p := range []string{"/", "/instellingen/beveiliging", "/some/deep/page?x=1"} {
+	for _, p := range []string{"/", "/settings/security", "/some/deep/page?x=1"} {
 		w := do(e.h, "GET", p, "172.18.0.2:1", nil)
 		if w.Code != http.StatusOK || w.Body.String() != testShell {
 			t.Fatalf("GET %s: %d %q", p, w.Code, w.Body.String())

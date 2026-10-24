@@ -17,7 +17,7 @@
 		loadError = null;
 		try {
 			// Both requests in parallel: one round-trip of latency for the whole page.
-			const [m, a] = await Promise.all([api.get<Me>('/me'), api.get<{ apps: App[] }>('/apps')]);
+			const [m, a] = await Promise.all([api.get<Me>('/me'), api.get<{ apps: App[] }>('/apps?mine=1')]);
 			me = m;
 			apps = a.apps;
 		} catch (e) {

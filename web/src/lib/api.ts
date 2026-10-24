@@ -93,6 +93,10 @@ export const api = {
 
 /** GET /api/me */
 export interface Me {
+	/** Account id: "owner" or a uuid. */
+	id: string;
+	role: 'owner' | 'admin' | 'member';
+	admin: boolean;
 	username: string;
 	display_name: string | null;
 	given_name: string | null;

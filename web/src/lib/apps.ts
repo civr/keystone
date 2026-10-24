@@ -9,6 +9,8 @@ export interface App {
 	config: AppConfig;
 	/** OIDC client secret or LDAP bind password has been generated. */
 	has_secret?: boolean;
+	/** Account ids that may use it; null is everyone. */
+	access?: string[] | null;
 	sort: number;
 	created_at: string;
 }

@@ -1,9 +1,11 @@
-/** The app shell's left menu: "Mijn apps", then the Instellingen sections. */
+/** The app shell's left menu: My apps and Vault, then the Settings sections. */
 export interface NavItem {
 	href: string;
 	label: string;
 	/** SVG path data on a 20×20 grid, stroked in currentColor. */
 	icon: string;
+	/** Only admins see it. */
+	admin?: boolean;
 }
 export interface NavGroup {
 	/** Group heading; null for the ungrouped top items. */
@@ -15,59 +17,71 @@ export const NAV: NavGroup[] = [
 	{
 		title: null,
 		items: [
-			{
-				href: '/',
-				label: 'Mijn apps',
-				icon: 'M3.5 3.5h5v5h-5zM11.5 3.5h5v5h-5zM3.5 11.5h5v5h-5zM11.5 11.5h5v5h-5z'
-			},
-			{
-				href: '/kluis',
-				label: 'Kluis',
-				icon: 'M3 4h14v11.5H3zM10 7a2.75 2.75 0 1 0 0 5.5A2.75 2.75 0 0 0 10 7zM5.5 15.5V17M14.5 15.5V17'
-			}
+			{ href: '/', label: 'My apps', icon: 'M3.5 3.5h5v5h-5zM11.5 3.5h5v5h-5zM3.5 11.5h5v5h-5zM11.5 11.5h5v5h-5z' },
+			{ href: '/vault', label: 'Vault', icon: 'M3 4h14v11.5H3zM10 7a2.75 2.75 0 1 0 0 5.5A2.75 2.75 0 0 0 10 7zM5.5 15.5V17M14.5 15.5V17' }
 		]
 	},
 	{
-		title: 'Instellingen',
+		title: 'Settings',
 		items: [
 			{
-				href: '/instellingen',
-				label: 'Algemeen',
+				href: '/settings',
+				label: 'General',
+				admin: true,
 				icon: 'M10 2.8v2M10 15.2v2M2.8 10h2M15.2 10h2M4.9 4.9l1.4 1.4M13.7 13.7l1.4 1.4M4.9 15.1l1.4-1.4M13.7 6.3l1.4-1.4M10 6.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4z'
 			},
 			{
-				href: '/instellingen/huisstijl',
-				label: 'Huisstijl',
+				href: '/settings/account',
+				label: 'Account',
+				icon: 'M10 3.5a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5zM3.75 16.5c.8-3 3.3-4.6 6.25-4.6s5.45 1.6 6.25 4.6'
+			},
+			{ href: '/settings/devices', label: 'Devices', icon: 'M2.5 4.5h11v8h-11zM6 15.5h4M15 7.5h3v8.5h-3z' },
+			{
+				href: '/settings/users',
+				label: 'Users',
+				admin: true,
+				icon: 'M7.5 4a2.75 2.75 0 1 0 0 5.5A2.75 2.75 0 0 0 7.5 4zM2.5 16c.6-2.6 2.6-4 5-4s4.4 1.4 5 4M13.5 4.5a2.5 2.5 0 0 1 0 5M14.5 12.2c1.6.4 2.7 1.7 3 3.8'
+			},
+			{ href: '/settings/apps', label: 'Apps', admin: true, icon: 'M4 4h12v12H4zM4 8.5h12M8.5 8.5V16' },
+			{
+				href: '/settings/branding',
+				label: 'Branding',
+				admin: true,
 				icon: 'M10 3a7 7 0 1 0 0 14c.9 0 1.5-.6 1.5-1.4 0-1.1-1-1.4-1-2.5 0-.8.7-1.5 1.5-1.5h2a3 3 0 0 0 3-3C17 5.7 13.9 3 10 3zM6.5 10h.01M8 6.8h.01M12 6.8h.01'
 			},
 			{
-				href: '/instellingen/ad',
-				label: 'Active Directory',
-				icon: 'M3 4.5h14v5H3zM3 10.5h14v5H3zM6 7h.01M6 13h.01'
-			},
-			{
-				href: '/instellingen/apps',
-				label: 'Apps',
-				icon: 'M4 4h12v12H4zM4 8.5h12M8.5 8.5V16'
-			},
-			{
-				href: '/instellingen/beveiliging',
-				label: 'Beveiliging',
+				href: '/settings/security',
+				label: 'Security',
+				admin: true,
 				icon: 'M10 2.5 16 5v4.6c0 3.7-2.6 6.6-6 7.9-3.4-1.3-6-4.2-6-7.9V5z'
 			},
+			{ href: '/settings/ad', label: 'Active Directory', admin: true, icon: 'M3 4.5h14v5H3zM3 10.5h14v5H3zM6 7h.01M6 13h.01' },
 			{
-				href: '/instellingen/apparaten',
-				label: 'Apparaten',
-				icon: 'M2.5 4.5h11v8h-11zM6 15.5h4M15 7.5h3v8.5h-3z'
-			},
-			{
-				href: '/instellingen/activiteit',
-				label: 'Activiteit',
+				href: '/settings/activity',
+				label: 'Activity',
+				admin: true,
 				icon: 'M10 3.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM10 6.5V10l2.5 1.5'
 			}
 		]
 	}
 ];
+
+/** The menu for an account: members do not see the admin sections. */
+export function navFor(admin: boolean): NavGroup[] {
+	return NAV.map((g) => ({ ...g, items: g.items.filter((i) => admin || !i.admin) }));
+}
+
+/** Old (Dutch) paths and where they live now. */
+export const MOVED: Record<string, string> = {
+	'/kluis': '/vault',
+	'/instellingen': '/settings',
+	'/instellingen/huisstijl': '/settings/branding',
+	'/instellingen/ad': '/settings/ad',
+	'/instellingen/apps': '/settings/apps',
+	'/instellingen/beveiliging': '/settings/security',
+	'/instellingen/apparaten': '/settings/devices',
+	'/instellingen/activiteit': '/settings/activity'
+};
 
 const trim = (p: string) => p.replace(/\/+$/, '') || '/';
 
