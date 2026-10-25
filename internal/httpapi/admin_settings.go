@@ -59,11 +59,14 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, c := range diffJSON(cur, next) {
-		need := rbac.SecurityWrite
-		if c.Path == "domain" || c.Path == "public_url" {
-			need = rbac.SystemWrite
+		ok := g.Has(rbac.SecurityWrite)
+		switch {
+		case c.Path == "domain" || c.Path == "public_url":
+			ok = g.Has(rbac.SystemWrite)
+		case strings.HasPrefix(c.Path, "login.") || strings.HasPrefix(c.Path, "proxy_auth."):
+			ok = ok || g.Has(rbac.AuthWrite)
 		}
-		if !g.Has(need) {
+		if !ok {
 			writeError(w, http.StatusForbidden, "forbidden", "You do not have permission to change "+c.Path+".")
 			return
 		}

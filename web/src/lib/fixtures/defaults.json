@@ -56,5 +56,11 @@
     "reconfirm_minutes": 15,
     "clipboard_clear_seconds": 30,
     "allow_reveal": true
+  },
+  "proxy_auth": {
+    "enabled": false,
+    "header": "Remote-User",
+    "match": "username",
+    "trusted": []
   }
 }

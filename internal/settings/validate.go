@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"regexp"
 )
 
 // ValidationError identifies the offending field (JSON path) and an English message.
@@ -59,6 +60,8 @@ func contains(prefixes []netip.Prefix, ip netip.Addr) bool {
 // Validate checks bounds and formats. When requesterIP is valid and a
 // login/admin CIDR list is non-empty, the list must contain the requester so
 // the change cannot lock them out. An invalid requesterIP (e.g. CLI) skips
+var headerRe = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
+
 // that check.
 func (s Settings) Validate(requesterIP netip.Addr) error {
 	if s.PublicURL != "" {
@@ -104,6 +107,19 @@ func (s Settings) Validate(requesterIP netip.Addr) error {
 	}
 	if _, err := parseCIDRs("network.trusted_proxies", s.Network.TrustedProxies); err != nil {
 		return err
+	}
+	proxies, err := parseCIDRs("proxy_auth.trusted", s.ProxyAuth.Trusted)
+	if err != nil {
+		return err
+	}
+	if err := oneOf("proxy_auth.match", s.ProxyAuth.Match, "username", "email"); err != nil {
+		return err
+	}
+	if !headerRe.MatchString(s.ProxyAuth.Header) {
+		return bad("proxy_auth.header", "use a header name such as Remote-User")
+	}
+	if s.ProxyAuth.Enabled && len(proxies) == 0 {
+		return bad("proxy_auth.trusted", "name the proxy addresses that may sign people in")
 	}
 	if requesterIP.IsValid() {
 		if len(admin) > 0 && !contains(admin, requesterIP) {

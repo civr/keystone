@@ -30,6 +30,7 @@ type client struct {
 	host    string // request Host; setupHost by default
 	origin  string // Origin header; setupOrigin by default
 	cookies map[string]string
+	headers map[string]string // extra request headers
 }
 
 func newClient(t *testing.T, e *env, ip string) *client {
@@ -56,6 +57,9 @@ func (c *client) do(method, path string, body any) *httptest.ResponseRecorder {
 	r.RemoteAddr = c.ip + ":40000"
 	r.Header.Set("Origin", c.origin)
 	r.Header.Set("Content-Type", "application/json")
+	for k, v := range c.headers {
+		r.Header.Set(k, v)
+	}
 	for k, v := range c.cookies {
 		r.AddCookie(&http.Cookie{Name: k, Value: v})
 	}

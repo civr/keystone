@@ -4,7 +4,8 @@
 
 	const tabs = [
 		{ id: 'sessions', label: 'Sessions', groups: ['sessions'] },
-		{ id: 'sign-in', label: 'Sign-in', groups: ['sign-in', 'brute-force'] }
+		{ id: 'sign-in', label: 'Sign-in', groups: ['sign-in', 'brute-force'] },
+		{ id: 'proxy', label: 'Reverse proxy', groups: ['proxy'] }
 	];
 	let tab = $state(tabs[0].id);
 	const shown = $derived(tabs.find((t) => t.id === tab)!.groups);

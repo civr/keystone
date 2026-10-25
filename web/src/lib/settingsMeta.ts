@@ -41,6 +41,7 @@ export interface Settings {
 	ldap: { require_tls: boolean; allowed_cidrs: string[]; bind_per_ip_per_minute: number };
 	gate: { fail_per_ip_per_minute: number };
 	vault: { reconfirm_minutes: number; clipboard_clear_seconds: number; allow_reveal: boolean };
+	proxy_auth: { enabled: boolean; header: string; match: string; trusted: string[] };
 }
 
 export type Kind = 'bool' | 'int' | 'enum' | 'cidrs' | 'text';
@@ -374,6 +375,34 @@ export const settingsMeta: Record<string, FieldMeta> = {
 		unit: 'seconds',
 		weakens: raised
 	},
+	'proxy_auth.enabled': {
+		label: 'Sign in through the reverse proxy',
+		help: 'An identity-aware proxy in front of Keystone (such as one with its own login) signs people in by passing their name in a header.',
+		kind: 'bool',
+		weakens: turnedOn
+	},
+	'proxy_auth.header': {
+		label: 'Identity header',
+		help: 'The header the proxy puts the name in.',
+		kind: 'text',
+		placeholder: 'Remote-User'
+	},
+	'proxy_auth.match': {
+		label: 'Header holds',
+		help: 'What Keystone matches the header against.',
+		kind: 'enum',
+		options: [
+			{ value: 'username', label: 'Username' },
+			{ value: 'email', label: 'E-mail' }
+		]
+	},
+	'proxy_auth.trusted': {
+		label: 'Proxy addresses',
+		help: 'Only requests that reach Keystone straight from these addresses may use the header; anyone else’s copy is ignored.',
+		kind: 'cidrs',
+		placeholder: '10.0.0.2/32',
+		weakens: added
+	},
 	'vault.allow_reveal': {
 		label: 'Show passwords',
 		help: 'Let a vault password be shown, not only copied.',
@@ -472,6 +501,12 @@ export const securityGroups: SettingsGroup[] = [
 		id: 'gate',
 		title: 'Gate',
 		paths: ['gate.fail_per_ip_per_minute']
+	},
+	{
+		id: 'proxy',
+		title: 'Reverse proxy',
+		paths: ['proxy_auth.enabled', 'proxy_auth.header', 'proxy_auth.match', 'proxy_auth.trusted'],
+		foot: 'The proxy must remove this header from what clients send. Sign-in through the proxy skips Keystone’s own passkey and code steps: the proxy is trusted to have done that.'
 	},
 	{
 		id: 'vault',

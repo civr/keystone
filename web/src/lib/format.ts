@@ -141,6 +141,7 @@ const VALUES: Record<string, string> = {
 	recovery: 'recovery code',
 	stepup: 'confirmation',
 	launch: 'signed in for you',
+	proxy: 'reverse proxy',
 	ad_unavailable: 'Active Directory unreachable',
 	ad_error: 'Active Directory error'
 };

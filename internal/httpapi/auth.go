@@ -54,6 +54,7 @@ func (s *server) authRoutes(r chi.Router) {
 	r.Post("/passkey/finish", s.authPasskeyFinish)
 	r.Post("/recovery", s.authRecovery)
 	r.Post("/emergency", s.authEmergency)
+	r.Post("/proxy", s.authProxy)
 	r.With(requireSession).Post("/stepup/begin", s.stepUpBegin)
 	r.With(requireSession).Post("/stepup/finish", s.stepUpFinish)
 	r.With(requireSession).Post("/stepup/password", s.stepUpPassword)

@@ -67,6 +67,7 @@ describe('settingsMeta coverage', () => {
 			'Tokens (OIDC)',
 			'LDAP for apps',
 			'Gate',
+			'Reverse proxy',
 			'Vault'
 		]);
 	});

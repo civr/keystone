@@ -15,6 +15,18 @@ type Settings struct {
 	LDAP       LDAPSettings       `json:"ldap"`
 	Gate       GateSettings       `json:"gate"`
 	Vault      VaultSettings      `json:"vault"`
+	ProxyAuth  ProxyAuthSettings  `json:"proxy_auth"`
+}
+
+// ProxyAuthSettings let a reverse proxy that already signed the person in
+// (an identity-aware proxy) sign them in to Keystone with a header. The
+// header counts only when the request reached Keystone directly from one
+// of Trusted (the address Caddy saw).
+type ProxyAuthSettings struct {
+	Enabled bool     `json:"enabled"`
+	Header  string   `json:"header"`
+	Match   string   `json:"match"` // username or email
+	Trusted []string `json:"trusted"`
 }
 
 type SessionSettings struct {
@@ -100,6 +112,7 @@ func Defaults() Settings {
 		LDAP:       LDAPSettings{RequireTLS: true, AllowedCIDRs: []string{}, BindPerIPPerMinute: 10},
 		Gate:       GateSettings{FailPerIPPerMinute: 60},
 		Vault:      VaultSettings{ReconfirmMinutes: 15, ClipboardClearSeconds: 30, AllowReveal: true},
+		ProxyAuth:  ProxyAuthSettings{Header: "Remote-User", Match: "username", Trusted: []string{}},
 	}
 }
 
@@ -116,5 +129,8 @@ func (s *Settings) normalize() {
 	}
 	if s.LDAP.AllowedCIDRs == nil {
 		s.LDAP.AllowedCIDRs = []string{}
+	}
+	if s.ProxyAuth.Trusted == nil {
+		s.ProxyAuth.Trusted = []string{}
 	}
 }

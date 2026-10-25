@@ -56,5 +56,15 @@
 		"vault.revealed",
 		"vault.updated"
 	],
-	"methods": ["emergency", "launch", "passkey", "passkey_register", "password", "recovery", "stepup", "trusted_device"]
+	"methods": [
+		"emergency",
+		"launch",
+		"passkey",
+		"passkey_register",
+		"password",
+		"proxy",
+		"recovery",
+		"stepup",
+		"trusted_device"
+	]
 }

@@ -110,6 +110,13 @@
 			return;
 		}
 		if (me) return void leave();
+		// Behind an identity-aware proxy that already signed us in.
+		try {
+			await api.send('POST', '/auth/proxy');
+			return void (await finished());
+		} catch {
+			/* not set up, or not through the proxy: sign in here */
+		}
 		go('password');
 		await tick();
 		(username ? passwordInput : userInput)?.focus(); // remembered user: straight to the password
