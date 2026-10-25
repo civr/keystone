@@ -88,7 +88,7 @@ func (s *server) vaultLaunchPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a, err := apps.ByID(ctx, s.d.Pool, l.App)
-	if err != nil || a.Protocol != apps.Vault || a.Config.Vault == nil || !a.Allowed(accountKey(SessionFrom(ctx).UserID)) {
+	if err != nil || a.Protocol != apps.Vault || a.Config.Vault == nil || !s.mayUse(ctx, a) {
 		gone()
 		return
 	}

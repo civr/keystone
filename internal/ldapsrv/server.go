@@ -262,7 +262,7 @@ func member(v runtime.View, a apps.App, uid string) (apps.Owner, bool) {
 func members(v runtime.View, a apps.App) []apps.Owner {
 	var out []apps.Owner
 	for _, acct := range v.Accounts {
-		if !acct.Disabled && a.Allowed(acct.ID) {
+		if !acct.Disabled && a.AllowedFor(acct) {
 			out = append(out, acct)
 		}
 	}

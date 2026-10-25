@@ -311,7 +311,7 @@ func (p *Provider) issue(ctx context.Context, cfg settings.Settings, issuer stri
 // or excluded account is an invalid grant.
 func (p *Provider) account(ctx context.Context, userID string, client apps.App) (apps.Owner, error) {
 	o, err := p.Account(ctx, userID)
-	if errors.Is(err, accounts.ErrNotFound) || (err == nil && (o.Disabled || !client.Allowed(o.ID))) {
+	if errors.Is(err, accounts.ErrNotFound) || (err == nil && (o.Disabled || !client.AllowedFor(o))) {
 		return o, errGrant
 	}
 	return o, err

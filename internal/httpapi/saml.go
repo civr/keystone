@@ -109,7 +109,7 @@ func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	f, a, err := s.samlProvider().Respond(ctx, settingsFrom(ctx).PublicURL, r, req, owner, samlLogin(sess))
 	switch {
-	case err == nil && !a.Allowed(owner.ID):
+	case err == nil && !a.AllowedFor(owner):
 		samlFail(w, http.StatusForbidden, "You do not have access to this app.")
 		return
 	case errors.Is(err, samlidp.ErrUnknownSP):
@@ -140,7 +140,7 @@ func (s *server) samlIdPInitiated(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "saml account", err)
 		return
 	}
-	if !a.Allowed(owner.ID) {
+	if !a.AllowedFor(owner) {
 		errNotFound(w, r)
 		return
 	}

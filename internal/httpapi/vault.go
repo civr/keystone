@@ -35,7 +35,7 @@ func (s *server) vaultApp(w http.ResponseWriter, r *http.Request) (apps.App, boo
 		writeInvalid(w, "protocol", "Only vault apps have stored credentials.")
 		return a, false
 	}
-	if !a.Allowed(accountKey(SessionFrom(r.Context()).UserID)) {
+	if !s.mayUse(r.Context(), a) {
 		errNotFound(w, r)
 		return a, false
 	}

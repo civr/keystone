@@ -1,30 +1,49 @@
 package httpapi
 
-import "github.com/go-chi/chi/v5"
+import (
+	"github.com/go-chi/chi/v5"
+
+	"github.com/civr/keystone/internal/rbac"
+)
 
 // adminRoutes mounts /api/admin. Everything needs a finished setup and a
 // session; writes additionally need a recent confirmation (step-up). Each
-// account manages its own sessions and passkeys; the rest is for admins, and
-// recovery codes, the emergency account and AD are the owner's.
+// route names the permissions that open it (package rbac); each account
+// manages its own sessions and passkeys, and recovery codes, the emergency
+// account and AD are the owner's.
 func (s *server) adminRoutes(r chi.Router) {
 	// Gates are applied per route (not r.Use) so unknown paths still answer 404.
-	me := r.With(s.requireSetupDone, requireSession)
+	done := r.With(s.requireSetupDone)
+	me := done.With(requireSession)
 	meW := me.With(requireStepUp)
-	g := r.With(s.requireSetupDone, s.requireAdmin)
-	w := g.With(requireStepUp)
-	own := r.With(s.requireSetupDone, requireOwner)
+	can := func(perms ...string) chi.Router { return done.With(s.need(perms...)) }
+	canW := func(perms ...string) chi.Router { return done.With(s.need(perms...), requireStepUp) }
+	own := done.With(requireOwner)
 	ownW := own.With(requireStepUp)
 
-	g.Get("/settings", s.getSettings)
-	w.Put("/settings", s.putSettings)
+	can(rbac.SecurityWrite, rbac.SystemWrite, rbac.AuthWrite).Get("/settings", s.getSettings)
+	canW(rbac.SecurityWrite, rbac.SystemWrite).Put("/settings", s.putSettings)
 
-	g.Get("/branding", s.getBranding)
-	w.Put("/branding", s.putBranding)
+	can().Get("/branding", s.getBranding)
+	canW(rbac.BrandingWrite).Put("/branding", s.putBranding)
 
-	g.Get("/users", s.listUsers)
-	w.Post("/users", s.createUser)
-	w.Put("/users/{id}", s.updateUser)
-	w.Delete("/users/{id}", s.deleteUser)
+	can(rbac.UsersRead, rbac.UsersWrite).Get("/users", s.listUsers)
+	canW(rbac.UsersWrite).Post("/users", s.createUser)
+	canW(rbac.UsersWrite).Put("/users/{id}", s.updateUser)
+	canW(rbac.UsersWrite).Delete("/users/{id}", s.deleteUser)
+	can(rbac.UsersRead, rbac.RolesWrite).Get("/users/{id}/roles", s.getUserRoles)
+	canW(rbac.RolesWrite).Put("/users/{id}/roles", s.putUserRoles)
+
+	can(rbac.UsersRead, rbac.RolesWrite).Get("/roles", s.listRoles)
+	canW(rbac.RolesWrite).Post("/roles", s.createRole)
+	canW(rbac.RolesWrite).Put("/roles/{id}", s.updateRole)
+	canW(rbac.RolesWrite).Delete("/roles/{id}", s.deleteRole)
+
+	can(rbac.UsersRead, rbac.GroupsWrite).Get("/groups", s.listGroups)
+	canW(rbac.GroupsWrite).Post("/groups", s.createGroup)
+	canW(rbac.GroupsWrite).Put("/groups/{id}", s.updateGroup)
+	canW(rbac.GroupsWrite).Delete("/groups/{id}", s.deleteGroup)
+	canW(rbac.RolesWrite).Put("/groups/{id}/roles", s.putGroupRoles)
 
 	own.Get("/ad", s.getAD)
 	ownW.Put("/ad", s.putAD)
@@ -43,11 +62,12 @@ func (s *server) adminRoutes(r chi.Router) {
 	own.Get("/emergency", s.getEmergency)
 	ownW.Put("/emergency", s.putEmergency)
 
-	g.Get("/keys", s.listKeys)
-	w.Post("/keys/{use}/rotate", s.rotateKey)
+	can(rbac.SecurityWrite).Get("/keys", s.listKeys)
+	canW(rbac.SecurityWrite).Post("/keys/{use}/rotate", s.rotateKey)
 
-	g.Get("/audit", s.listAudit)
-	g.Get("/audit/export", s.exportAudit)
+	can(rbac.AuditRead).Get("/audit", s.listAudit)
+	can(rbac.AuditRead).Get("/audit/export", s.exportAudit)
+	can().Get("/overview", s.overview)
 }
 
 // accountRoutes mounts /api/account: the signed-in account's own password.
@@ -56,22 +76,23 @@ func (s *server) accountRoutes(r chi.Router) {
 }
 
 // appRoutes mounts /api/apps: everyone signed in sees the apps they may use
-// and opens vault tiles; admins change apps (with a step-up).
+// and opens vault tiles; app admins change the apps they are given, admins
+// with apps.write any app (with a step-up).
 func (s *server) appRoutes(r chi.Router) {
 	// Gates are applied per route (not r.Use) so unknown paths still answer 404.
 	me := r.With(s.requireSetupDone, requireSession)
-	g := r.With(s.requireSetupDone, s.requireAdmin)
-	w := g.With(requireStepUp)
+	meW := me.With(requireStepUp)
+	all := r.With(s.requireSetupDone, s.need(rbac.AppsWrite), requireStepUp)
 
 	me.Get("/", s.listApps)
-	w.Post("/", s.createApp)
-	w.Put("/order", s.reorderApps)
-	w.Post("/icon", s.fetchAppIcon)
-	w.Put("/{id}", s.updateApp)
-	w.Delete("/{id}", s.deleteApp)
-	w.Post("/{id}/secret", s.appSecret)
+	all.Post("/", s.createApp)
+	all.Put("/order", s.reorderApps)
+	all.Post("/icon", s.fetchAppIcon)
+	meW.Put("/{id}", s.appAdmin(s.updateApp))
+	all.Delete("/{id}", s.deleteApp)
+	meW.Post("/{id}/secret", s.appAdmin(s.appSecret))
 	me.Get("/{id}/vault", s.getVault)
-	w.Put("/{id}/vault", s.putVault)
+	meW.Put("/{id}/vault", s.appAdmin(s.putVault))
 	me.Post("/{id}/vault/password", s.vaultPassword)
 	me.Post("/{id}/vault/launch", s.vaultLaunch)
 }

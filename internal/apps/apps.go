@@ -96,20 +96,32 @@ type App struct {
 	URL      string
 	Protocol string
 	Config   Config
-	// Access lists the account ids that may use the app; nil is everyone.
+	// Access lists who may use the app: account ids and "group:<id>"
+	// entries; nil is everyone.
 	Access []string
 }
 
-// Allowed reports whether account id may use a.
-func (a App) Allowed(id string) bool {
+// Allowed reports whether account id, in groups, may use a.
+func (a App) Allowed(id string, groups ...string) bool {
 	if a.Access == nil {
 		return true
 	}
 	if id == "" {
 		id = accounts.OwnerID
 	}
-	return slices.Contains(a.Access, id)
+	if slices.Contains(a.Access, id) {
+		return true
+	}
+	for _, g := range groups {
+		if slices.Contains(a.Access, "group:"+g) {
+			return true
+		}
+	}
+	return false
 }
+
+// AllowedFor reports whether acct may use a.
+func (a App) AllowedFor(acct Owner) bool { return a.Allowed(acct.ID, acct.Groups...) }
 
 // Owner is a Keystone account: the owner or a user (package accounts).
 type Owner = accounts.Account

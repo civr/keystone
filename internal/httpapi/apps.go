@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/civr/keystone/internal/rbac"
 	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/appicon"
 	"github.com/civr/keystone/internal/apps"
@@ -270,9 +271,18 @@ func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "load account", err)
 		return
 	}
-	all := acct.IsAdmin() && r.URL.Query().Get("mine") == ""
-	rows, err := s.d.Pool.Query(ctx, `select `+appCols+` from apps where $1 or access is null or $2 = any(access)
-		order by sort, created_at, id`, all, acct.ID)
+	g, err := s.grants(ctx)
+	if err != nil {
+		errInternal(w, "load grants", err)
+		return
+	}
+	all := g.Has(rbac.AppsRead) && r.URL.Query().Get("mine") == ""
+	groups := make([]string, 0, len(acct.Groups))
+	for _, g := range acct.Groups {
+		groups = append(groups, "group:"+g)
+	}
+	rows, err := s.d.Pool.Query(ctx, `select `+appCols+` from apps where $1 or access is null or $2 = any(access) or access && $3::text[]
+		order by sort, created_at, id`, all, acct.ID, groups)
 	if err != nil {
 		errInternal(w, "list apps", err)
 		return
@@ -282,7 +292,7 @@ func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "list apps", err)
 		return
 	}
-	if !acct.IsAdmin() {
+	if !all {
 		// Members get the tile, not how the app is set up or who else uses
 		// it; only whether a SAML tile signs in directly (tileHref).
 		for i := range list {
@@ -381,9 +391,22 @@ func (s *server) checkAccess(ctx context.Context, w http.ResponseWriter, access 
 	for _, a := range list {
 		known[a.ID] = true
 	}
+	rows, err := s.d.Pool.Query(ctx, `select 'group:' || id::text from groups`)
+	if err != nil {
+		errInternal(w, "list groups", err)
+		return false
+	}
+	groups, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		errInternal(w, "list groups", err)
+		return false
+	}
+	for _, g := range groups {
+		known[g] = true
+	}
 	for _, id := range access {
 		if !known[id] {
-			writeInvalid(w, "access", "Choose people who have an account.")
+			writeInvalid(w, "access", "Choose people or groups that exist.")
 			return false
 		}
 	}

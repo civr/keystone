@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/civr/keystone/internal/rbac"
 	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/realip"
 	"github.com/civr/keystone/internal/session"
@@ -28,6 +29,7 @@ const (
 	keySettings ctxKey = iota
 	keyClientIP
 	keySession
+	keyGrants
 )
 
 // settingsFrom returns the settings snapshot taken at the start of the request.
@@ -259,20 +261,40 @@ func (s *server) accountActive(ctx context.Context, user string) bool {
 	return err == nil && !a.Disabled
 }
 
-// requireAdmin lets only admins (the owner or an admin account) through.
-func (s *server) requireAdmin(next http.Handler) http.Handler {
-	return requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		acct, err := s.account(r.Context())
-		if err != nil {
-			errInternal(w, "load account", err)
-			return
-		}
-		if !acct.IsAdmin() {
-			writeError(w, http.StatusForbidden, "admin_required", "Only an admin can do this.")
-			return
-		}
-		next.ServeHTTP(w, r)
-	}))
+// grants returns what the signed-in account may do (rbac), cached on the
+// request context by need.
+func (s *server) grants(ctx context.Context) (rbac.Grants, error) {
+	if g, ok := ctx.Value(keyGrants).(rbac.Grants); ok {
+		return g, nil
+	}
+	sess := SessionFrom(ctx)
+	if sess == nil {
+		return rbac.Grants{}, errNoSession
+	}
+	return rbac.Load(ctx, s.d.Pool, accountKey(sess.UserID))
+}
+
+// need lets a request through when the account holds any of perms
+// (globally). Handlers that act on one app check app-scoped grants themselves.
+func (s *server) need(perms ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return requireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			g, err := s.grants(r.Context())
+			if err != nil {
+				errInternal(w, "load grants", err)
+				return
+			}
+			ok := len(perms) == 0 && g.Admin()
+			for _, p := range perms {
+				ok = ok || g.Has(p)
+			}
+			if !ok {
+				writeError(w, http.StatusForbidden, "forbidden", "You do not have permission to do this.")
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyGrants, g)))
+		}))
+	}
 }
 
 // requireOwner lets only the owner through: recovery codes, the emergency

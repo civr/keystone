@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/civr/keystone/internal/rbac"
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/settings"
@@ -51,6 +52,22 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cur := settingsFrom(ctx)
+	// The address is a system setting; everything else is security.
+	g, err := s.grants(ctx)
+	if err != nil {
+		errInternal(w, "load grants", err)
+		return
+	}
+	for _, c := range diffJSON(cur, next) {
+		need := rbac.SecurityWrite
+		if c.Path == "domain" || c.Path == "public_url" {
+			need = rbac.SystemWrite
+		}
+		if !g.Has(need) {
+			writeError(w, http.StatusForbidden, "forbidden", "You do not have permission to change "+c.Path+".")
+			return
+		}
+	}
 	if originOf(cur.PublicURL) != originOf(next.PublicURL) && r.URL.Query().Get("confirm") != "1" {
 		writeJSON(w, http.StatusConflict, map[string]string{
 			"error": "confirm_required", "warning": "passkeys_rp_change",

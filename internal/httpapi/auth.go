@@ -16,6 +16,7 @@ import (
 
 	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/ad"
+	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/gatetoken"
@@ -139,6 +140,12 @@ func (s *server) passkeyCount(ctx context.Context, user string) (int, error) {
 	var n int
 	err := s.d.Pool.QueryRow(ctx, `select count(*) from passkeys where user_id is not distinct from $1`, accounts.Ref(user)).Scan(&n)
 	return n, err
+}
+
+// mayUse reports whether the signed-in account may use app a.
+func (s *server) mayUse(ctx context.Context, a apps.App) bool {
+	acct, err := s.account(ctx)
+	return err == nil && a.AllowedFor(acct)
 }
 
 // accountKey turns a session's UserID into an account id ("" → owner).
@@ -1028,12 +1035,20 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "count passkeys", err)
 		return
 	}
-	role := acct.Role
-	if acct.IsOwner() {
+	g, err := s.grants(ctx)
+	if err != nil {
+		errInternal(w, "load grants", err)
+		return
+	}
+	role := "member"
+	switch {
+	case acct.IsOwner():
 		role = "owner"
+	case g.Admin():
+		role = "admin"
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"id": acct.ID, "role": role, "admin": acct.IsAdmin(),
+		"id": acct.ID, "role": role, "admin": g.Admin(), "permissions": g.List(), "roles": g.Roles(), "app_admin_of": g.Apps(),
 		"passkey_missing": passkeys == 0,
 		"username":        acct.Username, "display_name": acct.DisplayName, "given_name": acct.GivenName, "email": acct.Email,
 		"emergency": sess.Emergency, "must_register_passkey": sess.MustRegisterPasskey,

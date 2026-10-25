@@ -83,7 +83,7 @@ func (s *server) oidcAuthorize(w http.ResponseWriter, r *http.Request) {
 		back(url.Values{"error": {oerr.Code}, "error_description": {oerr.Description}})
 		return
 	}
-	if !ar.App.Allowed(accountKey(SessionFrom(ctx).UserID)) {
+	if !s.mayUse(ctx, ar.App) {
 		back(url.Values{"error": {"access_denied"}, "error_description": {"You do not have access to this app."}})
 		return
 	}

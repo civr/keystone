@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/mail"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -15,6 +16,7 @@ import (
 	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/crypto"
+	"github.com/civr/keystone/internal/rbac"
 )
 
 // Accounts (Settings › Users): admins add people who sign in with a Keystone
@@ -30,17 +32,45 @@ type userView struct {
 	Username    string    `json:"username"`
 	DisplayName string    `json:"display_name"`
 	Email       string    `json:"email"`
-	Role        string    `json:"role"` // owner, admin or member
+	Role        string    `json:"role"`  // owner, admin (any role) or member
+	Roles       []string  `json:"roles"` // global role ids given directly
+	Groups      []string  `json:"groups"`
 	Disabled    bool      `json:"disabled"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-func viewOf(a accounts.Account) userView {
-	role := a.Role
-	if a.IsOwner() {
-		role = "owner"
+func viewOf(a accounts.Account, roles []string) userView {
+	role := "member"
+	switch {
+	case a.IsOwner():
+		role, roles = "owner", []string{"superadmin"}
+	case len(roles) > 0:
+		role = "admin"
 	}
-	return userView{ID: a.ID, Username: a.Username, DisplayName: a.DisplayName, Email: a.Email, Role: role, Disabled: a.Disabled, CreatedAt: a.CreatedAt}
+	if roles == nil {
+		roles = []string{}
+	}
+	return userView{ID: a.ID, Username: a.Username, DisplayName: a.DisplayName, Email: a.Email, Role: role, Roles: roles,
+		Groups: a.Groups, Disabled: a.Disabled, CreatedAt: a.CreatedAt}
+}
+
+// directRoles maps account ids to the global roles given to them directly.
+func (s *server) directRoles(ctx context.Context) (map[string][]string, error) {
+	rows, err := s.d.Pool.Query(ctx, `select account_id, role_id from role_assignments
+		where account_id is not null and app_id is null order by role_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][]string{}
+	for rows.Next() {
+		var acct, role string
+		if err := rows.Scan(&acct, &role); err != nil {
+			return nil, err
+		}
+		out[acct] = append(out[acct], role)
+	}
+	return out, rows.Err()
 }
 
 func (s *server) listUsers(w http.ResponseWriter, r *http.Request) {
@@ -49,11 +79,58 @@ func (s *server) listUsers(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "list users", err)
 		return
 	}
+	roles, err := s.directRoles(r.Context())
+	if err != nil {
+		errInternal(w, "list roles", err)
+		return
+	}
 	out := make([]userView, 0, len(list))
 	for _, a := range list {
-		out = append(out, viewOf(a))
+		out = append(out, viewOf(a, roles[a.ID]))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"users": out})
+}
+
+// legacyRoles turns the simple role choice (admin or member) into global
+// roles, keeping the account's app-scoped ones.
+func (s *server) legacyRoles(ctx context.Context, id, role string) ([]assignment, error) {
+	cur, err := s.assignmentsOf(ctx, "account_id", id)
+	if err != nil {
+		return nil, err
+	}
+	var next []assignment
+	for _, a := range cur {
+		if a.App != "" || role == accounts.Admin {
+			next = append(next, a)
+		}
+	}
+	if role == accounts.Admin && !slices.ContainsFunc(next, func(a assignment) bool { return a.Role == "admin" && a.App == "" }) {
+		next = append(next, assignment{Role: "admin"})
+	}
+	return next, nil
+}
+
+// mayManage reports whether the actor may change account target: only with
+// at least every permission target has, so a password reset or a disabled
+// account can never take over someone with more rights. False when an answer
+// was written.
+func (s *server) mayManage(w http.ResponseWriter, r *http.Request, target string) bool {
+	ctx := r.Context()
+	g, err := s.grants(ctx)
+	if err != nil {
+		errInternal(w, "load grants", err)
+		return false
+	}
+	tg, err := rbac.Load(ctx, s.d.Pool, target)
+	if err != nil {
+		errInternal(w, "load grants", err)
+		return false
+	}
+	if !g.Covers(tg.List()) || !g.CoversApps(tg) {
+		writeError(w, http.StatusForbidden, "escalation", "This person has rights you do not have; you cannot change their account.")
+		return false
+	}
+	return true
 }
 
 // passwordError is the message for an unacceptable new password, or "".
@@ -93,7 +170,7 @@ func (s *server) createUser(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `json:"display_name"`
 		Email       string `json:"email"`
 		Password    string `json:"password"`
-		Role        string `json:"role"`
+		Role        string `json:"role"` // admin or member; roles are set under /roles
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -103,6 +180,9 @@ func (s *server) createUser(w http.ResponseWriter, r *http.Request) {
 	if !accounts.ValidUsername(in.Username) {
 		writeInvalid(w, "username", "Use lowercase letters, digits, dot, dash or underscore (at most 64).")
 		return
+	}
+	if in.Role == "" {
+		in.Role = accounts.Member
 	}
 	if f, msg := profileError(in.DisplayName, in.Email, in.Role); f != "" {
 		writeInvalid(w, f, msg)
@@ -123,12 +203,18 @@ func (s *server) createUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if in.Role == accounts.Admin {
+		if g, err := s.grants(ctx); err != nil || !g.Has(rbac.RolesWrite) || !g.Covers(rbac.AdminPermissions) {
+			writeError(w, http.StatusForbidden, "escalation", "You cannot make someone an administrator.")
+			return
+		}
+	}
 	hash, err := crypto.HashSecret(in.Password)
 	if err != nil {
 		errInternal(w, "hash password", err)
 		return
 	}
-	a, err := accounts.Create(ctx, s.d.Pool, accounts.New{Username: in.Username, DisplayName: in.DisplayName, Email: in.Email, PasswordHash: hash, Role: in.Role})
+	a, err := accounts.Create(ctx, s.d.Pool, accounts.New{Username: in.Username, DisplayName: in.DisplayName, Email: in.Email, PasswordHash: hash, Role: accounts.Member})
 	if errors.Is(err, accounts.ErrTaken) {
 		writeInvalid(w, "username", "This username is already in use.")
 		return
@@ -137,8 +223,16 @@ func (s *server) createUser(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "create user", err)
 		return
 	}
-	s.d.Audit.Log(ctx, actor(ctx), "user.created", clientIP(ctx), map[string]any{"id": a.ID, "username": a.Username, "role": a.Role})
-	writeJSON(w, http.StatusCreated, viewOf(a))
+	var roles []string
+	if in.Role == accounts.Admin {
+		if _, err := s.d.Pool.Exec(ctx, `insert into role_assignments (role_id, account_id) values ('admin', $1)`, a.ID); err != nil {
+			errInternal(w, "assign role", err)
+			return
+		}
+		roles = []string{"admin"}
+	}
+	s.d.Audit.Log(ctx, actor(ctx), "user.created", clientIP(ctx), map[string]any{"id": a.ID, "username": a.Username, "roles": roles})
+	writeJSON(w, http.StatusCreated, viewOf(a, roles))
 }
 
 func (s *server) updateUser(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +264,10 @@ func (s *server) updateUser(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "load user", err)
 		return
 	}
-	display, email, role := cur.DisplayName, cur.Email, cur.Role
+	if !s.mayManage(w, r, id) {
+		return
+	}
+	display, email, role := cur.DisplayName, cur.Email, accounts.Member
 	if in.DisplayName != nil {
 		v := strings.TrimSpace(*in.DisplayName)
 		in.DisplayName, display = &v, v
@@ -189,7 +286,21 @@ func (s *server) updateUser(w http.ResponseWriter, r *http.Request) {
 	if in.Email != nil && !s.emailFree(ctx, w, email, id) {
 		return
 	}
-	change := accounts.Change{DisplayName: in.DisplayName, Email: in.Email, Role: in.Role, Disabled: in.Disabled}
+	if in.Role != nil {
+		next, err := s.legacyRoles(ctx, id, *in.Role)
+		if err != nil {
+			errInternal(w, "load roles", err)
+			return
+		}
+		if g, err := s.grants(ctx); err != nil || !g.Has(rbac.RolesWrite) {
+			writeError(w, http.StatusForbidden, "forbidden", "You cannot change roles.")
+			return
+		}
+		if !s.replaceAssignments(w, r, "account_id", id, next) {
+			return
+		}
+	}
+	change := accounts.Change{DisplayName: in.DisplayName, Email: in.Email, Disabled: in.Disabled}
 	if in.Password != nil {
 		if msg := passwordError(*in.Password); msg != "" {
 			writeInvalid(w, "password", msg)
@@ -213,10 +324,15 @@ func (s *server) updateUser(w http.ResponseWriter, r *http.Request) {
 			slog.Error("users: revoke sessions", "err", err)
 		}
 	}
+	roles, err := s.directRoles(ctx)
+	if err != nil {
+		errInternal(w, "list roles", err)
+		return
+	}
 	s.d.Audit.Log(ctx, actor(ctx), "user.updated", clientIP(ctx), map[string]any{
-		"id": a.ID, "username": a.Username, "role": a.Role, "disabled": a.Disabled, "password_reset": in.Password != nil,
+		"id": a.ID, "username": a.Username, "roles": roles[a.ID], "disabled": a.Disabled, "password_reset": in.Password != nil,
 	})
-	writeJSON(w, http.StatusOK, viewOf(a))
+	writeJSON(w, http.StatusOK, viewOf(a, roles[a.ID]))
 }
 
 func (s *server) deleteUser(w http.ResponseWriter, r *http.Request) {
@@ -231,6 +347,9 @@ func (s *server) deleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if id == SessionFrom(ctx).UserID {
 		writeError(w, http.StatusConflict, "self", "You cannot delete your own account.")
+		return
+	}
+	if !s.mayManage(w, r, id) {
 		return
 	}
 	a, err := accounts.Load(ctx, s.d.Pool, id)

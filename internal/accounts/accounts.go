@@ -39,6 +39,8 @@ type Account struct {
 	Role         string
 	Disabled     bool
 	CreatedAt    time.Time
+	// Groups are the ids of the groups the account is in.
+	Groups []string
 }
 
 // IsOwner reports whether a is the owner.
@@ -96,10 +98,41 @@ func scan(row pgx.Row) (Account, error) {
 
 // Load returns the account with id.
 func Load(ctx context.Context, q Reader, id string) (Account, error) {
+	var a Account
+	var err error
 	if id == OwnerID || id == "" {
-		return scan(q.QueryRow(ctx, ownerSelect))
+		a, err = scan(q.QueryRow(ctx, ownerSelect))
+	} else {
+		a, err = scan(q.QueryRow(ctx, userSelect+` where id::text = $1`, id))
 	}
-	return scan(q.QueryRow(ctx, userSelect+` where id::text = $1`, id))
+	if err != nil {
+		return a, err
+	}
+	return a, withGroups(ctx, q, []*Account{&a})
+}
+
+// withGroups fills in the group ids of each account.
+func withGroups(ctx context.Context, q Reader, list []*Account) error {
+	rows, err := q.Query(ctx, `select account_id, group_id::text from group_members`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	byID := map[string]*Account{}
+	for _, a := range list {
+		a.Groups = []string{}
+		byID[a.ID] = a
+	}
+	for rows.Next() {
+		var acct, group string
+		if err := rows.Scan(&acct, &group); err != nil {
+			return err
+		}
+		if a := byID[acct]; a != nil {
+			a.Groups = append(a.Groups, group)
+		}
+	}
+	return rows.Err()
 }
 
 // Owner returns the owner.
@@ -145,7 +178,14 @@ func List(ctx context.Context, q Reader) ([]Account, error) {
 		}
 		out = append(out, a)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	ptrs := make([]*Account, len(out))
+	for i := range out {
+		ptrs[i] = &out[i]
+	}
+	return out, withGroups(ctx, q, ptrs)
 }
 
 // New is a user to create.
@@ -226,7 +266,9 @@ func Delete(ctx context.Context, q Querier, id string) error {
 	}
 	var n int
 	err := q.QueryRow(ctx, `with gone as (delete from users where id::text = $1 returning username),
-		kept as (insert into retired_usernames (username) select username from gone on conflict do nothing)
+		kept as (insert into retired_usernames (username) select username from gone on conflict do nothing),
+		m as (delete from group_members where account_id = $1),
+		r as (delete from role_assignments where account_id = $1)
 		select count(*) from gone`, id).Scan(&n)
 	if err == nil && n != 1 {
 		err = ErrNotFound

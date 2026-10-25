@@ -53,7 +53,7 @@ func (s *server) gateStart(w http.ResponseWriter, r *http.Request) {
 		bad()
 		return
 	}
-	if !app.Allowed(accountKey(SessionFrom(ctx).UserID)) {
+	if !s.mayUse(ctx, *app) {
 		writeError(w, http.StatusForbidden, "no_access", "You do not have access to this app.")
 		return
 	}
