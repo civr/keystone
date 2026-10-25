@@ -23,6 +23,19 @@ async function clipboardSeconds(): Promise<number> {
  * copy button works inside its own click, on http as well as https.
  */
 export async function openVaultApp(app: App, href: string): Promise<void> {
+	const mode = app.config?.vault?.mode;
+	if (mode === 'form' || mode === 'json') {
+		// Keystone posts the app's login form for us (vault_launch.go).
+		try {
+			const { url } = await api.send<{ url: string }>('POST', `/apps/${app.id}/vault/launch`);
+			location.assign(url);
+		} catch (err) {
+			if (err instanceof ApiError && err.code === 'no_password') toast(`No password is stored for ${app.name}.`, 'error');
+			else if (err instanceof ApiError) toast(err.message, 'error');
+			else if (!(err instanceof Error && err.message === 'cancelled')) toast('Signing in failed.', 'error');
+		}
+		return;
+	}
 	try {
 		const [entry, secret] = await Promise.all([
 			api.get<{ username: string }>(`/apps/${app.id}/vault`),

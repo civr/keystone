@@ -2,15 +2,20 @@ package httpapi
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"html"
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/civr/keystone/internal/branding"
 )
 
 var (
+	photoRe      = regexp.MustCompile(`^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$`)
 	shellTitleRe = regexp.MustCompile(`(?is)<title>.*?</title>`)
 	shellIconRe  = regexp.MustCompile(`(?is)<link\s+rel="icon"[^>]*>`)
 	shellThemeRe = regexp.MustCompile(`(?is)<meta\s+name="theme-color"[^>]*>`)
@@ -28,9 +33,36 @@ func brandShell(shell []byte, b branding.Branding) []byte {
 		out = shellIconRe.ReplaceAllLiteral(out, []byte(`<link rel="icon" href="`+b.Logo+`" />`))
 	}
 	out = shellThemeRe.ReplaceAllLiteral(out, []byte(`<meta name="theme-color" content="`+b.Background+`" />`))
-	head := `<meta name="ks-brand" content="` + name + `" />` +
+	bg := ""
+	if b.LoginImage != "" {
+		sum := sha256.Sum256([]byte(b.LoginImage))
+		bg = `<meta name="ks-login-image" content="/api/branding/login-image?v=` + hex.EncodeToString(sum[:6]) + `" />`
+	}
+	head := bg + `<meta name="ks-brand" content="` + name + `" />` +
 		`<style id="ks-brand">:root{--primary:` + b.Accent + `;--color-bg:` + b.Background + `}</style></head>`
 	return bytes.Replace(out, []byte("</head>"), []byte(head), 1)
+}
+
+// loginImage serves the sign-in background (public: the sign-in page shows it).
+func (s *server) loginImage(w http.ResponseWriter, r *http.Request) {
+	b, err := s.branding.Get(r.Context())
+	if err != nil {
+		errInternal(w, "load branding", err)
+		return
+	}
+	m := photoRe.FindStringSubmatch(b.LoginImage)
+	if m == nil {
+		errNotFound(w, r)
+		return
+	}
+	raw, err := base64.StdEncoding.DecodeString(b.LoginImage[strings.IndexByte(b.LoginImage, ',')+1:])
+	if err != nil {
+		errNotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "image/"+m[1])
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable") // the URL carries a hash
+	_, _ = w.Write(raw)
 }
 
 func (s *server) getBranding(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +77,7 @@ func (s *server) getBranding(w http.ResponseWriter, r *http.Request) {
 func (s *server) putBranding(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var next branding.Branding
-	if !readJSONLimit(w, r, &next, maxAppBody) {
+	if !readJSONLimit(w, r, &next, branding.MaxLoginImage+maxAppBody) {
 		return
 	}
 	next.Normalize()
@@ -58,6 +90,14 @@ func (s *server) putBranding(w http.ResponseWriter, r *http.Request) {
 			writeInvalid(w, "logo", msg)
 			return
 		}
+	}
+	if next.LoginImage != "" && !photoRe.MatchString(next.LoginImage) {
+		writeInvalid(w, "login_image", "Choose a JPEG, PNG or WebP image.")
+		return
+	}
+	if len(next.LoginImage) > branding.MaxLoginImage {
+		writeInvalid(w, "login_image", "The image may be at most 3 MB.")
+		return
 	}
 	old, err := s.branding.Put(ctx, next)
 	if err != nil {
@@ -77,6 +117,9 @@ func (s *server) putBranding(w http.ResponseWriter, r *http.Request) {
 	}
 	if old.Logo != next.Logo {
 		changed["logo"] = next.Logo != ""
+	}
+	if old.LoginImage != next.LoginImage {
+		changed["login_image"] = next.LoginImage != ""
 	}
 	if len(changed) > 0 {
 		s.d.Audit.Log(ctx, actor(ctx), "branding.changed", clientIP(ctx), changed)

@@ -132,6 +132,7 @@ const VALUES: Record<string, string> = {
 	emergency: 'emergency account',
 	recovery: 'recovery code',
 	stepup: 'confirmation',
+	launch: 'signed in for you',
 	ad_unavailable: 'Active Directory unreachable',
 	ad_error: 'Active Directory error'
 };

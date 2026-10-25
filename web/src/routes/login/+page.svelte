@@ -6,7 +6,7 @@
 	import { safeNext } from '$lib/nav';
 	import { api, ApiError, type Me } from '$lib/api';
 	import { formatCode } from '$lib/codes';
-	import { brand as site, logoSrc, pageTitle } from '$lib/brand.svelte';
+	import { brand as site, logoSrc, pageTitle, loginBackground } from '$lib/brand.svelte';
 	import { step } from '$lib/motion';
 	import {
 		authenticate,
@@ -285,7 +285,7 @@
 	{#if busy}<span class="spinner" aria-hidden="true"></span>{/if}{text}
 {/snippet}
 
-<main class="auth-page">
+<main class="auth-page" style:background={loginBackground() || undefined}>
 	<div class="auth-card">
 		{@render brand()}
 		<div class="auth-stage">

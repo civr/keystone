@@ -23,7 +23,11 @@ export interface AppConfig {
 	oidc?: { client_id: string; redirect_uris: string[] };
 	ldap?: { slug: string };
 	gate?: { host: string; bypass_paths: string[] };
+	/** How a vault tile signs in: copy the password, or post the login form. */
+	vault?: { mode: VaultMode; login_url?: string; user_field?: string; pass_field?: string };
 }
+
+export type VaultMode = 'copy' | 'form' | 'json';
 
 /**
  * Where a tile goes: Keystone's IdP-initiated SAML endpoint when the app

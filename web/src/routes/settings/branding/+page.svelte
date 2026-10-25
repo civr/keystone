@@ -46,6 +46,35 @@
 		reader.readAsDataURL(file);
 	}
 
+	let photoInput = $state<HTMLInputElement | null>(null);
+	let photoBusy = $state(false);
+
+	/** Scales a photo to at most 2560 px wide and stores it as JPEG (well under 3 MB). */
+	async function pickPhoto(e: Event & { currentTarget: HTMLInputElement }) {
+		const file = e.currentTarget.files?.[0];
+		e.currentTarget.value = '';
+		if (!file) return;
+		if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return void (errors.login_image = 'Choose a JPEG, PNG or WebP image.');
+		photoBusy = true;
+		try {
+			const bmp = await createImageBitmap(file);
+			const scale = Math.min(1, 2560 / bmp.width);
+			const canvas = document.createElement('canvas');
+			canvas.width = Math.round(bmp.width * scale);
+			canvas.height = Math.round(bmp.height * scale);
+			canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+			let q = 0.85;
+			let url = canvas.toDataURL('image/jpeg', q);
+			while (url.length > 3_000_000 && q > 0.4) url = canvas.toDataURL('image/jpeg', (q -= 0.15));
+			form.login_image = url;
+			delete errors.login_image;
+		} catch {
+			errors.login_image = 'This image could not be read.';
+		} finally {
+			photoBusy = false;
+		}
+	}
+
 	async function save(e: SubmitEvent) {
 		e.preventDefault();
 		if (saving) return;
@@ -113,6 +142,34 @@
 			</div>
 		</section>
 
+		<section class="group" aria-labelledby="b-login">
+			<h2 id="b-login">Sign-in page</h2>
+			<div class="card">
+				<div class="srow stack">
+					<div
+						class="login-thumb"
+						style:--primary={form.accent}
+						style:background={form.login_image ? `url("${form.login_image}") center / cover no-repeat` : undefined}
+					>
+						<span class="mini-card"><img src={logoSrc(form.logo)} alt="" width="18" height="18" />{form.name.trim() || DEFAULT_BRAND.name}</span>
+					</div>
+					<div class="thumb-actions">
+						<span class="help">{form.login_image ? 'Your photo.' : 'A soft gradient in the accent colour.'}</span>
+						<span class="control">
+							{#if form.login_image}
+								<button type="button" class="btn btn-secondary btn-sm" onclick={() => (form.login_image = '')}>Use gradient</button>
+							{/if}
+							<button type="button" class="btn btn-secondary btn-sm" onclick={() => photoInput?.click()} disabled={photoBusy}>
+								{#if photoBusy}<span class="spinner" aria-hidden="true"></span>{/if}Choose photo
+							</button>
+						</span>
+						<input class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" bind:this={photoInput} onchange={pickPhoto} tabindex="-1" />
+					</div>
+					{#if errors.login_image}<small class="field-error" role="alert">{errors.login_image}</small>{/if}
+				</div>
+			</div>
+		</section>
+
 		<section class="group" aria-labelledby="b-preview">
 			<h2 id="b-preview">Preview</h2>
 			<div class="preview" style:--primary={form.accent} style:--color-bg={form.background}>
@@ -166,6 +223,37 @@
 {/snippet}
 
 <style>
+	.login-thumb {
+		display: grid;
+		place-items: center;
+		height: 150px;
+		border-radius: var(--radius-card);
+		background:
+			radial-gradient(120% 90% at 15% 10%, color-mix(in srgb, var(--primary) 55%, #fff) 0%, transparent 60%),
+			radial-gradient(110% 90% at 90% 100%, color-mix(in srgb, var(--primary) 70%, #1d1d1f) 0%, transparent 65%),
+			color-mix(in srgb, var(--primary) 35%, #f5f5f7);
+	}
+	.mini-card {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 10px 16px;
+		border-radius: 8px;
+		background: #fff;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+		font-size: 0.875rem;
+		font-weight: 600;
+	}
+	.mini-card img {
+		object-fit: contain;
+	}
+	.thumb-actions {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
 	.cols {
 		columns: 2 380px;
 		column-gap: 20px;

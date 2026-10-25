@@ -63,13 +63,30 @@ type Gate struct {
 	BypassPaths []string `json:"bypass_paths"`
 }
 
+// Vault sign-in modes: copy the password, or post the app's login form
+// (form fields, or a JSON body sent as text/plain) with the stored details.
+const (
+	VaultCopy = "copy"
+	VaultForm = "form"
+	VaultJSON = "json"
+)
+
+// VaultLogin says how a vault tile signs in.
+type VaultLogin struct {
+	Mode      string `json:"mode"`
+	LoginURL  string `json:"login_url,omitempty"`
+	UserField string `json:"user_field,omitempty"`
+	PassField string `json:"pass_field,omitempty"`
+}
+
 // Config is the protocol-specific part of an app (apps.config).
 type Config struct {
-	Account Account `json:"account"`
-	SAML    *SAML   `json:"saml,omitempty"`
-	OIDC    *OIDC   `json:"oidc,omitempty"`
-	LDAP    *LDAP   `json:"ldap,omitempty"`
-	Gate    *Gate   `json:"gate,omitempty"`
+	Account Account     `json:"account"`
+	SAML    *SAML       `json:"saml,omitempty"`
+	OIDC    *OIDC       `json:"oidc,omitempty"`
+	LDAP    *LDAP       `json:"ldap,omitempty"`
+	Gate    *Gate       `json:"gate,omitempty"`
+	Vault   *VaultLogin `json:"vault,omitempty"`
 }
 
 // App is one tile.
@@ -96,6 +113,8 @@ func (a App) Allowed(id string) bool {
 
 // Owner is a Keystone account: the owner or a user (package accounts).
 type Owner = accounts.Account
+
+var fieldRe = regexp.MustCompile(`^[A-Za-z0-9_.\[\]-]{1,64}$`)
 
 var (
 	slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
@@ -142,10 +161,30 @@ func (c *Config) Validate(protocol string) (field, msg string) {
 			return "config.account." + f.name, "At most 256 characters, no line breaks."
 		}
 	}
-	saml, oidc, ldap, gate := c.SAML, c.OIDC, c.LDAP, c.Gate
-	c.SAML, c.OIDC, c.LDAP, c.Gate = nil, nil, nil, nil
+	saml, oidc, ldap, gate, vault := c.SAML, c.OIDC, c.LDAP, c.Gate, c.Vault
+	c.SAML, c.OIDC, c.LDAP, c.Gate, c.Vault = nil, nil, nil, nil, nil
 	switch protocol {
-	case Link, Vault:
+	case Link:
+	case Vault:
+		if vault == nil || vault.Mode == "" || vault.Mode == VaultCopy {
+			break
+		}
+		if vault.Mode != VaultForm && vault.Mode != VaultJSON {
+			return "config.vault.mode", "Choose how the tile signs in."
+		}
+		if !appURL(vault.LoginURL) {
+			return "config.vault.login_url", "Enter the address the login form is sent to; http is only allowed on your home network."
+		}
+		if vault.UserField == "" {
+			vault.UserField = "username"
+		}
+		if vault.PassField == "" {
+			vault.PassField = "password"
+		}
+		if !fieldRe.MatchString(vault.UserField) || !fieldRe.MatchString(vault.PassField) {
+			return "config.vault.user_field", "Field names use letters, digits and . _ - [ ] (at most 64)."
+		}
+		c.Vault = vault
 	case SAMLP:
 		if saml == nil {
 			return "config.saml", "Enter the SAML details of the app."
@@ -170,7 +209,7 @@ func (c *Config) Validate(protocol string) (field, msg string) {
 		c.OIDC = oidc
 	case LDAPP:
 		if ldap == nil || !slugRe.MatchString(ldap.Slug) {
-			return "config.ldap.slug", "Gebruik 1 tot 32 kleine letters, cijfers of streepjes."
+			return "config.ldap.slug", "Use 1 to 32 lowercase letters, digits or dashes."
 		}
 		c.LDAP = ldap
 	case GateP:

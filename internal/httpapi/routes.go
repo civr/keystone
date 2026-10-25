@@ -73,4 +73,5 @@ func (s *server) appRoutes(r chi.Router) {
 	me.Get("/{id}/vault", s.getVault)
 	w.Put("/{id}/vault", s.putVault)
 	me.Post("/{id}/vault/password", s.vaultPassword)
+	me.Post("/{id}/vault/launch", s.vaultLaunch)
 }

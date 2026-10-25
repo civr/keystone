@@ -25,7 +25,13 @@ type Branding struct {
 	Logo       string `json:"logo"`       // data:image/… URL; "" is Keystone's own mark
 	Accent     string `json:"accent"`     // #rrggbb: buttons, links, the selected menu item
 	Background string `json:"background"` // #rrggbb: the page behind the white boxes
+	// LoginImage is the sign-in page's background photo (data:image/… URL);
+	// "" is a soft gradient in the accent colour.
+	LoginImage string `json:"login_image"`
 }
+
+// MaxLoginImage is the largest login background, as a data URL.
+const MaxLoginImage = 4 << 20
 
 // MaxName is the longest name, in characters.
 const MaxName = 40

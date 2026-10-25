@@ -1,5 +1,5 @@
 /** Per-protocol app settings for Instellingen › Apps (mirrors internal/apps). */
-import type { App, AppConfig, Protocol } from './apps';
+import type { App, AppConfig, Protocol, VaultMode } from './apps';
 
 export const PROTOCOLS: { value: Protocol; label: string; help: string }[] = [
 	{ value: 'link', label: 'Link', help: 'Just a tile; the app handles sign-in itself.' },
@@ -24,6 +24,7 @@ export interface ProtocolForm {
 	oidc: { redirect_uris: string };
 	ldap: { slug: string };
 	gate: { host: string; bypass: string };
+	vault: { mode: VaultMode; login_url: string; user_field: string; pass_field: string };
 }
 
 export function protocolForm(app: App | null): ProtocolForm {
@@ -34,7 +35,13 @@ export function protocolForm(app: App | null): ProtocolForm {
 		saml: { entity_id: '', acs_url: '', idp_initiated: false, ...c.saml },
 		oidc: { redirect_uris: (c.oidc?.redirect_uris ?? []).join('\n') },
 		ldap: { slug: c.ldap?.slug ?? '' },
-		gate: { host: c.gate?.host ?? '', bypass: (c.gate?.bypass_paths ?? []).join('\n') }
+		gate: { host: c.gate?.host ?? '', bypass: (c.gate?.bypass_paths ?? []).join('\n') },
+		vault: {
+			mode: c.vault?.mode ?? 'copy',
+			login_url: c.vault?.login_url ?? '',
+			user_field: c.vault?.user_field ?? 'username',
+			pass_field: c.vault?.pass_field ?? 'password'
+		}
 	};
 }
 
@@ -56,6 +63,17 @@ export function protocolPayload(f: ProtocolForm): { protocol: Protocol; config: 
 			break;
 		case 'gate':
 			config.gate = { host: f.gate.host.trim().toLowerCase(), bypass_paths: lines(f.gate.bypass) };
+			break;
+		case 'vault':
+			config.vault =
+				f.vault.mode === 'copy'
+					? { mode: 'copy' }
+					: {
+							mode: f.vault.mode,
+							login_url: f.vault.login_url.trim(),
+							user_field: f.vault.user_field.trim(),
+							pass_field: f.vault.pass_field.trim()
+						};
 			break;
 	}
 	return { protocol: f.protocol, config };
@@ -101,6 +119,8 @@ export function protocolError(f: ProtocolForm): { field: string; message: string
 		if (!c.gate!.bypass_paths.every((x) => x.startsWith('/') && !/[\s?#]/.test(x)))
 			return { field: 'config.gate.bypass_paths', message: 'Each exception is a path starting with /.' };
 	}
+	if (f.protocol === 'vault' && c.vault?.mode !== 'copy' && !appUrl(c.vault?.login_url ?? ''))
+		return { field: 'config.vault.login_url', message: 'Enter the address the login form is sent to.' };
 	return null;
 }
 

@@ -127,6 +127,49 @@
 		<input class="input" type="password" autocomplete="new-password" placeholder={vault.hasPassword ? '•••••••• (stored)' : ''} bind:value={vault.password} />
 		<small>{vault.hasPassword ? 'Leave empty to keep the stored password.' : 'Kept encrypted with the vault key, outside the database.'}</small>
 	</label>
+	<fieldset class="field">
+		<legend class="field-label">When the tile is opened</legend>
+		<div class="segmented">
+			<label><input type="radio" bind:group={form.vault.mode} value="copy" /><span>Copy the password</span></label>
+			<label><input type="radio" bind:group={form.vault.mode} value="form" /><span>Sign in for me</span></label>
+			<label><input type="radio" bind:group={form.vault.mode} value="json" /><span>Sign in (JSON)</span></label>
+		</div>
+		<small>
+			{#if form.vault.mode === 'copy'}
+				Shows the username and copies the password; you paste it into the app.
+			{:else if form.vault.mode === 'form'}
+				Keystone sends the app’s login form for you. Works with classic login pages (routers, NAS).
+			{:else}
+				Keystone sends the details as JSON to the app’s login API. Try it; not every app accepts it.
+			{/if}
+		</small>
+	</fieldset>
+	{#if form.vault.mode !== 'copy'}
+		<label class="field">
+			<span>Login form address</span>
+			<input
+				id="config.vault.login_url"
+				class="input mono"
+				type="url"
+				spellcheck="false"
+				autocapitalize="none"
+				placeholder="http://192.168.1.1/login"
+				aria-invalid={errors['config.vault.login_url'] ? 'true' : undefined}
+				bind:value={form.vault.login_url}
+			/>
+			{#if errors['config.vault.login_url']}<small class="field-error" role="alert">{errors['config.vault.login_url']}</small>{:else}<small>Where the app’s login form posts to: its <code>action</code>, or the login API.</small>{/if}
+		</label>
+		<div class="pair">
+			<label class="field">
+				<span>Username field</span>
+				<input class="input mono" spellcheck="false" autocapitalize="none" bind:value={form.vault.user_field} />
+			</label>
+			<label class="field">
+				<span>Password field</span>
+				<input class="input mono" spellcheck="false" autocapitalize="none" bind:value={form.vault.pass_field} />
+			</label>
+		</div>
+	{/if}
 {/if}
 
 {#if form.protocol !== 'link' && form.protocol !== 'vault'}
@@ -166,6 +209,16 @@
 {/if}
 
 <style>
+	.pair {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 12px;
+	}
+	fieldset.field {
+		margin: 0;
+		padding: 0;
+		border: 0;
+	}
 	.account {
 		display: grid;
 		gap: 8px;

@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { api, ApiError } from '$lib/api';
 	import { formatCode } from '$lib/codes';
-	import { brand, logoSrc, pageTitle } from '$lib/brand.svelte';
+	import { brand, logoSrc, pageTitle, loginBackground } from '$lib/brand.svelte';
 	import { step as slide } from '$lib/motion';
 
 	/*
@@ -108,7 +108,7 @@
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
 {/snippet}
 
-<main class="auth-page">
+<main class="auth-page" style:background={loginBackground() || undefined}>
 	<div class="auth-card">
 		<div class="auth-brand"><img class="mark" src={logoSrc()} alt="" width="64" height="64" /><span>{brand.name}</span></div>
 

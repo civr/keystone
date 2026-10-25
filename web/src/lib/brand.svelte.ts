@@ -10,23 +10,27 @@ export interface Branding {
 	logo: string;
 	accent: string;
 	background: string;
+	/** Sign-in background photo (data:image/… URL); '' is the accent gradient. */
+	login_image: string;
 }
 
 export const DEFAULT_BRAND: Branding = {
 	name: 'Keystone',
 	logo: '',
 	accent: '#007aff',
-	background: '#f5f5f7'
+	background: '#f5f5f7',
+	login_image: ''
 };
 export const DEFAULT_LOGO = '/favicon.svg';
 
-function fromPage(): Pick<Branding, 'name' | 'logo'> {
-	if (typeof document === 'undefined') return { name: DEFAULT_BRAND.name, logo: '' };
+function fromPage(): { name: string; logo: string; loginImage: string } {
+	if (typeof document === 'undefined') return { name: DEFAULT_BRAND.name, logo: '', loginImage: '' };
 	const name = document.querySelector<HTMLMetaElement>('meta[name="ks-brand"]')?.content.trim();
 	const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.getAttribute('href') ?? '';
 	return {
 		name: name || DEFAULT_BRAND.name,
-		logo: icon.startsWith('data:image/') ? icon : ''
+		logo: icon.startsWith('data:image/') ? icon : '',
+		loginImage: document.querySelector<HTMLMetaElement>('meta[name="ks-login-image"]')?.content ?? ''
 	};
 }
 
@@ -38,6 +42,11 @@ export function logoSrc(logo: string = brand.logo): string {
 	return logo || DEFAULT_LOGO;
 }
 
+/** CSS background for the sign-in and setup pages; '' is the default gradient. */
+export function loginBackground(): string {
+	return brand.loginImage ? `url("${brand.loginImage}") center / cover no-repeat` : '';
+}
+
 /** Page title: "Inloggen · Huis" or just the name. */
 export function pageTitle(...parts: string[]): string {
 	return [...parts, brand.name].join(' · ');
@@ -47,6 +56,7 @@ export function pageTitle(...parts: string[]): string {
 export function applyBrand(b: Branding): void {
 	brand.name = b.name;
 	brand.logo = b.logo;
+	brand.loginImage = b.login_image;
 	const head = document.head;
 	let meta = head.querySelector<HTMLMetaElement>('meta[name="ks-brand"]');
 	if (!meta) {

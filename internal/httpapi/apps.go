@@ -290,6 +290,9 @@ func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
 			if sm := list[i].Config.SAML; sm != nil {
 				cfg.SAML = &apps.SAML{IdPInitiated: sm.IdPInitiated}
 			}
+			if v := list[i].Config.Vault; v != nil {
+				cfg.Vault = &apps.VaultLogin{Mode: v.Mode} // how the tile opens
+			}
 			list[i].Config, list[i].Access, list[i].HasSecret = cfg, nil, false
 		}
 	}
