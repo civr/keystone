@@ -536,3 +536,47 @@ func (s *server) reorderApps(w http.ResponseWriter, r *http.Request) {
 	s.d.Audit.Log(ctx, actor(ctx), "app.reordered", clientIP(ctx), nil)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
+
+// recentApps lists the ids of the apps the signed-in account opened last,
+// newest first (at most six), from the audit log.
+func (s *server) recentApps(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	rows, err := s.d.Pool.Query(ctx, `select id from (
+			select detail->>'id' as id, max(at) as last from audit_log
+			where action = 'app.access' and actor = $1 and detail ? 'id' and at > now() - interval '30 days'
+			group by 1
+		) x order by last desc limit 6`, actor(ctx))
+	if err != nil {
+		errInternal(w, "recent apps", err)
+		return
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		errInternal(w, "recent apps", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ids": ids})
+}
+
+// appOpened records that a plain link tile was opened (SSO apps are recorded
+// by their protocol), for Recently used and the dashboard.
+func (s *server) appOpened(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, ok := appID(w, r)
+	if !ok {
+		return
+	}
+	a, err := apps.ByID(ctx, s.d.Pool, id)
+	if errors.Is(err, apps.ErrNotFound) || (err == nil && !s.mayUse(ctx, a)) {
+		errNotFound(w, r)
+		return
+	}
+	if err != nil {
+		errInternal(w, "load app", err)
+		return
+	}
+	if a.Protocol == apps.Link {
+		s.appAccess(ctx, a, "link")
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

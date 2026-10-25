@@ -1,5 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { securityGroups } from '$lib/settingsMeta';
+	import SettingsEditor from '$lib/components/settings/SettingsEditor.svelte';
+
+	let view = $state<'log' | 'settings'>('log');
 	import { api, ApiError } from '$lib/api';
 	import { auditLabel, auditSummary } from '$lib/format';
 	import { toast } from '$lib/toast.svelte';
@@ -106,6 +110,15 @@
 </div>
 <p class="pane-intro">Everything that happens in Keystone, newest first.</p>
 
+<div class="segmented tabs" role="tablist" aria-label="Sections">
+	<label><input type="radio" name="audit-view" value="log" bind:group={view} /><span>Log</span></label>
+	<label><input type="radio" name="audit-view" value="settings" bind:group={view} /><span>Retention &amp; syslog</span></label>
+</div>
+
+{#if view === 'settings'}
+	<SettingsEditor groups={securityGroups} visible={['audit']} />
+{:else}
+
 {#if !loaded && error}
 	<div class="empty-note">
 		<p>{error}</p>
@@ -154,8 +167,12 @@
 		</div>
 	{/if}
 {/if}
+{/if}
 
 <style>
+	.tabs {
+		margin: 0 0 18px;
+	}
 	.list {
 		margin: 0;
 		padding: 0;

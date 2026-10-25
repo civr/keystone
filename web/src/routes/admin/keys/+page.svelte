@@ -1,16 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api, ApiError, type Me } from '$lib/api';
-	import { securityGroups, securityTabs } from '$lib/settingsMeta';
 	import { codesFile, download } from '$lib/codes';
 	import { toast } from '$lib/toast.svelte';
-	import SettingsEditor from '$lib/components/settings/SettingsEditor.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import Confirm from '$lib/components/settings/Confirm.svelte';
 
 	let confirmer: Confirm;
-	let tab = $state(securityTabs[0].id);
-	const shown = $derived(securityTabs.find((t) => t.id === tab)!.groups);
 
 	// --- Recovery codes ---
 	let codes = $state<string[] | null>(null);
@@ -141,18 +137,9 @@
 	}
 </script>
 
-<div class="pane-head"><h1 class="pane-title">Security</h1></div>
-<p class="pane-intro">Every security measure in Keystone. Changes ask you to confirm and are logged under Activity.</p>
+<div class="pane-head"><h1 class="pane-title">Keys &amp; recovery</h1></div>
+<p class="pane-intro">The keys Keystone signs with, and the owner's ways back in.</p>
 
-<div class="segmented tabs" role="tablist" aria-label="Sections">
-	{#each securityTabs as t (t.id)}
-		<label><input type="radio" name="sec-tab" value={t.id} bind:group={tab} /><span>{t.label}</span></label>
-	{/each}
-</div>
-
-<SettingsEditor groups={securityGroups} visible={shown}>
-	{#snippet after()}
-		{#if tab === 'keys'}
 		{#if isOwner}
 		<section class="group" aria-labelledby="g-herstel">
 			<h2 id="g-herstel">Recovery</h2>
@@ -215,9 +202,8 @@
 			</div>
 			<p class="foot">The vault key lives in the secrets volume and is not renewed here.</p>
 		</section>
-		{/if}
-	{/snippet}
-</SettingsEditor>
+		
+
 
 <Sheet bind:open={codesOpen} title="New recovery codes">
 	{#if codes}
@@ -256,9 +242,6 @@
 <Confirm bind:this={confirmer} />
 
 <style>
-	.tabs {
-		margin: 0 0 20px;
-	}
 	.pw-link {
 		margin: 4px 0 0 -6px;
 	}

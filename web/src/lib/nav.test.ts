@@ -1,42 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { NAV, initials, isActive, navFor, searchHref, safeNext } from './nav';
+import { ADMIN_NAV, USER_NAV, initials, isActive, navFor, searchHref, safeNext } from './nav';
 
 describe('isActive', () => {
 	it.each([
 		['/', '/', true],
-		['/settings', '/settings', true],
-		['/settings/', '/settings', true],
-		['/settings/ad', '/settings', false],
-		['/settings/ad/', '/settings/ad', true],
-		['/settings', '/', false],
+		['/admin', '/admin', true],
+		['/admin/', '/admin', true],
+		['/admin/users', '/admin', false],
+		['/admin/users/', '/admin/users', true],
+		['/admin', '/', false],
 		['/login', '/', false]
 	])('%s on %s → %s', (path, href, want) => {
 		expect(isActive(path, href)).toBe(want);
 	});
 });
 
-describe('NAV', () => {
-	it('has My apps and Vault first, then the Settings group in order', () => {
-		expect(NAV.map((g) => g.title)).toEqual([null, 'Settings']);
-		expect(NAV[0].items.map((i) => [i.label, i.href])).toEqual([
-			['My apps', '/'],
-			['Vault', '/vault']
-		]);
-		expect(NAV[1].items.map((i) => i.href)).toEqual([
-			'/settings',
-			'/settings/account',
-			'/settings/devices',
-			'/settings/users',
-			'/settings/apps',
-			'/settings/branding',
-			'/settings/security',
-			'/settings/ad',
-			'/settings/activity'
+describe('menus', () => {
+	const member = { permissions: [], owner: false };
+	const auditor = { permissions: ['users.read', 'apps.read', 'audit.read'], owner: false };
+	const owner = { permissions: ['*'], owner: true };
+	it('give everyone the user portal', () => {
+		expect(navFor(USER_NAV, member).flatMap((g) => g.items.map((i) => i.href))).toEqual([
+			'/',
+			'/vault',
+			'/account',
+			'/account/security',
+			'/account/access',
+			'/account/preferences'
 		]);
 	});
-	it('shows members only their own sections', () => {
-		expect(navFor(false)[1].items.map((i) => i.label)).toEqual(['Account', 'Devices']);
-		expect(navFor(true)[1].items).toHaveLength(9);
+	it('show admin sections by permission', () => {
+		expect(navFor(ADMIN_NAV, member)).toEqual([]);
+		const hrefs = navFor(ADMIN_NAV, auditor).flatMap((g) => g.items.map((i) => i.href));
+		expect(hrefs).toEqual(['/admin', '/admin/users', '/admin/groups', '/admin/roles', '/admin/apps', '/admin/audit']);
+		expect(navFor(ADMIN_NAV, owner).flatMap((g) => g.items)).toHaveLength(ADMIN_NAV.flatMap((g) => g.items).length);
 	});
 });
 

@@ -239,7 +239,7 @@
 		gap: 6px;
 		padding: 10px 16px;
 		border-radius: 8px;
-		background: #fff;
+		background: var(--c-bg-card);
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 		font-size: 0.875rem;
 		font-weight: 600;
@@ -322,7 +322,7 @@
 		gap: 8px;
 		padding: 10px 14px;
 		border-bottom: 1px solid var(--c-border);
-		background: #fff;
+		background: var(--c-bg-card);
 		font-size: 0.875rem;
 	}
 	.pv-bar img {
@@ -346,7 +346,7 @@
 		font-size: 0.8125rem;
 	}
 	.pv-item.active {
-		background: color-mix(in srgb, var(--primary) 11%, #fff);
+		background: var(--c-selected-mid);
 		color: color-mix(in srgb, var(--primary) 86%, #000);
 		font-weight: 500;
 	}
@@ -360,7 +360,7 @@
 		padding: 14px;
 		border: 1px solid var(--c-border);
 		border-radius: var(--radius-card);
-		background: #fff;
+		background: var(--c-bg-card);
 		font-size: 0.875rem;
 	}
 	.pv-box p {

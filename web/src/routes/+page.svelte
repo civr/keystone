@@ -8,6 +8,7 @@
 
 	let me = $state<Me | null>(null);
 	let apps = $state<App[] | null>(null);
+	let recentIds = $state<string[]>([]);
 	let loadError = $state<string | null>(null);
 	let query = $state('');
 
@@ -17,7 +18,12 @@
 		loadError = null;
 		try {
 			// Both requests in parallel: one round-trip of latency for the whole page.
-			const [m, a] = await Promise.all([api.get<Me>('/me'), api.get<{ apps: App[] }>('/apps?mine=1')]);
+			const [m, a, r] = await Promise.all([
+				api.get<Me>('/me'),
+				api.get<{ apps: App[] }>('/apps?mine=1'),
+				api.get<{ ids: string[] }>('/apps/recent').catch(() => ({ ids: [] }))
+			]);
+			recentIds = r.ids;
 			me = m;
 			apps = a.apps;
 		} catch (e) {
@@ -67,12 +73,14 @@
 			<p>
 				<strong>No passkey yet.</strong>
 				You sign in with only your password. Open Keystone over https and add a passkey under
-				<a class="link" href="/settings/devices">Devices</a>.
+				<a class="link" href="/account/security">Sign-in &amp; devices</a>.
 			</p>
 		</div>
 	{/if}
 
-	<h1 class="visually-hidden">My apps</h1>
+	<div class="head">
+		<h1>My apps</h1>
+	</div>
 
 	{#if loadError}
 		<div class="surface state">
@@ -91,12 +99,18 @@
 			<p class="state-title">No apps yet</p>
 			{#if me?.admin}
 				<p>Add your first app; it shows up here right away.</p>
-				<a class="btn btn-primary" href="/settings/apps">Go to Settings › Apps</a>
+				<a class="btn btn-primary" href="/admin/apps">Add an app</a>
 			{:else}
 				<p>An admin has not given you any apps yet.</p>
 			{/if}
 		</div>
 	{:else}
+		{@const recent = query.trim() ? [] : recentIds.map((id) => apps!.find((a) => a.id === id)).filter((a): a is App => !!a)}
+		{#if recent.length}
+			<h2 class="section">Recently used</h2>
+			<AppGrid apps={recent} />
+			<h2 class="section">All apps</h2>
+		{/if}
 		<AppGrid apps={matches} highlightFirst={query.trim() !== '' && matches.length > 0} />
 		{#if matches.length === 0}
 			<div class="surface state">
@@ -107,6 +121,19 @@
 </AppShell>
 
 <style>
+	.head h1 {
+		margin: 4px 0 18px;
+		font-size: 1.75rem;
+	}
+	.section {
+		margin: 22px 0 12px;
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--color-text-muted);
+	}
+	.section:first-of-type {
+		margin-top: 0;
+	}
 	.banner {
 		display: flex;
 		gap: 10px;
@@ -140,7 +167,7 @@
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 		gap: 22px 12px;
 		animation: appear var(--dur-3) var(--ease) 180ms both;
 	}

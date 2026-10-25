@@ -96,7 +96,14 @@ export interface Me {
 	/** Account id: "owner" or a uuid. */
 	id: string;
 	role: 'owner' | 'admin' | 'member';
+	/** Opens the admin portal: holds any permission. */
 	admin: boolean;
+	/** Global permissions ("*" for a super admin). */
+	permissions: string[];
+	/** Global role ids. */
+	roles: string[];
+	/** Apps this account administers (application admin). */
+	app_admin_of: string[];
 	username: string;
 	display_name: string | null;
 	given_name: string | null;

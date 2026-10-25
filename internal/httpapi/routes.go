@@ -49,6 +49,8 @@ func (s *server) adminRoutes(r chi.Router) {
 	ownW.Put("/ad", s.putAD)
 	ownW.Post("/ad/test", s.testAD)
 
+	can(rbac.SessionsManage).Get("/sessions/all", s.listAllSessions)
+	canW(rbac.SessionsManage).Delete("/sessions/all/{id}", s.endAnySession)
 	me.Get("/sessions", s.listSessions)
 	meW.Delete("/sessions/{id}", s.deleteSession)
 
@@ -70,9 +72,11 @@ func (s *server) adminRoutes(r chi.Router) {
 	can().Get("/overview", s.overview)
 }
 
-// accountRoutes mounts /api/account: the signed-in account's own password.
+// accountRoutes mounts /api/account: the signed-in account's own password
+// and what it has access to.
 func (s *server) accountRoutes(r chi.Router) {
 	r.With(s.requireSetupDone, requireStepUp).Put("/password", s.changeOwnPassword)
+	r.With(s.requireSetupDone, requireSession).Get("/access", s.myAccess)
 }
 
 // appRoutes mounts /api/apps: everyone signed in sees the apps they may use
@@ -85,6 +89,8 @@ func (s *server) appRoutes(r chi.Router) {
 	all := r.With(s.requireSetupDone, s.need(rbac.AppsWrite), requireStepUp)
 
 	me.Get("/", s.listApps)
+	me.Get("/recent", s.recentApps)
+	me.Post("/{id}/opened", s.appOpened)
 	all.Post("/", s.createApp)
 	all.Put("/order", s.reorderApps)
 	all.Post("/icon", s.fetchAppIcon)

@@ -104,3 +104,41 @@ func TestAppAdminAndGroupAccess(t *testing.T) {
 		t.Fatalf("member apps = %+v", apps)
 	}
 }
+
+// Admin-wide sessions need sessions.manage; my access and recently used are
+// per account.
+func TestPortalEndpoints(t *testing.T) {
+	t.Parallel()
+	l, owner := adminClient(t, "192.168.1.20")
+	l.settings(t, func(s *settings.Settings) { s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100 })
+	member, mid := signedIn(t, l, owner, "pm", "192.168.1.50")
+	member.must("GET", "/api/admin/sessions/all", nil, 403)
+	var all struct{ Sessions []map[string]any }
+	body(t, owner.must("GET", "/api/admin/sessions/all", nil, 200).Body, &all)
+	var theirs string
+	for _, s := range all.Sessions {
+		if s["account"] == mid {
+			theirs = s["id"].(string)
+		}
+	}
+	if theirs == "" {
+		t.Fatal("member session not listed")
+	}
+	owner.must("DELETE", "/api/admin/sessions/all/"+theirs, nil, 200)
+	member.must("GET", "/api/me", nil, 401)
+
+	member, _ = signedIn(t, l, owner, "pm2", "192.168.1.51")
+	var acc map[string]any
+	body(t, member.must("GET", "/api/account/access", nil, 200).Body, &acc)
+	if len(acc["roles"].([]any)) != 0 {
+		t.Fatalf("access = %v", acc)
+	}
+	var a map[string]any
+	body(t, owner.must("POST", "/api/apps", map[string]any{"name": "Wiki", "url": "https://wiki.home.lan", "color": "#007aff"}, 201).Body, &a)
+	member.must("POST", "/api/apps/"+a["id"].(string)+"/opened", nil, 204)
+	var recent struct{ IDs []string }
+	body(t, member.must("GET", "/api/apps/recent", nil, 200).Body, &recent)
+	if len(recent.IDs) != 1 || recent.IDs[0] != a["id"] {
+		t.Fatalf("recent = %v", recent.IDs)
+	}
+}

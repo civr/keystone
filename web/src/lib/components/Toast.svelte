@@ -51,7 +51,7 @@
 		padding: 8px 8px 8px 16px;
 		border: 1px solid var(--c-border);
 		border-radius: var(--radius-md);
-		background: #fff;
+		background: var(--c-elevated);
 		font-size: 0.875rem;
 		font-weight: 500;
 		line-height: 1.35;

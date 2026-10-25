@@ -87,7 +87,7 @@
 			box-shadow var(--dur-2) var(--ease);
 	}
 	.search:focus-within {
-		background: #fff;
+		background: var(--c-field);
 		box-shadow: 0 0 0 1px var(--primary);
 	}
 	.lens {

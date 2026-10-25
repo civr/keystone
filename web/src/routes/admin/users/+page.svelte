@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { api, ApiError } from '$lib/api';
+	import { api, ApiError, type Me } from '$lib/api';
 	import { initials } from '$lib/nav';
 	import { strongPassword } from '$lib/vault';
 	import { toast } from '$lib/toast.svelte';
@@ -12,18 +12,33 @@
 		display_name: string;
 		email: string;
 		role: 'owner' | 'admin' | 'member';
+		roles: string[];
+		groups: string[];
 		disabled: boolean;
 		created_at: string;
 	}
-	type Form = { username: string; display_name: string; email: string; password: string; role: 'admin' | 'member'; disabled: boolean };
+	type Form = { username: string; display_name: string; email: string; password: string; roles: string[]; disabled: boolean };
+	interface Role {
+		id: string;
+		name: string;
+		description: string;
+	}
 
 	let users = $state<User[] | null>(null);
+	let roles = $state<Role[]>([]);
+	let groupNames = $state<Record<string, string>>({});
+	let me = $state<Me | null>(null);
 	let loadError = $state('');
+	const can = (p: string) => !!me && (me.permissions.includes('*') || me.permissions.includes(p));
 
 	async function load() {
 		loadError = '';
 		try {
+			me = await api.get<Me>('/me');
 			users = (await api.get<{ users: User[] }>('/admin/users')).users;
+			roles = (await api.get<{ roles: Role[] }>('/admin/roles')).roles;
+			const g = await api.get<{ groups: { id: string; name: string }[] }>('/admin/groups');
+			groupNames = Object.fromEntries(g.groups.map((x) => [x.id, x.name]));
 		} catch (e) {
 			loadError = e instanceof ApiError ? e.message : 'The users could not be loaded.';
 		}
@@ -32,14 +47,14 @@
 
 	let open = $state(false);
 	let editing = $state<User | null>(null);
-	let form = $state<Form>({ username: '', display_name: '', email: '', password: '', role: 'member', disabled: false });
+	let form = $state<Form>({ username: '', display_name: '', email: '', password: '', roles: [], disabled: false });
 	let errors = $state<Partial<Record<keyof Form, string>>>({});
 	let saving = $state(false);
 	let confirmDelete = $state(false);
 
 	function startAdd() {
 		editing = null;
-		form = { username: '', display_name: '', email: '', password: strongPassword(), role: 'member', disabled: false };
+		form = { username: '', display_name: '', email: '', password: strongPassword(), roles: [], disabled: false };
 		errors = {};
 		open = true;
 	}
@@ -47,7 +62,7 @@
 	function startEdit(u: User) {
 		if (u.role === 'owner') return;
 		editing = u;
-		form = { username: u.username, display_name: u.display_name, email: u.email, password: '', role: u.role, disabled: u.disabled };
+		form = { username: u.username, display_name: u.display_name, email: u.email, password: '', roles: [...u.roles], disabled: u.disabled };
 		errors = {};
 		confirmDelete = false;
 		open = true;
@@ -59,15 +74,28 @@
 		errors = {};
 		saving = true;
 		try {
+			let id: string;
 			if (editing) {
-				const body: Record<string, unknown> = { display_name: form.display_name, email: form.email, role: form.role, disabled: form.disabled };
+				const body: Record<string, unknown> = { display_name: form.display_name, email: form.email, disabled: form.disabled };
 				if (form.password) body.password = form.password;
 				await api.send('PUT', `/admin/users/${editing.id}`, body);
-				toast('Saved');
+				id = editing.id;
 			} else {
-				const u = await api.send<User>('POST', '/admin/users', form);
-				toast(`${u.display_name || u.username} added`);
+				const u = await api.send<User>('POST', '/admin/users', {
+					username: form.username,
+					display_name: form.display_name,
+					email: form.email,
+					password: form.password
+				});
+				id = u.id;
 			}
+			const before = editing?.roles ?? [];
+			if (can('roles.write') && (before.length !== form.roles.length || before.some((r) => !form.roles.includes(r)))) {
+				const cur = await api.get<{ roles: { role: string; app?: string }[] }>(`/admin/users/${id}/roles`);
+				const scoped = cur.roles.filter((a) => a.app);
+				await api.send('PUT', `/admin/users/${id}/roles`, { roles: [...form.roles.map((role) => ({ role })), ...scoped] });
+			}
+			toast(editing ? 'Saved' : `${form.display_name || form.username} added`);
 			open = false;
 			await load();
 		} catch (err) {
@@ -95,14 +123,14 @@
 		}
 	}
 
-	const ROLE: Record<User['role'], string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
+	const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
 </script>
 
 <div class="pane-head">
 	<h1 class="pane-title">Users</h1>
-	<button type="button" class="btn btn-primary btn-sm" onclick={startAdd}>Add</button>
+	{#if can('users.write')}<button type="button" class="btn btn-primary btn-sm" onclick={startAdd}>Add</button>{/if}
 </div>
-<p class="pane-intro">People who sign in to Keystone. Admins manage settings and apps; members use the apps they are given.</p>
+<p class="pane-intro">People who sign in to Keystone. Roles decide what they may manage; without a role they use the apps they are given.</p>
 
 {#if loadError}
 	<p class="error" role="alert">{loadError}</p>
@@ -119,7 +147,12 @@
 						<span class="help">{u.username}{u.email ? ` · ${u.email}` : ''}</span>
 					</span>
 					{#if u.disabled}<span class="chip warn">Disabled</span>{/if}
-					<span class="chip" class:accent={u.role !== 'member'}>{ROLE[u.role]}</span>
+					{#each u.groups as g}<span class="chip">{groupNames[g] ?? 'Group'}</span>{/each}
+					{#if u.role === 'owner'}
+						<span class="chip accent">Owner</span>
+					{:else}
+						{#each u.roles as r}<span class="chip accent">{roleName(r)}</span>{/each}
+					{/if}
 					{#if u.role !== 'owner'}
 						<svg class="chev" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5l5 5-5 5" /></svg>
 					{/if}
@@ -165,13 +198,24 @@
 			</div>
 			{#if errors.password}<small class="field-error" role="alert">{errors.password}</small>{:else}<small>At least 12 characters. Share it with them; they can change it under Account.</small>{/if}
 		</div>
-		<fieldset class="field">
-			<legend class="field-label">Role</legend>
-			<div class="segmented">
-				<label><input type="radio" bind:group={form.role} value="member" /><span>Member</span></label>
-				<label><input type="radio" bind:group={form.role} value="admin" /><span>Admin</span></label>
-			</div>
-		</fieldset>
+		{#if can('roles.write')}
+			<fieldset class="field">
+				<legend class="field-label">Roles</legend>
+				<div class="role-list">
+					{#each roles as r (r.id)}
+						<label class="check">
+							<input
+								type="checkbox"
+								checked={form.roles.includes(r.id)}
+								onchange={(e) => (form.roles = e.currentTarget.checked ? [...form.roles, r.id] : form.roles.filter((x) => x !== r.id))}
+							/>
+							<span>{r.name}<small>{r.description}</small></span>
+						</label>
+					{/each}
+				</div>
+				<small>No role: they use the apps they are given. Groups can give roles too.</small>
+			</fieldset>
+		{/if}
 		{#if editing}
 			<label class="check">
 				<input type="checkbox" bind:checked={form.disabled} />
@@ -234,6 +278,11 @@
 		display: flex;
 		gap: 8px;
 		align-items: center;
+	}
+	.role-list {
+		display: grid;
+		gap: 10px;
+		margin: 6px 0 8px;
 	}
 	fieldset {
 		margin: 0;

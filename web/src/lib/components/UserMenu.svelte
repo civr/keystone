@@ -191,7 +191,7 @@
 		padding: 5px;
 		border-radius: var(--radius-md);
 		border: 1px solid var(--c-border);
-		background: #fff;
+		background: var(--c-elevated);
 		transform-origin: top right;
 	}
 	.head {

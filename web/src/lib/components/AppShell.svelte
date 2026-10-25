@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError, type Me } from '$lib/api';
 	import { firstName } from '$lib/greeting';
-	import { navFor, isActive, searchHref } from '$lib/nav';
+	import { ADMIN_NAV, USER_NAV, navFor, isActive, searchHref } from '$lib/nav';
 	import { toast } from '$lib/toast.svelte';
 	import { brand, logoSrc } from '$lib/brand.svelte';
 	import TopbarSearch from './TopbarSearch.svelte';
@@ -15,8 +15,11 @@
 		query = $bindable(''),
 		onsearch,
 		full = false,
+		portal = 'user',
 		children
 	}: {
+		/** Which portal: the user portal (light menu) or /admin (dark menu). */
+		portal?: 'user' | 'admin';
 		/** The page fills the window edge to edge (no padding, no max width). */
 		full?: boolean;
 		me: Me | null;
@@ -26,6 +29,29 @@
 		onsearch?: () => void;
 		children: Snippet;
 	} = $props();
+
+	const groups = $derived(
+		navFor(portal === 'admin' ? ADMIN_NAV : USER_NAV, { permissions: me?.permissions ?? [], owner: me?.role === 'owner' })
+	);
+
+	// Admin groups fold away; the one with the current page stays open.
+	const FOLD_KEY = 'keystone.admin.folded';
+	let folded = $state<string[]>(readFolded());
+	function readFolded(): string[] {
+		try {
+			return JSON.parse(localStorage.getItem(FOLD_KEY) ?? '[]');
+		} catch {
+			return [];
+		}
+	}
+	function toggleGroup(title: string) {
+		folded = folded.includes(title) ? folded.filter((t) => t !== title) : [...folded, title];
+		try {
+			localStorage.setItem(FOLD_KEY, JSON.stringify(folded));
+		} catch {
+			/* not remembered */
+		}
+	}
 
 	const NAV_KEY = 'keystone.nav';
 	let iconsOnly = $state(readNav());
@@ -89,15 +115,21 @@
 
 {#snippet menu(collapsed: boolean, id: string, onpick?: () => void)}
 	<nav aria-label="Main menu">
-		{#each navFor(me?.admin ?? false, me?.role === 'owner') as g, gi (gi)}
+		{#each groups as g, gi (gi)}
+			{@const open = !g.title || collapsed || portal !== 'admin' || !folded.includes(g.title) || g.items.some((i) => isActive(path, i.href))}
 			{#if g.title}
 				{#if collapsed}
 					<div class="nav-rule" role="presentation"></div>
+				{:else if portal === 'admin'}
+					<button type="button" class="nav-group fold" id="nav-{id}-g-{gi}" aria-expanded={open} onclick={() => toggleGroup(g.title!)}>
+						{g.title}
+						<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 8l3 3 3-3" /></svg>
+					</button>
 				{:else}
 					<p class="nav-group" id="nav-{id}-g-{gi}">{g.title}</p>
 				{/if}
 			{/if}
-			<ul aria-labelledby={g.title && !collapsed ? `nav-${id}-g-${gi}` : undefined}>
+			<ul aria-labelledby={g.title && !collapsed ? `nav-${id}-g-${gi}` : undefined} hidden={!open}>
 				{#each g.items as item (item.href)}
 					{@const active = isActive(path, item.href)}
 					<li>
@@ -123,7 +155,7 @@
 	</nav>
 {/snippet}
 
-<div class="shell" class:icons={iconsOnly}>
+<div class="shell {portal}" class:icons={iconsOnly}>
 	<aside class="rail">
 		<div class="rail-inner">
 			<a class="brand" href="/" aria-label="{brand.name}, my apps">
@@ -154,8 +186,13 @@
 			<div class="search">
 				<TopbarSearch bind:value={query} onsubmit={search} />
 			</div>
+			{#if me?.admin}
+				<a class="btn btn-secondary btn-sm switch-portal" href={portal === 'admin' ? '/' : '/admin'}>
+					{portal === 'admin' ? 'User portal' : 'Admin'}
+				</a>
+			{/if}
 			{#if me}
-				<UserMenu name={me.display_name?.trim() || firstName(me)} username={me.username} settingsHref={me.admin ? '/settings' : '/settings/account'} onlogout={logout} />
+				<UserMenu name={me.display_name?.trim() || firstName(me)} username={me.username} settingsHref="/account" onlogout={logout} />
 			{:else}
 				<div class="user-ghost" aria-hidden="true"><span class="ghost"></span></div>
 			{/if}
@@ -270,6 +307,78 @@
 		}
 	}
 	.menu-btn {
+		display: none;
+	}
+
+	/* The user portal has a light menu (Okta-like launcher); the admin
+	   portal keeps the dark one. */
+	.shell.user {
+		--nav-bg: var(--c-bg-card);
+		--nav-ink: var(--color-text);
+		--nav-ink-2: var(--color-text-muted);
+		--nav-hover: var(--c-hover);
+		--nav-active: var(--c-selected-mid);
+		--nav-active-ink: var(--primary-dark);
+		--nav-rule: var(--c-border);
+	}
+	.shell.user .rail {
+		border-right: 1px solid var(--c-border);
+	}
+	.shell.user .nav-link.active,
+	.shell.user .nav-link.active:hover {
+		box-shadow: none;
+		font-weight: 600;
+	}
+	/* The admin menu is longer: denser rows so it fits the window. */
+	.shell.admin .nav-link {
+		height: 34px;
+		margin: 1px 12px;
+		font-size: 0.9375rem;
+	}
+	.shell.admin .glyph {
+		width: 22px;
+		height: 22px;
+		border-radius: 6px;
+	}
+	.shell.admin .nav-link .glyph svg {
+		width: 14px;
+		height: 14px;
+	}
+	.shell.admin .nav-group {
+		padding-top: 14px;
+	}
+	.shell.admin .brand {
+		height: 64px;
+	}
+	.switch-portal {
+		flex: none;
+	}
+	.nav-group.fold {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		width: 100%;
+		border: 0;
+		background: none;
+		text-align: left;
+		cursor: pointer;
+		font: inherit;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--nav-ink-2);
+	}
+	.nav-group.fold svg {
+		width: 16px;
+		height: 16px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		transition: transform var(--dur-2) var(--ease);
+	}
+	.nav-group.fold[aria-expanded='false'] svg {
+		transform: rotate(-90deg);
+	}
+	ul[hidden] {
 		display: none;
 	}
 

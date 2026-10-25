@@ -136,12 +136,17 @@
 	let vault = $state({ username: '', password: '', hasPassword: false });
 	// Who can use the app: null is everyone.
 	let access = $state<string[] | null>(null);
-	let people = $state<{ id: string; username: string; display_name: string }[]>([]);
-	onMount(() => {
-		api.get<{ users: { id: string; username: string; display_name: string }[] }>('/admin/users').then(
-			(r) => (people = r.users),
-			() => {}
-		);
+	// Who an app is for: people and groups ("group:<id>").
+	let people = $state<{ id: string; label: string; group: boolean }[]>([]);
+	onMount(async () => {
+		const [u, g] = await Promise.all([
+			api.get<{ users: { id: string; username: string; display_name: string }[] }>('/admin/users').catch(() => ({ users: [] })),
+			api.get<{ groups: { id: string; name: string }[] }>('/admin/groups').catch(() => ({ groups: [] }))
+		]);
+		people = [
+			...g.groups.map((x) => ({ id: `group:${x.id}`, label: x.name, group: true })),
+			...u.users.map((x) => ({ id: x.id, label: x.display_name || x.username, group: false }))
+		];
 	});
 
 	async function loadVault(app: App) {
@@ -471,7 +476,7 @@
 									onchange={(e) =>
 										(access = e.currentTarget.checked ? [...(access ?? []), p.id] : (access ?? []).filter((x) => x !== p.id))}
 								/>
-								<span>{p.display_name || p.username}</span>
+								<span>{p.label}{#if p.group}<small>Group</small>{/if}</span>
 							</label>
 						{/each}
 					</div>

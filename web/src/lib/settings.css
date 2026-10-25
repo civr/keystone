@@ -200,7 +200,7 @@
 		box-shadow var(--dur-2) var(--ease);
 }
 .segmented input:checked + span {
-	background: #fff;
+	background: var(--c-elevated);
 	box-shadow: 0 0 0 1px var(--c-border);
 	font-weight: 600;
 }
@@ -222,7 +222,7 @@
 	padding: 8px 8px 8px 20px;
 	border: 1px solid var(--c-border);
 	border-radius: var(--radius-md);
-	background: #fff;
+	background: var(--c-elevated);
 }
 .savebar .count {
 	flex: 1;

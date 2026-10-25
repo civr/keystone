@@ -84,7 +84,7 @@
 			</div>
 		</form>
 	{/if}
-	<p class="foot">Passkeys and signed-in devices are under Devices.</p>
+	<p class="foot">Passkeys and signed-in devices are under Sign-in &amp; devices.</p>
 </section>
 
 <style>

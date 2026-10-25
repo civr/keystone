@@ -326,7 +326,7 @@
 		display: grid;
 		grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
 		height: 100%;
-		background: #fff;
+		background: var(--c-bg-card);
 	}
 	.list-pane {
 		display: flex;
