@@ -4,8 +4,15 @@
 	let {
 		open = $bindable(false),
 		title,
+		onclose,
 		children
-	}: { open?: boolean; title: string; children: Snippet } = $props();
+	}: {
+		open?: boolean;
+		title: string;
+		/** Called once whenever the sheet closes (button, Esc, backdrop or open = false). */
+		onclose?: () => void;
+		children: Snippet;
+	} = $props();
 
 	let dialog: HTMLDialogElement;
 	const uid = $props.id();
@@ -23,7 +30,7 @@
 </script>
 
 <!-- A sheet: centred on wide screens, rising from the bottom edge on phones. -->
-<dialog bind:this={dialog} aria-labelledby={titleId} onclose={() => (open = false)} onclick={onBackdrop}>
+<dialog bind:this={dialog} aria-labelledby={titleId} onclose={() => ((open = false), onclose?.())} onclick={onBackdrop}>
 	<div class="panel">
 		<header>
 			<h2 id={titleId}>{title}</h2>
