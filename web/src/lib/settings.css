@@ -15,7 +15,7 @@
 }
 .pane-title {
 	margin: 0;
-	font-size: 1.5rem;
+	font-size: 1.75rem;
 	font-weight: 700;
 	line-height: 1.2;
 	letter-spacing: -0.02em;
@@ -24,7 +24,7 @@
 	margin: 0 0 18px;
 	max-width: 64ch;
 	color: var(--color-text-muted);
-	font-size: 0.9375rem;
+	font-size: 1rem;
 	line-height: 1.47;
 	text-wrap: pretty;
 }
@@ -38,7 +38,7 @@
 	margin: 0 0 8px;
 	padding: 0 2px;
 	font-family: var(--font);
-	font-size: 0.875rem;
+	font-size: 1rem;
 	font-weight: 600;
 	line-height: 1.4;
 	letter-spacing: -0.005em;
@@ -96,13 +96,12 @@
 	content: none;
 }
 
-/* Rows at System Settings density: 13–14px text, 40px rows. */
 .srow {
 	display: flex;
 	align-items: center;
 	gap: 14px;
-	min-height: 40px;
-	padding: 8px 14px;
+	min-height: 48px;
+	padding: 10px 16px;
 }
 .srow.stack {
 	flex-direction: column;
@@ -115,14 +114,14 @@
 }
 .srow .label {
 	display: block;
-	font-size: 0.875rem;
+	font-size: 1rem;
 	font-weight: 400;
 	line-height: 1.35;
 	color: var(--color-text);
 }
 .srow .help {
-	margin: 1px 0 0;
-	font-size: 0.75rem;
+	margin: 2px 0 0;
+	font-size: 0.875rem;
 	line-height: 1.4;
 	color: var(--color-text-muted);
 	text-wrap: pretty;

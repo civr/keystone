@@ -63,25 +63,26 @@
 	--t-slate: #3a3a3c;
 	--t-slate-bg: rgba(118, 118, 128, 0.12);
 
-	/* ── Chrome: solid white bars ── */
-	--material-bar: #ffffff;
-	--material-side: #ffffff;
+	/* ── Chrome: a slate sidebar and a light toolbar, as 1Password for Mac ── */
+	--material-bar: #f2f2f4;
+	--material-side: #3b4555;
 	--material-blur: none;
 	--topbar-bg: var(--material-bar);
 	--topbar-ink: #1d1d1f;
 	--topbar-ink-2: #6e6e73;
 	--topbar-hover: rgba(0, 0, 0, 0.05);
-	--topbar-stroke: var(--c-border);
-	--topbar-field: rgba(118, 118, 128, 0.12);
-	--topbar-field-stroke: transparent;
+	--topbar-stroke: #d4d4d8;
+	--topbar-field: #ffffff;
+	--topbar-field-stroke: #cfcfd4;
 	--nav-bg: var(--material-side);
-	--nav-ink: #1d1d1f;
-	--nav-ink-2: #6e6e73;
-	--nav-hover: rgba(0, 0, 0, 0.05);
-	--nav-active: var(--c-selected-mid);
-	--nav-active-ink: var(--primary-dark);
+	--nav-ink: #ffffff;
+	--nav-ink-2: rgba(255, 255, 255, 0.62);
+	--nav-hover: rgba(255, 255, 255, 0.07);
+	--nav-active: rgba(255, 255, 255, 0.13);
+	--nav-active-ink: #ffffff;
+	--nav-rule: rgba(255, 255, 255, 0.14);
 	--nav-active-shadow: none;
-	--nav-w: 232px;
+	--nav-w: 248px;
 	--nav-w-icons: 64px;
 
 	/* ── Radii: small and few ── */
@@ -90,7 +91,7 @@
 	--radius-control: 6px; /* inputs, buttons */
 	--radius-md: 8px; /* menus, notes */
 	--radius-lg: 8px;
-	--radius-card: 8px; /* boxes */
+	--radius-card: 10px; /* boxes */
 	--radius-sheet: 10px;
 	--radius-icon: 18%; /* app tiles */
 	--radius-full: 9999px;
@@ -157,7 +158,7 @@ body {
 	margin: 0;
 	min-height: 100dvh;
 	font-family: var(--font);
-	font-size: 0.9375rem; /* 15px: Apple's compact body for dense UI */
+	font-size: 1rem; /* 16px */
 	font-weight: 400;
 	line-height: 1.47;
 	letter-spacing: -0.01em;
@@ -247,7 +248,7 @@ pre,
 	border: 0;
 	border-radius: var(--radius-control);
 	font-family: inherit;
-	font-size: 0.9375rem;
+	font-size: 1rem;
 	font-weight: 500;
 	line-height: 1;
 	letter-spacing: -0.01em;
@@ -335,9 +336,9 @@ pre,
 }
 
 .btn-sm {
-	height: 30px;
+	height: 32px;
 	padding: 0 14px;
-	font-size: 0.8125rem;
+	font-size: 0.9375rem;
 }
 .btn.block {
 	width: 100%;
@@ -371,7 +372,7 @@ pre,
 /* ── Fields ── */
 .input {
 	width: 100%;
-	height: 40px;
+	height: 42px;
 	padding: 0 12px;
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-control);

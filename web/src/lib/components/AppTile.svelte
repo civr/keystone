@@ -65,8 +65,8 @@
 		position: relative;
 		display: grid;
 		place-items: center;
-		width: 64px;
-		height: 64px;
+		width: 72px;
+		height: 72px;
 		border-radius: var(--radius-icon);
 		/* Without its own icon an app gets a flat tile in its colour. */
 		background: var(--tile-color, #8e8e93);
@@ -89,7 +89,7 @@
 	}
 	.name {
 		max-width: 100%;
-		font-size: 0.8125rem;
+		font-size: 0.9375rem;
 		line-height: 1.25;
 		text-align: center;
 		display: -webkit-box;

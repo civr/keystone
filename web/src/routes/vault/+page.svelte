@@ -42,7 +42,7 @@
 	function openItem(it: VaultItem) {
 		current = it;
 		secret = null;
-		detailOpen = true;
+		detailOpen = matchMedia('(max-width: 767px)').matches;
 		if (it.has_password || it.has_note) reveal();
 	}
 
@@ -143,6 +143,12 @@
 		}
 	}
 
+	/** A stable colour per item, as app icons have. */
+	function hue(t: string) {
+		let h = 0;
+		for (const c of t) h = (h * 31 + c.charCodeAt(0)) % 360;
+		return h;
+	}
 	function initial(t: string) {
 		return Array.from(t.trim())[0]?.toUpperCase() ?? '?';
 	}
@@ -159,85 +165,107 @@
 	<title>{pageTitle('Vault')}</title>
 </svelte:head>
 
-<AppShell {me} bind:query onsearch={() => shown[0] && openItem(shown[0])}>
-	<div class="pane">
-		<div class="pane-head">
-			<h1 class="pane-title">Vault</h1>
-			<button type="button" class="btn btn-primary btn-sm" onclick={startAdd}>Add</button>
-		</div>
-		<p class="pane-intro">Passwords for anything, kept encrypted. Search with the bar at the top.</p>
+<AppShell {me} full bind:query onsearch={() => shown[0] && openItem(shown[0])}>
+	<div class="vault">
+		<section class="list-pane" aria-label="Passwords">
+			<div class="list-head">
+				<span class="count">{items ? `${shown.length} ${shown.length === 1 ? 'item' : 'items'}` : ''}</span>
+				<button type="button" class="btn btn-secondary btn-sm add" onclick={startAdd} aria-label="Add a password">
+					<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11" /></svg>
+				</button>
+			</div>
+			{#if loadError}
+				<div class="pane-note">
+					<p>{loadError}</p>
+					<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Try again</button>
+				</div>
+			{:else if items === null}
+				<p class="pane-note" role="status">Loading…</p>
+			{:else if items.length === 0}
+				<div class="pane-note">
+					<p>Nothing in the vault yet.</p>
+					<button type="button" class="btn btn-primary btn-sm" onclick={startAdd}>Add a password</button>
+				</div>
+			{:else if shown.length === 0}
+				<p class="pane-note">Nothing matches “{query.trim()}”.</p>
+			{:else}
+				<ul class="rows">
+					{#each shown as it (it.id)}
+						<li>
+							<button type="button" class="row" class:selected={current?.id === it.id} onclick={() => openItem(it)}>
+								<span class="mark" style:--hue={hue(it.title)} aria-hidden="true">{initial(it.title)}</span>
+								<span class="text">
+									<span class="title">{it.title}</span>
+									<span class="sub">{it.username || host(it.url) || '—'}</span>
+								</span>
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
 
-		{#if loadError}
-			<div class="empty-note">
-				<p>{loadError}</p>
-				<button type="button" class="btn btn-secondary btn-sm" onclick={load}>Try again</button>
-			</div>
-		{:else if items === null}
-			<p class="loading-note" role="status">Loading…</p>
-		{:else if items.length === 0}
-			<div class="empty-note">
-				<p>Nothing in the vault yet.</p>
-				<button type="button" class="btn btn-primary btn-sm" onclick={startAdd}>Add a password</button>
-			</div>
-		{:else if shown.length === 0}
-			<div class="empty-note"><p>Nothing matches “{query.trim()}”.</p></div>
-		{:else}
-			<ul class="card list">
-				{#each shown as it (it.id)}
-					<li>
-						<button type="button" class="srow item" onclick={() => openItem(it)}>
-							<span class="mark" aria-hidden="true">{initial(it.title)}</span>
-							<span class="text">
-								<span class="label">{it.title}</span>
-								<span class="help">{it.username || host(it.url) || '—'}</span>
-							</span>
-							<svg class="chev" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5l5 5-5 5" /></svg>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<section class="detail-pane" aria-label="Details">
+			{#if current}
+				{@render detail(current)}
+			{:else}
+				<p class="pane-note empty">Choose an item to see its details.</p>
+			{/if}
+		</section>
 	</div>
 </AppShell>
 
-<Sheet bind:open={detailOpen} title={current?.title ?? ''}>
-	{#if current}
-		{@const it = current}
-		<div class="card">
-			<div class="srow">
-				<div class="text"><span class="help">Username</span><span class="label value">{it.username || '—'}</span></div>
-				{#if it.username}<button type="button" class="btn btn-secondary btn-sm" onclick={() => copy(it.username, 'Username')}>Copy</button>{/if}
-			</div>
-			<div class="srow">
-				<div class="text">
-					<span class="help">Password</span>
-					<span class="label value">{it.has_password ? '••••••••••••' : '—'}</span>
+{#snippet detail(it: VaultItem)}
+	<div class="detail">
+		<header class="detail-head">
+			<span class="mark big" style:--hue={hue(it.title)} aria-hidden="true">{initial(it.title)}</span>
+			<h1>{it.title}</h1>
+			<button type="button" class="btn btn-secondary btn-sm edit" onclick={startEdit}>Edit</button>
+		</header>
+		<div class="fields">
+			<div class="fld">
+				<span class="k">username</span>
+				<div class="v-row">
+					<span class="v">{it.username || '—'}</span>
+					{#if it.username}<button type="button" class="btn btn-flat btn-sm" onclick={() => copy(it.username, 'Username')}>Copy</button>{/if}
 				</div>
-				{#if it.has_password}
-					<button type="button" class="btn btn-secondary btn-sm" onclick={copyPassword} disabled={!secret}>
-						{#if revealing}<span class="spinner" aria-hidden="true"></span>{/if}Copy
-					</button>
-				{/if}
 			</div>
-			{#if it.url}
-				<div class="srow">
-					<div class="text"><span class="help">Website</span><span class="label value">{it.url}</span></div>
-					{#if safeHref(it.url)}
-						<a class="btn btn-secondary btn-sm" href={safeHref(it.url)} target="_blank" rel="noopener noreferrer">Open</a>
+			<div class="fld">
+				<span class="k">password</span>
+				<div class="v-row">
+					<span class="v dots">{it.has_password ? '••••••••••••' : '—'}</span>
+					{#if it.has_password}
+						<button type="button" class="btn btn-flat btn-sm" onclick={copyPassword} disabled={!secret}>
+							{#if revealing}<span class="spinner" aria-hidden="true"></span>{/if}Copy
+						</button>
 					{/if}
 				</div>
-			{/if}
-			{#if it.has_note}
-				<div class="srow stack">
-					<div class="text"><span class="help">Note</span></div>
-					{#if secret}<p class="note">{secret.note}</p>{:else}<p class="note help">…</p>{/if}
-				</div>
-			{/if}
+			</div>
 		</div>
-		<div class="sheet-actions">
-			<button type="button" class="btn btn-secondary" onclick={startEdit}>Edit</button>
+		{#if it.url}
+			<div class="fld loose">
+				<span class="k">website</span>
+				{#if safeHref(it.url)}
+					<a class="v link-v" href={safeHref(it.url)} target="_blank" rel="noopener noreferrer">{it.url}</a>
+				{:else}<span class="v">{it.url}</span>{/if}
+			</div>
+		{/if}
+		{#if it.has_note}
+			<div class="fld loose">
+				<span class="k">note</span>
+				<p class="v note">{secret ? secret.note : '…'}</p>
+			</div>
+		{/if}
+		<div class="fld loose">
+			<span class="k">last modified</span>
+			<span class="v muted">{new Date(it.updated_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</span>
 		</div>
-	{/if}
+	</div>
+{/snippet}
+
+<!-- On a phone the details open as a sheet over the list. -->
+<Sheet bind:open={detailOpen} title={current?.title ?? ''}>
+	{#if current}{@render detail(current)}{/if}
 </Sheet>
 
 <Sheet bind:open={editOpen} title={editing ? 'Edit' : 'New password'}>
@@ -293,57 +321,180 @@
 </Sheet>
 
 <style>
-	.pane {
-		max-width: 760px;
-		margin: 0 auto;
+	/* 1Password-style: a white list beside the details, filling the window. */
+	.vault {
+		display: grid;
+		grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+		height: 100%;
+		background: #fff;
 	}
-	.list {
+	.list-pane {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		border-right: 1px solid var(--c-border);
+	}
+	.list-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 10px 12px 10px 18px;
+		border-bottom: 1px solid var(--c-border);
+		color: var(--color-text-muted);
+		font-size: 0.9375rem;
+	}
+	.add {
+		width: 36px;
+		padding: 0;
+	}
+	.rows {
+		flex: 1;
+		overflow-y: auto;
 		margin: 0;
+		padding: 0;
+		list-style: none;
 	}
-	.item {
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 14px;
 		width: 100%;
+		padding: 10px 18px;
 		border: 0;
 		background: none;
-		font: inherit;
 		color: inherit;
+		font: inherit;
 		text-align: left;
 		cursor: pointer;
 	}
-	.item:hover {
+	.row:hover {
 		background: var(--c-hover);
 	}
-	.item .help {
-		display: block;
-		margin: 0;
+	.row.selected,
+	.row.selected:hover {
+		background: var(--primary);
+		color: #fff;
+	}
+	.row .text {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.title {
+		font-size: 1.0625rem;
+		font-weight: 600;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.sub {
+		color: var(--color-text-muted);
+		font-size: 0.9375rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.row.selected .sub {
+		color: rgba(255, 255, 255, 0.85);
 	}
 	.mark {
 		display: grid;
 		place-items: center;
 		flex: none;
-		width: 32px;
-		height: 32px;
-		border-radius: var(--radius-sm);
-		background: var(--c-selected-mid);
-		color: var(--primary-dark);
+		width: 40px;
+		height: 40px;
+		border-radius: 9px;
+		background: hsl(var(--hue) 62% 50%);
+		color: #fff;
+		font-size: 1.125rem;
 		font-weight: 600;
 	}
-	.chev {
-		flex: none;
-		width: 16px;
-		height: 16px;
-		fill: none;
-		stroke: var(--c-400);
-		stroke-width: 2;
-		stroke-linecap: round;
-		stroke-linejoin: round;
+	.mark.big {
+		width: 72px;
+		height: 72px;
+		border-radius: 16px;
+		font-size: 2rem;
 	}
-	.value {
+	.detail-pane {
+		min-height: 0;
+		overflow-y: auto;
+	}
+	.pane-note {
+		margin: 0;
+		padding: 28px 20px;
+		color: var(--color-text-muted);
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 10px;
+	}
+	.pane-note p {
+		margin: 0;
+	}
+	.pane-note.empty {
+		height: 100%;
+		align-items: center;
+		justify-content: center;
+	}
+	.detail {
+		max-width: 680px;
+		padding: 32px 40px;
+	}
+	.detail-head {
+		display: flex;
+		align-items: center;
+		gap: 18px;
+		margin-bottom: 26px;
+	}
+	.detail-head h1 {
+		flex: 1;
+		min-width: 0;
+		margin: 0;
+		font-size: 1.875rem;
+	}
+	.fields {
+		display: grid;
+		gap: 16px;
+		padding: 20px 22px;
+		border: 1px solid var(--c-border);
+		border-radius: 12px;
+		margin-bottom: 20px;
+	}
+	.fld {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.fld.loose {
+		padding: 0 22px;
+		margin-bottom: 16px;
+	}
+	.k {
+		color: var(--color-text-muted);
+		font-size: 0.9375rem;
+	}
+	.v-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.v {
+		font-size: 1.0625rem;
 		overflow-wrap: anywhere;
 	}
-	.note {
+	.v.dots {
+		letter-spacing: 0.12em;
+	}
+	.v.muted {
+		color: var(--color-text-muted);
+	}
+	.v.note {
 		margin: 0;
 		white-space: pre-wrap;
-		overflow-wrap: anywhere;
+	}
+	.link-v {
+		color: var(--primary);
 	}
 	.pw-row {
 		display: flex;
@@ -352,6 +503,20 @@
 	}
 	.note-input {
 		font-family: var(--font);
-		font-size: 0.9375rem;
+		font-size: 1rem;
+	}
+	@media (max-width: 767px) {
+		.vault {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.detail-pane {
+			display: none;
+		}
+		.detail {
+			padding: 0;
+		}
+		.fld.loose {
+			padding: 0 4px;
+		}
 	}
 </style>

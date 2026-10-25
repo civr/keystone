@@ -140,7 +140,7 @@
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
 		gap: 22px 12px;
 		animation: appear var(--dur-3) var(--ease) 180ms both;
 	}

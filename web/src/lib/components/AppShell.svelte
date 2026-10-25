@@ -14,8 +14,11 @@
 		me,
 		query = $bindable(''),
 		onsearch,
+		full = false,
 		children
 	}: {
+		/** The page fills the window edge to edge (no padding, no max width). */
+		full?: boolean;
 		me: Me | null;
 		/** The top-bar search text; home binds it to filter the grid. */
 		query?: string;
@@ -124,7 +127,7 @@
 	<aside class="rail">
 		<div class="rail-inner">
 			<a class="brand" href="/" aria-label="{brand.name}, my apps">
-				<img class="brand-mark" src={logoSrc()} alt="" width="28" height="28" />
+				<img class="brand-mark" src={logoSrc()} alt="" width="40" height="40" />
 				<span class="brand-name">{brand.name}</span>
 			</a>
 			{@render menu(iconsOnly, 'rail')}
@@ -158,7 +161,7 @@
 			{/if}
 		</header>
 
-		<main class="content">
+		<main class="content" class:full>
 			<div class="inner">{@render children()}</div>
 		</main>
 	</div>
@@ -168,7 +171,7 @@
 	<div class="drawer-panel">
 		<div class="drawer-head">
 			<span class="brand">
-				<img class="brand-mark" src={logoSrc()} alt="" width="28" height="28" />
+				<img class="brand-mark" src={logoSrc()} alt="" width="40" height="40" />
 				<span class="brand-name">{brand.name}</span>
 			</span>
 			<button type="button" class="topbar-btn" aria-label="Close menu" onclick={closeDrawer}>
@@ -273,7 +276,6 @@
 	/* ── Sidebar ── */
 	.rail {
 		background: var(--nav-bg);
-		border-right: 1px solid var(--c-border);
 		color: var(--nav-ink);
 	}
 	.rail-inner {
@@ -287,9 +289,9 @@
 	.brand {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		height: var(--bar-h);
-		padding: 0 18px;
+		gap: 12px;
+		height: 84px;
+		padding: 0 22px;
 		color: var(--nav-ink);
 		text-decoration: none;
 		overflow: hidden;
@@ -300,13 +302,13 @@
 	}
 	.brand-mark {
 		flex: none;
-		width: 28px;
-		height: 28px;
+		width: 40px;
+		height: 40px;
 		object-fit: contain;
 	}
 	.brand-name {
 		font-family: var(--font-display);
-		font-size: 1.0625rem;
+		font-size: 1.25rem;
 		font-weight: 600;
 		letter-spacing: -0.02em;
 		white-space: nowrap;
@@ -328,8 +330,8 @@
 	}
 	.nav-group {
 		margin: 0;
-		padding: 18px 20px 4px;
-		font-size: 0.75rem;
+		padding: 22px 24px 6px;
+		font-size: 0.8125rem;
 		font-weight: 600;
 		line-height: 1.4;
 		color: var(--nav-ink-2);
@@ -337,19 +339,19 @@
 	.nav-rule {
 		height: 1px;
 		margin: 12px 18px;
-		background: var(--c-border);
+		background: var(--nav-rule);
 	}
 	/* Rows inset 10px; the selected row is tinted with the accent. */
 	.nav-link {
 		display: flex;
 		align-items: center;
 		gap: 9px;
-		margin: 1px 10px;
+		margin: 2px 12px;
 		padding: 0 10px;
-		height: 30px;
-		border-radius: var(--radius-sm);
+		height: 40px;
+		border-radius: 8px;
 		color: var(--nav-ink);
-		font-size: 0.875rem;
+		font-size: 1.0625rem;
 		font-weight: 400;
 		text-decoration: none;
 		white-space: nowrap;
@@ -367,22 +369,22 @@
 		display: grid;
 		place-items: center;
 		flex: none;
-		width: 22px;
-		height: 22px;
-		border-radius: 6px;
+		width: 26px;
+		height: 26px;
+		border-radius: 7px;
 		background: var(--tint);
 		color: #fff;
 	}
 	.nav-link .glyph svg {
-		width: 14px;
-		height: 14px;
+		width: 16px;
+		height: 16px;
 		stroke-width: 2;
 	}
 	.nav-link.active,
 	.nav-link.active:hover {
 		background: var(--nav-active);
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 		color: var(--nav-active-ink);
-		font-weight: 500;
 	}
 	.nav-link.icon-only {
 		justify-content: center;
@@ -439,6 +441,14 @@
 		max-width: 1080px;
 		margin: 0 auto;
 	}
+	.content.full {
+		padding: 0;
+		overflow: hidden;
+	}
+	.content.full .inner {
+		max-width: none;
+		height: 100%;
+	}
 
 	/* ── Phone and small tablet: the sidebar becomes a sheet from the bar ── */
 	@media (max-width: 767px) {
@@ -485,8 +495,8 @@
 		height: 100%;
 		overflow-y: auto;
 		padding: 0 0 max(16px, env(safe-area-inset-bottom));
-		background: #fff;
-		border-right: 1px solid var(--c-border);
+		background: var(--nav-bg);
+		color: var(--nav-ink);
 	}
 	/* Enters from the left and leaves the same way. */
 	.drawer[open] .drawer-panel {

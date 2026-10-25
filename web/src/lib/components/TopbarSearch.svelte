@@ -77,6 +77,7 @@
 		max-width: 100%;
 		height: 36px;
 		padding: 0 5px 0 11px;
+		border: 1px solid var(--topbar-field-stroke);
 		border-radius: var(--radius-control);
 		background: var(--topbar-field);
 		color: var(--topbar-ink-2);
@@ -107,7 +108,7 @@
 		outline: 0;
 		background: transparent;
 		color: var(--topbar-ink);
-		font-size: 0.9375rem;
+		font-size: 1rem;
 	}
 	input::placeholder {
 		color: var(--topbar-ink-2);
