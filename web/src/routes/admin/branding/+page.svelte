@@ -254,15 +254,15 @@
 		gap: 12px;
 		flex-wrap: wrap;
 	}
+	/* Groups side by side on a wide pane; a lone group fills the width. */
 	.cols {
-		columns: 2 380px;
-		column-gap: 20px;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+		gap: 0 20px;
+		align-items: start;
 	}
 	.cols > .group {
 		break-inside: avoid;
-	}
-	.cols > .group:only-child {
-		column-span: all;
 	}
 	.logo {
 		flex: none;
