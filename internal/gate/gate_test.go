@@ -90,15 +90,17 @@ func TestVerify(t *testing.T) {
 	})
 
 	t.Run("NginxMode401", func(t *testing.T) {
-		r := httptest.NewRequest("GET", "/verify?mode=nginx", nil)
-		r.Header.Set("X-Original-URL", "https://ha.home.lan/")
-		w := httptest.NewRecorder()
-		h.ServeHTTP(w, r)
-		if w.Code != 401 {
-			t.Fatalf("got %d", w.Code)
+		for _, m := range []string{"GET", "POST", "DELETE"} {
+			r := httptest.NewRequest(m, "/verify?mode=nginx", nil)
+			r.Header.Set("X-Original-URL", "https://ha.home.lan/")
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if w.Code != 401 {
+				t.Fatalf("%s: got %d", m, w.Code)
+			}
 		}
-		r = httptest.NewRequest("GET", "/login-redirect?rd="+"https%3A%2F%2Fha.home.lan%2F", nil)
-		w = httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/login-redirect?rd="+"https%3A%2F%2Fha.home.lan%2F", nil)
+		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != 302 || w.Header().Get("Location") != "https://keystone.home.lan/api/gate/start?rd=https%3A%2F%2Fha.home.lan%2F" {
 			t.Fatalf("login-redirect = %d %q", w.Code, w.Header().Get("Location"))

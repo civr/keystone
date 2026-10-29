@@ -53,7 +53,8 @@ type Server struct {
 // Handler returns the gate's HTTP handler.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /verify", s.verify)
+	// nginx auth_request keeps the client's method, so a POST to the app must not 405 here.
+	mux.HandleFunc("/verify", s.verify)
 	mux.HandleFunc("GET "+signinPath+"signin", s.signIn)
 	mux.HandleFunc("GET /login-redirect", s.loginRedirect)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
