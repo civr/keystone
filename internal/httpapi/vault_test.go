@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/civr/keystone/internal/settings"
 )
 
 func TestVault(t *testing.T) {
@@ -54,6 +56,9 @@ func TestVault(t *testing.T) {
 	})
 
 	t.Run("PasswordNeedsRecentPasskey", func(t *testing.T) {
+		// The default window is 0 (any sign-in opens the vault); test a set one.
+		l.put(t, func(s *settings.Settings) { s.Vault.ReconfirmMinutes = 15 })
+		defer l.put(t, func(s *settings.Settings) { s.Vault.ReconfirmMinutes = 0 })
 		sess := l.session(t, c)
 		sess.LastPasskeyAt = time.Now().Add(-16 * time.Minute)
 		if err := l.deps.Sessions.Update(context.Background(), sess); err != nil {
