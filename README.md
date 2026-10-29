@@ -29,6 +29,16 @@ vault keys) in the `keystone_secrets` volume. Existing secrets are never overwri
   tiles (see UniFi OS below).
 - **Branding:** set the name, logo, accent colour and background colour under **Settings › Branding**.
 
+## Admin portal
+
+Everyone signs in to the user portal (My apps, Vault, Account). People with a role also get the admin portal at
+`/admin`: a dashboard, Directory (users, groups, roles), Applications (apps with templates for Jellyfin, Home
+Assistant, Grafana, Proxmox and more), Authentication (sign-in and MFA, reverse-proxy sign-in, identity providers,
+sessions), Security (vault and 1Password Connect, network, keys and recovery, audit log) and System.
+
+Built-in roles: Super Admin, Administrator, Application Admin (per app), Security Admin and Read-only Auditor; add your
+own under Roles. See [docs/security.md](docs/security.md) for what Keystone guarantees and what it does not.
+
 ## Reverse proxy
 
 Keystone works without a reverse proxy: just use `http://<ip>:8080`. Passkeys need https, though, so for
