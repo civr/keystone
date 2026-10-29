@@ -109,6 +109,9 @@ func (s *server) samlSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	f, a, err := s.samlProvider().Respond(ctx, settingsFrom(ctx).PublicURL, r, req, owner, samlLogin(sess))
 	switch {
+	case err == nil && lacksMFA(ctx, a):
+		samlFail(w, http.StatusForbidden, msgNeedsMFA)
+		return
 	case err == nil && !a.AllowedFor(owner):
 		samlFail(w, http.StatusForbidden, "You do not have access to this app.")
 		return
@@ -142,6 +145,10 @@ func (s *server) samlIdPInitiated(w http.ResponseWriter, r *http.Request) {
 	}
 	if !a.AllowedFor(owner) {
 		errNotFound(w, r)
+		return
+	}
+	if lacksMFA(ctx, a) {
+		samlFail(w, http.StatusForbidden, msgNeedsMFA)
 		return
 	}
 	sess := SessionFrom(ctx)

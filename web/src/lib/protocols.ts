@@ -25,6 +25,7 @@ export interface ProtocolForm {
 	ldap: { slug: string };
 	gate: { host: string; bypass: string };
 	vault: { mode: VaultMode; login_url: string; user_field: string; pass_field: string };
+	requireMFA: boolean;
 }
 
 export function protocolForm(app: App | null): ProtocolForm {
@@ -41,7 +42,8 @@ export function protocolForm(app: App | null): ProtocolForm {
 			login_url: c.vault?.login_url ?? '',
 			user_field: c.vault?.user_field ?? 'username',
 			pass_field: c.vault?.pass_field ?? 'password'
-		}
+		},
+		requireMFA: c.require_mfa ?? false
 	};
 }
 
@@ -50,7 +52,10 @@ const lines = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean);
 /** The protocol and config to send; only the chosen protocol's section. */
 export function protocolPayload(f: ProtocolForm): { protocol: Protocol; config: AppConfig } {
 	const a = f.account;
-	const config: AppConfig = { account: { username: a.username.trim(), email: a.email.trim(), display_name: a.display_name.trim() } };
+	const config: AppConfig = {
+		account: { username: a.username.trim(), email: a.email.trim(), display_name: a.display_name.trim() },
+		require_mfa: f.requireMFA && f.protocol !== 'ldap'
+	};
 	switch (f.protocol) {
 		case 'saml':
 			config.saml = { entity_id: f.saml.entity_id.trim(), acs_url: f.saml.acs_url.trim(), idp_initiated: f.saml.idp_initiated };

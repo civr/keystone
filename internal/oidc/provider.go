@@ -243,6 +243,9 @@ func (p *Provider) issue(ctx context.Context, cfg settings.Settings, issuer stri
 	if err != nil {
 		return Tokens{}, err
 	}
+	if client.Config.RequireMFA && !sess.MFA() {
+		return Tokens{}, errGrant
+	}
 	key, err := p.Keys.Active(ctx, keys.OIDC)
 	if err != nil {
 		return Tokens{}, err

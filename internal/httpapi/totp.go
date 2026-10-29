@@ -133,7 +133,7 @@ func (s *server) authTOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
-	if !s.createSession(w, r, cfg, session.Session{UserID: p.user, LastFullAuthAt: now, NoPasskey: passkeys == 0, Emergency: p.emergency}) {
+	if !s.createSession(w, r, cfg, session.Session{UserID: p.user, LastFullAuthAt: now, NoPasskey: passkeys == 0, Emergency: p.emergency, OTP: true}) {
 		return
 	}
 	s.markDevice(w, r, cfg, now)

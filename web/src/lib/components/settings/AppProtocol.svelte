@@ -172,6 +172,13 @@
 	{/if}
 {/if}
 
+{#if form.protocol !== 'link' && form.protocol !== 'ldap'}
+	<label class="check">
+		<input type="checkbox" bind:checked={form.requireMFA} />
+		<span>Require a second factor<small>Only people who signed in with a passkey or an authenticator code can open it.</small></span>
+	</label>
+{/if}
+
 {#if form.protocol !== 'link' && form.protocol !== 'vault'}
 	<fieldset class="field account">
 		<legend class="field-label">Owner’s account in the app</legend>

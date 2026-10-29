@@ -55,7 +55,9 @@ type Session struct {
 	LastPasskeyAt  time.Time
 	// VaultLockedAt: the vault was locked by hand; confirmations before it
 	// no longer open the vault.
-	VaultLockedAt       time.Time
+	VaultLockedAt time.Time
+	// OTP: the sign-in included an authenticator code.
+	OTP                 bool
 	IP                  string
 	UserAgent           string
 	MustRegisterPasskey bool
@@ -305,5 +307,14 @@ func (s Session) AMR() []string {
 	if !s.LastPasskeyAt.IsZero() {
 		out = append(out, "hwk")
 	}
+	if s.OTP {
+		out = append(out, "otp")
+	}
+	if len(out) > 1 {
+		out = append(out, "mfa")
+	}
 	return out
 }
+
+// MFA reports whether the sign-in used a second factor (passkey or code).
+func (s Session) MFA() bool { return !s.LastPasskeyAt.IsZero() || s.OTP }

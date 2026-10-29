@@ -35,7 +35,7 @@ func (s *server) vaultApp(w http.ResponseWriter, r *http.Request) (apps.App, boo
 		writeInvalid(w, "protocol", "Only vault apps have stored credentials.")
 		return a, false
 	}
-	if !s.mayUse(r.Context(), a) {
+	if !s.mayUse(r.Context(), a) || lacksMFA(r.Context(), a) {
 		errNotFound(w, r)
 		return a, false
 	}

@@ -150,6 +150,15 @@ func (s *server) mayUse(ctx context.Context, a apps.App) bool {
 	return err == nil && a.AllowedFor(acct)
 }
 
+// msgNeedsMFA explains a refusal by an app that requires a second factor.
+const msgNeedsMFA = "This app needs a passkey or an authenticator code at sign-in. Sign out and sign in again with one."
+
+// lacksMFA reports whether app a requires a second factor this session did not use.
+func lacksMFA(ctx context.Context, a apps.App) bool {
+	sess := SessionFrom(ctx)
+	return a.Config.RequireMFA && (sess == nil || !sess.MFA())
+}
+
 // vaultOpen reports whether the vault is unlocked in sess: confirmed within
 // the vault's window, and after any manual lock.
 func vaultOpen(sess session.Session, d time.Duration, now time.Time) bool {

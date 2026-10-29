@@ -53,6 +53,10 @@ func (s *server) gateStart(w http.ResponseWriter, r *http.Request) {
 		bad()
 		return
 	}
+	if lacksMFA(ctx, *app) {
+		writeError(w, http.StatusForbidden, "mfa_required", msgNeedsMFA)
+		return
+	}
 	if !s.mayUse(ctx, *app) {
 		writeError(w, http.StatusForbidden, "no_access", "You do not have access to this app.")
 		return

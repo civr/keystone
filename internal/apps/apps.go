@@ -87,6 +87,9 @@ type Config struct {
 	LDAP    *LDAP       `json:"ldap,omitempty"`
 	Gate    *Gate       `json:"gate,omitempty"`
 	Vault   *VaultLogin `json:"vault,omitempty"`
+	// RequireMFA: only sessions signed in with a passkey or an
+	// authenticator code may use the app.
+	RequireMFA bool `json:"require_mfa,omitempty"`
 }
 
 // App is one tile.
@@ -220,6 +223,9 @@ func (c *Config) Validate(protocol string) (field, msg string) {
 		}
 		c.OIDC = oidc
 	case LDAPP:
+		if c.RequireMFA {
+			return "config.require_mfa", "LDAP apps check only a password; a second factor cannot be required."
+		}
 		if ldap == nil || !slugRe.MatchString(ldap.Slug) {
 			return "config.ldap.slug", "Use 1 to 32 lowercase letters, digits or dashes."
 		}

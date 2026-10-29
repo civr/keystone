@@ -128,7 +128,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 		sess, err := gatetoken.Resolve(ctx, s.Valkey, s.Sessions, v.Settings, c.Value, time.Now())
 		if err == nil {
 			who, ok := v.Account(sess.UserID)
-			if !ok || !app.AllowedFor(who) {
+			if !ok || !app.AllowedFor(who) || (app.Config.RequireMFA && !sess.MFA()) {
 				http.Error(w, "no access to this app", http.StatusForbidden)
 				return
 			}
