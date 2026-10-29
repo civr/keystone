@@ -2,6 +2,8 @@
 	import { api, ApiError } from '$lib/api';
 	import type { App } from '$lib/apps';
 	import { BYPASS_PRESETS, PROTOCOLS, connectionInfo, slugify, type ProtocolForm } from '$lib/protocols';
+	import { copyText } from '$lib/copy';
+	import { proxyConfig, type ProxyKind } from '$lib/proxyConfig';
 	import { toast } from '$lib/toast.svelte';
 
 	let {
@@ -21,6 +23,13 @@
 
 	let secret = $state('');
 	let making = $state(false);
+	let proxyKind = $state<ProxyKind>('npm');
+	let gateAddr = $state(`${location.hostname}:8081`);
+	const proxyText = $derived(
+		form.gate.host
+			? proxyConfig(proxyKind, { host: form.gate.host, gate: gateAddr || `${location.hostname}:8081`, keystone: location.origin, signIn: form.gate.sign_in, header: form.gate.header })
+			: ''
+	);
 
 	const info = $derived(app && app.protocol === form.protocol ? connectionInfo(location.origin, app) : []);
 	const signInHelp: Record<string, string> = {
@@ -46,7 +55,7 @@
 
 	async function copy(v: string) {
 		try {
-			await navigator.clipboard.writeText(v);
+			await copyText(v);
 			toast('Copied');
 		} catch {
 			toast('Copying failed.', 'error');
@@ -178,6 +187,24 @@
 			<input class="input" type="password" autocomplete="new-password" placeholder={vault.hasPassword ? 'Saved' : ''} bind:value={vault.password} />
 			<small>{vault.hasPassword ? 'Leave empty to keep the stored password.' : 'Kept encrypted with the vault key, outside the database.'}</small>
 		</label>
+	{/if}
+	{#if proxyText}
+		<div class="field">
+			<span class="field-label">Reverse proxy config</span>
+			<select class="input" aria-label="Reverse proxy" bind:value={proxyKind}>
+				<option value="npm">Nginx Proxy Manager</option>
+				<option value="nginx">nginx</option>
+				<option value="caddy">Caddy</option>
+				<option value="traefik">Traefik</option>
+			</select>
+			<label class="field">
+				<span>Gate address</span>
+				<input class="input mono" spellcheck="false" autocapitalize="none" placeholder="192.168.1.10:8081" bind:value={gateAddr} />
+			</label>
+			<textarea class="input mono" rows="10" readonly spellcheck="false" aria-label="Generated config" value={proxyText}></textarea>
+			<div><button type="button" class="btn btn-secondary btn-sm" onclick={() => copy(proxyText)}>Copy</button></div>
+			<small>Paste this into your proxy. Also add the proxy’s address under Network › Trusted proxies.{proxyKind === 'npm' ? ' Paste into the proxy host’s Advanced tab; keep Details pointing at the app.' : ''}</small>
+		</div>
 	{/if}
 {:else if form.protocol === 'vault'}
 	<label class="field">
