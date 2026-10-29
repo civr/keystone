@@ -165,7 +165,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 			h.Set("X-Keystone-Name", acct.DisplayName)
 			window := time.Duration(v.Settings.Vault.ReconfirmMinutes) * time.Minute
 			proxy := fromProxy(r, trusted)
-			if !proxy {
+			if !proxy && app.Config.Gate.SignIn != nil {
 				slog.Warn("gate: peer is not a trusted proxy, no credentials sent", "peer", r.RemoteAddr)
 			}
 			if err := s.addHeaders(ctx, h, app, sess, window, proxy); err != nil {
