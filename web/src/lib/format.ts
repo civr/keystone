@@ -73,6 +73,9 @@ const ACTIONS: Record<string, string> = {
 	'user.updated': 'User changed',
 	'user.deleted': 'User deleted',
 	'account.password_changed': 'Password changed',
+	'totp.enabled': 'Authenticator added',
+	'totp.disabled': 'Authenticator removed',
+	'totp.reset': 'Authenticator reset by an admin',
 	'role.created': 'Role added',
 	'role.updated': 'Role changed',
 	'role.deleted': 'Role deleted',
@@ -142,6 +145,7 @@ const VALUES: Record<string, string> = {
 	stepup: 'confirmation',
 	launch: 'signed in for you',
 	proxy: 'reverse proxy',
+	totp: 'authenticator code',
 	ad_unavailable: 'Active Directory unreachable',
 	ad_error: 'Active Directory error'
 };

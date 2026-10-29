@@ -107,6 +107,16 @@
 		}
 	}
 
+	async function resetTotp() {
+		if (!editing) return;
+		try {
+			await api.send('DELETE', `/admin/users/${editing.id}/totp`);
+			toast('Authenticator removed; they can set up a new one');
+		} catch (err) {
+			toast(err instanceof ApiError ? err.message : 'Removing failed.', 'error');
+		}
+	}
+
 	async function remove() {
 		if (!editing) return;
 		if (!confirmDelete) return void (confirmDelete = true);
@@ -216,6 +226,9 @@
 				<small>No role: they use the apps they are given. Groups can give roles too.</small>
 			</fieldset>
 		{/if}
+		{#if editing && can('users.write')}
+			<button type="button" class="btn btn-secondary btn-sm reset-totp" onclick={resetTotp} disabled={saving}>Remove authenticator app</button>
+		{/if}
 		{#if editing}
 			<label class="check">
 				<input type="checkbox" bind:checked={form.disabled} />
@@ -278,6 +291,9 @@
 		display: flex;
 		gap: 8px;
 		align-items: center;
+	}
+	.reset-totp {
+		align-self: flex-start;
 	}
 	.role-list {
 		display: grid;

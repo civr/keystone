@@ -55,6 +55,7 @@ func (s *server) authRoutes(r chi.Router) {
 	r.Post("/recovery", s.authRecovery)
 	r.Post("/emergency", s.authEmergency)
 	r.Post("/proxy", s.authProxy)
+	r.Post("/totp", s.authTOTP)
 	r.With(requireSession).Post("/stepup/begin", s.stepUpBegin)
 	r.With(requireSession).Post("/stepup/finish", s.stepUpFinish)
 	r.With(requireSession).Post("/stepup/password", s.stepUpPassword)
@@ -304,6 +305,9 @@ type pendingLogin struct {
 	passwordOK, emergency, device bool
 	// user is the account whose password was checked; "" is the owner.
 	user string
+	// totpDue: the account has an authenticator code that is still to be
+	// entered before anything else (passkey, session).
+	totpDue bool
 }
 
 func loginKey(token string) string { return "login:" + token }
@@ -315,7 +319,7 @@ func (s *server) newPending(w http.ResponseWriter, r *http.Request, ctx context.
 	}
 	p.token = tok
 	pipe := s.d.Valkey.TxPipeline()
-	pipe.HSet(ctx, loginKey(tok), "password_ok", p.passwordOK, "emergency", p.emergency, "device", p.device, "user", p.user)
+	pipe.HSet(ctx, loginKey(tok), "password_ok", p.passwordOK, "emergency", p.emergency, "device", p.device, "user", p.user, "totp", p.totpDue)
 	pipe.Expire(ctx, loginKey(tok), loginTTL)
 	if _, err := pipe.Exec(ctx); err != nil {
 		return p, err
@@ -333,7 +337,7 @@ func (s *server) loadPending(ctx context.Context, r *http.Request) (pendingLogin
 	if err != nil || len(h) == 0 {
 		return pendingLogin{}, false, err
 	}
-	return pendingLogin{token: tok, passwordOK: h["password_ok"] == "1", emergency: h["emergency"] == "1", device: h["device"] == "1", user: h["user"]}, true, nil
+	return pendingLogin{token: tok, passwordOK: h["password_ok"] == "1", emergency: h["emergency"] == "1", device: h["device"] == "1", user: h["user"], totpDue: h["totp"] == "1"}, true, nil
 }
 
 // consumePending deletes the pending state; false when it was already gone
@@ -368,7 +372,15 @@ func (s *server) startPending(w http.ResponseWriter, r *http.Request, ctx contex
 		errInternal(w, "count passkeys", err)
 		return
 	}
-	if _, err := s.newPending(w, r, ctx, cfg, pendingLogin{passwordOK: true, emergency: emergency, user: user}); err != nil {
+	due, err := s.totpEnabled(ctx, user)
+	if err != nil {
+		errInternal(w, "load totp", err)
+		return
+	}
+	if due {
+		next = "totp"
+	}
+	if _, err := s.newPending(w, r, ctx, cfg, pendingLogin{passwordOK: true, emergency: emergency, user: user, totpDue: due}); err != nil {
 		slog.Error("auth: store pending", "err", err)
 		errUnavailable(w)
 		return
@@ -514,7 +526,12 @@ func (s *server) passwordAccepted(w http.ResponseWriter, r *http.Request, cfg se
 	if err := s.d.Limiter.ResetFailures(ctx, account); err != nil {
 		slog.Error("auth: reset failures", "err", err)
 	}
-	if cfg.Login.PasskeyRequired {
+	due, err := s.totpEnabled(ctx, user)
+	if err != nil {
+		errInternal(w, "load totp", err)
+		return
+	}
+	if cfg.Login.PasskeyRequired || due {
 		s.startPending(w, r, ctx, cfg, user, false)
 		return
 	}
@@ -559,6 +576,9 @@ func (s *server) authPasskeyBegin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		switch {
+		case ok && p.passwordOK && p.totpDue:
+			writeError(w, http.StatusUnauthorized, "totp_required", "Enter the code from your authenticator app first.")
+			return
 		case ok && p.passwordOK:
 			next, nerr := s.nextStep(ctx, p.user)
 			if nerr != nil {
@@ -644,6 +664,10 @@ func (s *server) authPasskeyFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	if !ok || !(p.passwordOK || p.device) {
 		errPasswordRequired(w)
+		return
+	}
+	if p.totpDue {
+		writeError(w, http.StatusUnauthorized, "totp_required", "Enter the code from your authenticator app first.")
 		return
 	}
 	var fullAuth time.Time
@@ -940,6 +964,7 @@ func (s *server) stepUpPassword(w http.ResponseWriter, r *http.Request) {
 	sess := *SessionFrom(ctx)
 	var req struct {
 		Password string `json:"password"`
+		Code     string `json:"code"`
 	}
 	if !readJSON(w, r, &req) {
 		return
@@ -974,6 +999,25 @@ func (s *server) stepUpPassword(w http.ResponseWriter, r *http.Request) {
 	case !ok:
 		s.loginFailed(w, ctx, cfg, acct.Username, "stepup", ip)
 		return
+	}
+	// With an authenticator, the code is part of confirming.
+	if on, err := s.totpEnabled(ctx, sess.UserID); err != nil {
+		errInternal(w, "load totp", err)
+		return
+	} else if on {
+		if req.Code == "" {
+			writeError(w, http.StatusUnauthorized, "totp_required", "Also enter the code from your authenticator app.")
+			return
+		}
+		good, err := s.checkTOTP(ctx, sess.UserID, req.Code, true)
+		if err != nil {
+			errInternal(w, "check code", err)
+			return
+		}
+		if !good {
+			s.loginFailed(w, ctx, cfg, acct.Username, "stepup", ip)
+			return
+		}
 	}
 	sess.NoPasskey, sess.LastFullAuthAt = true, time.Now()
 	if err := s.d.Sessions.Update(ctx, sess); err != nil {

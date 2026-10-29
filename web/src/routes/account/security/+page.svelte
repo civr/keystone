@@ -8,6 +8,7 @@
 	import { easeOut, reducedMotion } from '$lib/motion';
 	import { toast } from '$lib/toast.svelte';
 	import Confirm from '$lib/components/settings/Confirm.svelte';
+	import TotpSetup from '$lib/components/TotpSetup.svelte';
 
 	interface Session {
 		id: string;
@@ -178,6 +179,8 @@
 			{/each}
 		</ul>
 	</section>
+
+	<TotpSetup />
 
 	<section class="group" aria-labelledby="g-passkeys">
 		<div class="group-head">

@@ -33,6 +33,7 @@ func (s *server) adminRoutes(r chi.Router) {
 	canW(rbac.UsersWrite).Delete("/users/{id}", s.deleteUser)
 	can(rbac.UsersRead, rbac.RolesWrite).Get("/users/{id}/roles", s.getUserRoles)
 	canW(rbac.RolesWrite).Put("/users/{id}/roles", s.putUserRoles)
+	canW(rbac.UsersWrite).Delete("/users/{id}/totp", s.resetUserTOTP)
 
 	can(rbac.UsersRead, rbac.RolesWrite).Get("/roles", s.listRoles)
 	canW(rbac.RolesWrite).Post("/roles", s.createRole)
@@ -77,6 +78,10 @@ func (s *server) adminRoutes(r chi.Router) {
 func (s *server) accountRoutes(r chi.Router) {
 	r.With(s.requireSetupDone, requireStepUp).Put("/password", s.changeOwnPassword)
 	r.With(s.requireSetupDone, requireSession).Get("/access", s.myAccess)
+	r.With(s.requireSetupDone, requireSession).Get("/totp", s.getMyTOTP)
+	r.With(s.requireSetupDone, requireStepUp).Post("/totp", s.beginTOTP)
+	r.With(s.requireSetupDone, requireSession).Post("/totp/confirm", s.confirmTOTP)
+	r.With(s.requireSetupDone, requireStepUp).Delete("/totp", s.deleteMyTOTP)
 }
 
 // appRoutes mounts /api/apps: everyone signed in sees the apps they may use

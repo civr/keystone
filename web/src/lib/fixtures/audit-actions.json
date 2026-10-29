@@ -46,6 +46,9 @@
 		"setup.unlock_failed",
 		"setup.unlocked",
 		"stepup",
+		"totp.disabled",
+		"totp.enabled",
+		"totp.reset",
 		"user.created",
 		"user.deleted",
 		"user.roles_changed",
@@ -56,15 +59,5 @@
 		"vault.revealed",
 		"vault.updated"
 	],
-	"methods": [
-		"emergency",
-		"launch",
-		"passkey",
-		"passkey_register",
-		"password",
-		"proxy",
-		"recovery",
-		"stepup",
-		"trusted_device"
-	]
+	"methods": ["emergency", "launch", "passkey", "passkey_register", "password", "proxy", "recovery", "stepup", "totp", "trusted_device"]
 }

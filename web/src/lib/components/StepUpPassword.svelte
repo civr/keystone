@@ -6,6 +6,8 @@
 	import Sheet from './Sheet.svelte';
 
 	let password = $state('');
+	let code = $state('');
+	let needCode = $state(false);
 	let error = $state('');
 	let busy = $state(false);
 	let input = $state<HTMLInputElement | null>(null);
@@ -14,6 +16,8 @@
 	$effect(() => {
 		prompt.generation;
 		password = '';
+		code = '';
+		needCode = false;
 		error = '';
 		tick().then(() => input?.focus());
 	});
@@ -24,14 +28,23 @@
 		busy = true;
 		error = '';
 		try {
-			await api.send('POST', '/auth/stepup/password', { password });
+			await api.send('POST', '/auth/stepup/password', { password, code });
 			password = '';
+			code = '';
 			settlePrompt(true);
 		} catch (err) {
+			if (err instanceof ApiError && err.code === 'totp_required') {
+				needCode = true;
+				error = '';
+				return;
+			}
 			password = '';
+			code = '';
 			error =
 				err instanceof ApiError && err.status === 401
-					? 'That password is not correct.'
+					? needCode
+						? 'That password or code is not right.'
+						: 'That password is not correct.'
 					: err instanceof ApiError
 						? err.message
 						: 'Something went wrong. Try again.';
@@ -55,10 +68,21 @@
 			bind:this={input}
 			bind:value={password}
 		/>
+		{#if needCode}
+			<input
+				class="input"
+				aria-label="Code from your authenticator app"
+				placeholder="Code from your authenticator app"
+				inputmode="numeric"
+				autocomplete="one-time-code"
+				maxlength="6"
+				bind:value={code}
+			/>
+		{/if}
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 		<div class="sheet-actions">
 			<button type="button" class="btn btn-secondary" onclick={() => settlePrompt(false)}>Cancel</button>
-			<button class="btn btn-primary" disabled={busy || !password}>
+			<button class="btn btn-primary" disabled={busy || !password || (needCode && code.length !== 6)}>
 				{#if busy}<span class="spinner" aria-hidden="true"></span>{/if}
 				Confirm
 			</button>

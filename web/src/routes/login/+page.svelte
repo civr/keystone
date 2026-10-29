@@ -17,8 +17,8 @@
 		type OptionsJSON
 	} from '$lib/webauthn';
 
-	type Mode = 'loading' | 'password' | 'emergency' | 'passkey' | 'register' | 'recovery';
-	const ORDER: Mode[] = ['loading', 'password', 'emergency', 'passkey', 'register', 'recovery'];
+	type Mode = 'loading' | 'password' | 'emergency' | 'totp' | 'passkey' | 'register' | 'recovery';
+	const ORDER: Mode[] = ['loading', 'password', 'emergency', 'totp', 'passkey', 'register', 'recovery'];
 	const USER_KEY = 'keystone.username';
 
 	let mode = $state<Mode>('loading');
@@ -27,6 +27,7 @@
 	let password = $state('');
 	let emergencyPassword = $state('');
 	let code = $state('');
+	let otp = $state('');
 	let busy = $state(false);
 	let error = $state('');
 	let notice = $state('');
@@ -182,6 +183,7 @@
 		if (next === 'done') return finished();
 		saveUser();
 		if (wantRecovery) return go('recovery');
+		if (next === 'totp') return go('totp');
 		go(next === 'register_passkey' ? 'register' : 'passkey');
 		await runPasskey();
 	}
@@ -240,6 +242,26 @@
 		}
 	}
 
+	async function submitTOTP(e: SubmitEvent) {
+		e.preventDefault();
+		if (busy) return;
+		busy = true;
+		error = '';
+		try {
+			const res = await api.send<{ next: string }>('POST', '/auth/totp', { code: otp });
+			otp = '';
+			busy = false;
+			if (res.next === 'done') return finished();
+			go(res.next === 'register_passkey' ? 'register' : 'passkey');
+			await runPasskey();
+		} catch (err) {
+			otp = '';
+			fail(err);
+		} finally {
+			busy = false;
+		}
+	}
+
 	async function submitRecovery(e: SubmitEvent) {
 		e.preventDefault();
 		if (busy) return;
@@ -259,7 +281,7 @@
 	}
 
 	function chooseRecovery() {
-		if (mode === 'passkey' || mode === 'register') return go('recovery');
+		if (mode === 'passkey' || mode === 'register' || mode === 'totp') return go('recovery');
 		wantRecovery = true;
 		notice = 'Sign in with your password first; then enter a recovery code.';
 	}
@@ -274,6 +296,7 @@
 		loading: site.name,
 		password: 'Sign in',
 		emergency: 'Emergency account',
+		totp: 'Enter your code',
 		passkey: 'Confirm with your passkey',
 		register: 'Create a passkey',
 		recovery: 'Recovery code'
@@ -380,6 +403,30 @@
 						</form>
 						<div class="links">
 							<button type="button" class="link" onclick={restart}>Back</button>
+						</div>
+					{:else if mode === 'totp'}
+						<p class="lede">Open your authenticator app and enter the six-digit code for {site.name}.</p>
+						<form class="form" onsubmit={submitTOTP} novalidate>
+							<!-- svelte-ignore a11y_autofocus -->
+							<input
+								class="input code"
+								aria-label="Code"
+								inputmode="numeric"
+								autocomplete="one-time-code"
+								maxlength="6"
+								placeholder="000000"
+								autofocus
+								value={otp}
+								oninput={(e) => (otp = e.currentTarget.value = e.currentTarget.value.replace(/\D/g, '').slice(0, 6))}
+							/>
+							{#if error}<p class="error" role="alert">{error}</p>{/if}
+							<button class="btn btn-primary block" disabled={busy || otp.length !== 6}>
+								{@render busyLabel('Continue')}
+							</button>
+						</form>
+						<div class="links">
+							<button type="button" class="link" onclick={chooseRecovery}>Use a recovery code</button>
+							<button type="button" class="link" onclick={restart}>Other account</button>
 						</div>
 					{:else if mode === 'passkey' || mode === 'register'}
 						<p class="lede">
