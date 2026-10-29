@@ -63,7 +63,11 @@ func (s *server) putSettings(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case c.Path == "domain" || c.Path == "public_url":
 			ok = g.Has(rbac.SystemWrite)
-		case strings.HasPrefix(c.Path, "login.") || strings.HasPrefix(c.Path, "proxy_auth."):
+		case strings.HasPrefix(c.Path, "proxy_auth."):
+			// Whoever sets the trusted proxy can sign in as anyone, so only a
+			// super admin may.
+			ok = g.Super()
+		case strings.HasPrefix(c.Path, "login."):
 			ok = ok || g.Has(rbac.AuthWrite)
 		}
 		if !ok {

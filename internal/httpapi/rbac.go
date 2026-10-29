@@ -412,6 +412,24 @@ func (s *server) setMembers(w http.ResponseWriter, r *http.Request, tx pgx.Tx, i
 			return false
 		}
 	}
+	// Membership also opens the apps and credential providers that name the
+	// group: changing it needs the right to manage those.
+	if g, err := s.grants(ctx); err != nil {
+		errInternal(w, "load grants", err)
+		return false
+	} else {
+		ref := "group:" + id
+		var apps, providers int
+		if err := s.d.Pool.QueryRow(ctx, `select (select count(*) from apps where $1 = any(access)),
+			(select count(*) from vault_providers where $1 = any(access))`, ref).Scan(&apps, &providers); err != nil {
+			errInternal(w, "group use", err)
+			return false
+		}
+		if (apps > 0 && !g.Has(rbac.AppsWrite)) || (providers > 0 && !g.Has(rbac.VaultWrite)) {
+			writeError(w, http.StatusForbidden, "escalation", "This group opens apps or credential providers you do not manage; you cannot change who is in it.")
+			return false
+		}
+	}
 	roles, err := s.assignmentsOf(ctx, "group_id", id)
 	if err != nil {
 		errInternal(w, "group roles", err)
