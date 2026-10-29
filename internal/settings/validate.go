@@ -86,7 +86,7 @@ func (s Settings) Validate(requesterIP netip.Addr) error {
 		inRange("tokens.refresh_days", s.Tokens.RefreshDays, 0, 365),
 		inRange("ldap.bind_per_ip_per_minute", s.LDAP.BindPerIPPerMinute, 1, 1000),
 		inRange("gate.fail_per_ip_per_minute", s.Gate.FailPerIPPerMinute, 1, 10000),
-		inRange("vault.reconfirm_minutes", s.Vault.ReconfirmMinutes, 1, 1440),
+		inRange("vault.reconfirm_minutes", s.Vault.ReconfirmMinutes, 0, 1440),
 		inRange("vault.clipboard_clear_seconds", s.Vault.ClipboardClearSeconds, 5, 600),
 	}
 	for _, err := range checks {

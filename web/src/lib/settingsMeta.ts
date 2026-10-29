@@ -359,9 +359,9 @@ export const settingsMeta: Record<string, FieldMeta> = {
 
 	'vault.reconfirm_minutes': {
 		label: 'Confirm again after',
-		help: 'Copying a password from the vault asks you to confirm first when your last confirmation is older than this.',
+		help: 'Using a vault password asks you to confirm when your last confirmation is older than this. 0 = never: signing in is enough.',
 		kind: 'int',
-		min: 1,
+		min: 0,
 		max: 1440,
 		unit: 'minutes',
 		weakens: raised

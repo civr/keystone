@@ -161,10 +161,15 @@ func lacksMFA(ctx context.Context, a apps.App) bool {
 
 // vaultOpen reports whether the vault is unlocked in sess: confirmed within
 // the vault's window, and after any manual lock.
+// A window of 0 never asks again: signing in opens the vault for the
+// session (until it is locked by hand).
 func vaultOpen(sess session.Session, d time.Duration, now time.Time) bool {
 	last := sess.LastPasskeyAt
 	if sess.NoPasskey && sess.LastFullAuthAt.After(last) {
 		last = sess.LastFullAuthAt
+	}
+	if d <= 0 {
+		return sess.VaultLockedAt.IsZero() || last.After(sess.VaultLockedAt)
 	}
 	return confirmedWithin(sess, d, now) && last.After(sess.VaultLockedAt)
 }

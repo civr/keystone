@@ -111,7 +111,7 @@ func Defaults() Settings {
 		Tokens:     TokenSettings{AccessMinutes: 10, IDMinutes: 10, RefreshDays: 30},
 		LDAP:       LDAPSettings{RequireTLS: true, AllowedCIDRs: []string{}, BindPerIPPerMinute: 10},
 		Gate:       GateSettings{FailPerIPPerMinute: 60},
-		Vault:      VaultSettings{ReconfirmMinutes: 15, ClipboardClearSeconds: 30, AllowReveal: true},
+		Vault:      VaultSettings{ReconfirmMinutes: 0, ClipboardClearSeconds: 30, AllowReveal: true},
 		ProxyAuth:  ProxyAuthSettings{Header: "Remote-User", Match: "username", Trusted: []string{}},
 	}
 }
