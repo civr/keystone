@@ -44,10 +44,6 @@ func NewWriter(pool *pgxpool.Pool, st *settings.Store) *Writer {
 // Close stops the syslog sender. Entries still queued are dropped.
 func (w *Writer) Close() { w.fwd.close() }
 
-// SyslogDropped reports how many syslog messages were dropped because the
-// send queue was full.
-func (w *Writer) SyslogDropped() uint64 { return w.fwd.Dropped() }
-
 // Log records an event. Failures are logged, never returned: auditing must not
 // break the request that triggered it. The write survives cancellation of ctx.
 // An invalid ip is stored as NULL.

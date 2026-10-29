@@ -78,7 +78,7 @@ type AuthRequest struct {
 
 // ParseAuthorize validates an authorization request against the apps.
 func ParseAuthorize(q url.Values, list []apps.App) (AuthRequest, *Error) {
-	a, ok := clientByID(list, q.Get("client_id"))
+	a, ok := ClientByID(list, q.Get("client_id"))
 	if !ok {
 		return AuthRequest{}, &Error{Code: "invalid_client", Description: "Unknown client_id."}
 	}
@@ -115,7 +115,8 @@ func ParseAuthorize(q url.Values, list []apps.App) (AuthRequest, *Error) {
 	return ar, nil
 }
 
-func clientByID(list []apps.App, id string) (apps.App, bool) {
+// ClientByID finds the oidc app with client id.
+func ClientByID(list []apps.App, id string) (apps.App, bool) {
 	for _, a := range list {
 		if a.Protocol == apps.OIDCP && a.Config.OIDC != nil && id != "" && a.Config.OIDC.ClientID == id {
 			return a, true
@@ -123,9 +124,6 @@ func clientByID(list []apps.App, id string) (apps.App, bool) {
 	}
 	return apps.App{}, false
 }
-
-// ClientByID finds the oidc app with client id.
-func ClientByID(list []apps.App, id string) (apps.App, bool) { return clientByID(list, id) }
 
 // grant is what a code or refresh token stands for.
 type grant struct {
@@ -370,7 +368,7 @@ func (p *Provider) Userinfo(ctx context.Context, cfg settings.Settings, issuer, 
 	if err != nil {
 		return nil, errToken
 	}
-	client, ok := clientByID(list, g.ClientID)
+	client, ok := ClientByID(list, g.ClientID)
 	if !ok {
 		return nil, errToken
 	}

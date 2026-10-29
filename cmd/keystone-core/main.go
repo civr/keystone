@@ -27,15 +27,12 @@ import (
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/httpapi"
 	"github.com/civr/keystone/internal/runtime"
-	"github.com/civr/keystone/internal/secrets"
 	"github.com/civr/keystone/internal/session"
 	"github.com/civr/keystone/internal/settings"
 )
 
 const (
 	listenAddr      = ":8080"
-	dbUser          = "keystone"
-	dbName          = "keystone"
 	shutdownTimeout = 15 * time.Second
 )
 
@@ -68,13 +65,8 @@ func main() {
 	}
 }
 
-// openDB loads the secrets, connects to Postgres and applies migrations.
-func openDB(ctx context.Context) (secrets.Secrets, *pgxpool.Pool, error) {
-	return runtime.OpenDB(ctx, true)
-}
-
 func serve(ctx context.Context) error {
-	sec, pool, err := openDB(ctx)
+	sec, pool, err := runtime.OpenDB(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -159,7 +151,7 @@ func setupCode(ctx context.Context, pool *pgxpool.Pool) (string, error) {
 }
 
 func resetNetwork(ctx context.Context) error {
-	_, pool, err := openDB(ctx)
+	_, pool, err := runtime.OpenDB(ctx, true)
 	if err != nil {
 		return err
 	}
