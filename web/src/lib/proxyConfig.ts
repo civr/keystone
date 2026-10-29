@@ -21,7 +21,6 @@ export function proxyConfig(kind: ProxyKind, o: Options): string {
 			'    keystone:',
 			'      forwardAuth:',
 			`        address: http://${o.gate}/verify`,
-			'        trustForwardHeader: true',
 			`        authResponseHeaders: [${out.join(', ')}]`,
 			'  routers:',
 			'    app:',
