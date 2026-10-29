@@ -93,9 +93,10 @@ func marker(appID string) string {
 }
 
 // addHeaders sets the header the app reads its login from (basic, header).
-func (s *Server) addHeaders(ctx context.Context, h http.Header, app *apps.App) error {
+// A closed vault sends none, as for the other sign-in modes.
+func (s *Server) addHeaders(ctx context.Context, h http.Header, app *apps.App, sess session.Session, window time.Duration) error {
 	si := app.Config.Gate.SignIn
-	if si == nil || (si.Mode != apps.SignInBasic && si.Mode != apps.SignInHeader) {
+	if si == nil || (si.Mode != apps.SignInBasic && si.Mode != apps.SignInHeader) || !session.VaultOpen(sess, window, time.Now()) {
 		return nil
 	}
 	user, pass, ok, err := s.credentials(ctx, app.ID)
