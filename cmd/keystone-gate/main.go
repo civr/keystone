@@ -15,9 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/gate"
 	"github.com/civr/keystone/internal/runtime"
 	"github.com/civr/keystone/internal/session"
+	"github.com/civr/keystone/internal/settings"
 )
 
 const listenAddr = ":8081"
@@ -72,11 +74,16 @@ func serve(ctx context.Context) error {
 		return err
 	}
 	defer rdb.Close()
+	aw := audit.NewWriter(pool, settings.NewStore(pool))
+	defer aw.Close()
 	g := &gate.Server{
 		View:     &runtime.Snapshot{Pool: pool, TTL: 5 * time.Second},
 		Valkey:   rdb,
 		Sessions: session.NewStore(rdb),
 		Limiter:  session.NewLimiter(rdb),
+		Pool:     pool,
+		VaultKey: sec.VaultKey,
+		Audit:    aw,
 	}
 	srv := &http.Server{
 		Addr: listenAddr, Handler: g.Handler(),

@@ -149,8 +149,10 @@ type appOut struct {
 	Config    apps.Config `json:"config"`
 	Access    []string    `json:"access"`
 	HasSecret bool        `json:"has_secret"`
-	Sort      int         `json:"sort"`
-	CreatedAt time.Time   `json:"created_at"`
+	// LaunchURL signs the person in to a gate app on its own host first.
+	LaunchURL string    `json:"launch_url,omitempty"`
+	Sort      int       `json:"sort"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 const appCols = `id::text, name, url, color, coalesce(icon, ''), protocol, config, access, sort, created_at`
@@ -297,6 +299,9 @@ func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "list apps", err)
 		return
 	}
+	for i := range list {
+		list[i].LaunchURL = gateLaunchURL(list[i])
+	}
 	if !all {
 		// Members get the tile, not how the app is set up or who else uses
 		// it; only whether a SAML tile signs in directly (tileHref).
@@ -315,6 +320,27 @@ func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"apps": list})
+}
+
+// gateLaunchURL is the keystone-gate address that signs in to a gate app
+// before landing on the app's own address; "" when the tile opens as is.
+func gateLaunchURL(a appOut) string {
+	g := a.Config.Gate
+	if a.Protocol != apps.GateP || g == nil || !g.SignIn.Server() {
+		return ""
+	}
+	u, err := url.Parse(a.URL)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	rd := u.EscapedPath()
+	if !strings.HasPrefix(rd, "/") {
+		rd = "/"
+	}
+	if u.RawQuery != "" {
+		rd += "?" + u.RawQuery
+	}
+	return u.Scheme + "://" + u.Host + "/.keystone/signin?rd=" + url.QueryEscape(rd)
 }
 
 func (s *server) readApp(w http.ResponseWriter, r *http.Request) (appInput, bool) {

@@ -14,6 +14,7 @@ import (
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/onepassword"
 	"github.com/civr/keystone/internal/rbac"
+	"github.com/civr/keystone/internal/session"
 )
 
 // Credential providers (Admin › Vault & secrets): a 1Password Connect server
@@ -266,7 +267,7 @@ func (s *server) vaultStatus(w http.ResponseWriter, r *http.Request) {
 	sess := *SessionFrom(ctx)
 	window := time.Duration(settingsFrom(ctx).Vault.ReconfirmMinutes) * time.Minute
 	now := time.Now()
-	open := vaultOpen(sess, window, now)
+	open := session.VaultOpen(sess, window, now)
 	left := 0
 	if open {
 		last := sess.LastPasskeyAt

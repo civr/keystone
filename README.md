@@ -171,6 +171,47 @@ location / { auth_request /_keystone; error_page 401 = @keystone_login;
 All three `proxy_set_header` lines are needed: this way nginx replaces whatever a visitor sends itself, and
 drops the header when the gate does not set it (for an exception).
 
+#### Sign in to the app for you
+
+Under **Sign in for me** a gate app can also use a username and password from the vault, so opening the
+app in Keystone logs you in:
+
+- **Basic auth** and **Header with API key**: the gate adds `Authorization: Basic ...` or `<Header>: <password>`
+  to the answer of `/verify`. Your proxy has to copy it to the app (see below).
+- **Login form**, **JSON login** and **Jellyfin**: the gate calls the app's login itself, at the
+  *address Keystone uses to reach the app* (for example `http://jellyfin:8096`; the gate must reach it on the
+  docker network), and sets the app's session cookie, or for Jellyfin its token, in your browser. The
+  password never reaches the browser. Your proxy has to send `/.keystone/*` on the app's host to the gate,
+  before the check. The first page load without a sign-in cookie is redirected to `/.keystone/signin`; the
+  vault has to be open (you confirmed with your passkey within the vault window), otherwise the gate asks
+  you to open the app from Keystone first.
+
+Caddy (add `Authorization`, or your header, to `copy_headers`):
+
+```
+jellyfin.example.com {
+	request_header -X-Keystone-*
+	handle /.keystone/* {
+		reverse_proxy keystone-host:8081
+	}
+	handle {
+		forward_auth keystone-host:8081 {
+			uri /verify
+			copy_headers X-Keystone-User X-Keystone-Email X-Keystone-Name Authorization
+		}
+		reverse_proxy jellyfin:8096
+	}
+}
+```
+
+Traefik: add `Authorization` (or your header) to `authResponseHeaders`, and a second router for the same
+host with ``rule: Host(`jellyfin.example.com`) && PathPrefix(`/.keystone/`)`` and a higher priority, whose
+service is `http://keystone-host:8081` and which has no `forwardAuth` middleware.
+
+nginx: add `location /.keystone/ { proxy_pass http://keystone-host:8081; proxy_set_header X-Forwarded-Host $http_host; proxy_set_header X-Forwarded-Proto $scheme; }`
+and, for basic or header mode, `auth_request_set $ks_auth $upstream_http_authorization;` with
+`proxy_set_header Authorization $ks_auth;` in `location /`.
+
 Let only your reverse proxy reach port 8081 and make sure it never passes on `X-Keystone-*` from visitors
 (Traefik replaces them automatically; with Caddy, `request_header -X-Keystone-*` does that). For automatic
 sign-in to Home Assistant itself, install the component in `integrations/home-assistant` (see the README

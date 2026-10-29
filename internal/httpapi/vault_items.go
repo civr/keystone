@@ -15,6 +15,7 @@ import (
 	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/onepassword"
+	"github.com/civr/keystone/internal/session"
 )
 
 // The vault's own items (Kluis): sign-in details for anything, not tied to an
@@ -253,7 +254,7 @@ func (s *server) revealVaultItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := settingsFrom(ctx)
-	if !vaultOpen(*SessionFrom(ctx), time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
+	if !session.VaultOpen(*SessionFrom(ctx), time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
 		writeError(w, http.StatusForbidden, "stepup_required", "Confirm this with your passkey first.")
 		return
 	}

@@ -103,17 +103,7 @@ func requireStepUp(next http.Handler) http.Handler {
 
 // needsStepUp reports whether a sensitive action needs a fresh confirmation.
 func needsStepUp(sess session.Session, cfg settings.Settings, now time.Time) bool {
-	return !confirmedWithin(sess, time.Duration(cfg.Login.StepUpMinutes)*time.Minute, now)
-}
-
-// confirmedWithin reports whether sess was confirmed in the last d: by a
-// passkey, or — while no passkey exists — by the password.
-func confirmedWithin(sess session.Session, d time.Duration, now time.Time) bool {
-	last := sess.LastPasskeyAt
-	if sess.NoPasskey && sess.LastFullAuthAt.After(last) {
-		last = sess.LastFullAuthAt
-	}
-	return !last.IsZero() && now.Sub(last) <= d
+	return !session.ConfirmedWithin(sess, time.Duration(cfg.Login.StepUpMinutes)*time.Minute, now)
 }
 
 // mustRegisterGate blocks every API call of a session created with a
@@ -157,26 +147,6 @@ const msgNeedsMFA = "This app needs a passkey or an authenticator code at sign-i
 func lacksMFA(ctx context.Context, a apps.App) bool {
 	sess := SessionFrom(ctx)
 	return a.Config.RequireMFA && (sess == nil || !sess.MFA())
-}
-
-// vaultOpen reports whether the vault is unlocked in sess: confirmed within
-// the vault's window, and after any manual lock.
-// A window of 0 never asks again: signing in opens the vault for the
-// session (until it is locked by hand).
-func vaultOpen(sess session.Session, d time.Duration, now time.Time) bool {
-	last := sess.LastPasskeyAt
-	if sess.NoPasskey && sess.LastFullAuthAt.After(last) {
-		last = sess.LastFullAuthAt
-	}
-	if d <= 0 {
-		// Any real sign-in counts, password or passkey; a reverse-proxy
-		// session has none and must confirm once.
-		if sess.LastFullAuthAt.After(last) {
-			last = sess.LastFullAuthAt
-		}
-		return !last.IsZero() && (sess.VaultLockedAt.IsZero() || last.After(sess.VaultLockedAt))
-	}
-	return confirmedWithin(sess, d, now) && last.After(sess.VaultLockedAt)
 }
 
 // accountKey turns a session's UserID into an account id ("" → owner).

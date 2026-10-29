@@ -1,5 +1,5 @@
 /** Per-protocol app settings for Instellingen › Apps (mirrors internal/apps). */
-import type { App, AppConfig, Protocol, VaultMode } from './apps';
+import type { App, AppConfig, GateSignIn, GateSignInMode, Protocol, VaultMode } from './apps';
 
 export const PROTOCOLS: { value: Protocol; label: string; help: string }[] = [
 	{ value: 'link', label: 'Link', help: 'Just a tile; the app handles sign-in itself.' },
@@ -23,7 +23,17 @@ export interface ProtocolForm {
 	saml: { entity_id: string; acs_url: string; idp_initiated: boolean };
 	oidc: { redirect_uris: string };
 	ldap: { slug: string };
-	gate: { host: string; bypass: string };
+	gate: {
+		host: string;
+		bypass: string;
+		/** '' is off. */
+		sign_in: GateSignInMode | '';
+		upstream: string;
+		login_path: string;
+		user_field: string;
+		pass_field: string;
+		header: string;
+	};
 	vault: { mode: VaultMode; login_url: string; user_field: string; pass_field: string };
 	requireMFA: boolean;
 }
@@ -36,7 +46,16 @@ export function protocolForm(app: App | null): ProtocolForm {
 		saml: { entity_id: '', acs_url: '', idp_initiated: false, ...c.saml },
 		oidc: { redirect_uris: (c.oidc?.redirect_uris ?? []).join('\n') },
 		ldap: { slug: c.ldap?.slug ?? '' },
-		gate: { host: c.gate?.host ?? '', bypass: (c.gate?.bypass_paths ?? []).join('\n') },
+		gate: {
+			host: c.gate?.host ?? '',
+			bypass: (c.gate?.bypass_paths ?? []).join('\n'),
+			sign_in: c.gate?.sign_in?.mode ?? '',
+			upstream: c.gate?.sign_in?.upstream ?? '',
+			login_path: c.gate?.sign_in?.login_path ?? '',
+			user_field: c.gate?.sign_in?.user_field ?? 'username',
+			pass_field: c.gate?.sign_in?.pass_field ?? 'password',
+			header: c.gate?.sign_in?.header ?? ''
+		},
 		vault: {
 			mode: c.vault?.mode ?? 'copy',
 			login_url: c.vault?.login_url ?? '',
@@ -48,6 +67,20 @@ export function protocolForm(app: App | null): ProtocolForm {
 }
 
 const lines = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean);
+
+function gateSignIn(g: ProtocolForm['gate']): GateSignIn {
+	const mode = g.sign_in as GateSignInMode;
+	if (mode === 'basic') return { mode };
+	if (mode === 'header') return { mode, header: g.header.trim() };
+	if (mode === 'jellyfin') return { mode, upstream: g.upstream.trim() };
+	return {
+		mode,
+		upstream: g.upstream.trim(),
+		login_path: g.login_path.trim(),
+		user_field: g.user_field.trim(),
+		pass_field: g.pass_field.trim()
+	};
+}
 
 /** The protocol and config to send; only the chosen protocol's section. */
 export function protocolPayload(f: ProtocolForm): { protocol: Protocol; config: AppConfig } {
@@ -68,6 +101,7 @@ export function protocolPayload(f: ProtocolForm): { protocol: Protocol; config: 
 			break;
 		case 'gate':
 			config.gate = { host: f.gate.host.trim().toLowerCase(), bypass_paths: lines(f.gate.bypass) };
+			if (f.gate.sign_in) config.gate.sign_in = gateSignIn(f.gate);
 			break;
 		case 'vault':
 			config.vault =
@@ -123,6 +157,15 @@ export function protocolError(f: ProtocolForm): { field: string; message: string
 			return { field: 'config.gate.host', message: 'Enter the app’s host name, such as ha.home.lan.' };
 		if (!c.gate!.bypass_paths.every((x) => x.startsWith('/') && !/[\s?#]/.test(x)))
 			return { field: 'config.gate.bypass_paths', message: 'Each exception is a path starting with /.' };
+		const si = c.gate!.sign_in;
+		if (si?.mode === 'header' && !/^[A-Za-z0-9-]{1,64}$/.test(si.header ?? ''))
+			return { field: 'config.gate.sign_in.header', message: 'Enter a header name such as X-Api-Key.' };
+		if (si && ['form', 'json', 'jellyfin'].includes(si.mode)) {
+			if (!/^https?:\/\/[^/?#\s@]+/i.test(si.upstream ?? '') || /[?#]/.test(si.upstream ?? ''))
+				return { field: 'config.gate.sign_in.upstream', message: 'Enter the address Keystone uses to reach the app, such as http://jellyfin:8096.' };
+			if (si.mode !== 'jellyfin' && (!si.login_path?.startsWith('/') || si.login_path.startsWith('//')))
+				return { field: 'config.gate.sign_in.login_path', message: 'Enter the path of the login, starting with /.' };
+		}
 	}
 	if (f.protocol === 'vault' && c.vault?.mode !== 'copy' && !appUrl(c.vault?.login_url ?? ''))
 		return { field: 'config.vault.login_url', message: 'Enter the address the login form is sent to.' };

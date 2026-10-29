@@ -183,7 +183,7 @@
 		protoErrors = {};
 		vault = { username: '', password: '', hasPassword: false };
 		access = app?.access ? [...app.access] : null;
-		if (app?.protocol === 'vault') loadVault(app);
+		if (app?.protocol === 'vault' || (app?.protocol === 'gate' && app.config.gate?.sign_in)) loadVault(app);
 		form = app
 			? { name: app.name, url: app.url, color: app.color, icon: app.icon || null }
 			: { name: '', url: 'https://', color: COLORS[(apps?.length ?? 0) % COLORS.length], icon: null };
@@ -261,7 +261,7 @@
 				editing = created;
 				toast(`${created.name} added`);
 			}
-			if (proto.protocol === 'vault') {
+			if (proto.protocol === 'vault' || (proto.protocol === 'gate' && proto.gate.sign_in)) {
 				const v: { username: string; password?: string } = { username: vault.username.trim() };
 				if (vault.password) v.password = vault.password;
 				await api.send('PUT', `/apps/${editing!.id}/vault`, v);

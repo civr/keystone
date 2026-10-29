@@ -10,6 +10,7 @@ import (
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/rbac"
+	"github.com/civr/keystone/internal/session"
 )
 
 // Vault (spec §5): credentials for apps without SAML/OIDC/LDAP. Passwords are
@@ -17,7 +18,8 @@ import (
 
 const maxVaultField = 1024
 
-// vaultApp loads the app in the URL and checks it uses the vault.
+// vaultApp loads the app in the URL and checks it has stored credentials: a
+// vault app, or a gate app that signs in for you.
 func (s *server) vaultApp(w http.ResponseWriter, r *http.Request) (apps.App, bool) {
 	id, ok := appID(w, r)
 	if !ok {
@@ -32,8 +34,8 @@ func (s *server) vaultApp(w http.ResponseWriter, r *http.Request) (apps.App, boo
 		errInternal(w, "vault app", err)
 		return a, false
 	}
-	if a.Protocol != apps.Vault {
-		writeInvalid(w, "protocol", "Only vault apps have stored credentials.")
+	if a.Protocol != apps.Vault && !(a.Protocol == apps.GateP && a.Config.Gate != nil && a.Config.Gate.SignIn != nil) {
+		writeInvalid(w, "protocol", "Only vault apps and gate apps that sign in for you have stored credentials.")
 		return a, false
 	}
 	manage := false
@@ -113,8 +115,12 @@ func (s *server) vaultPassword(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if a.Protocol != apps.Vault {
+		writeInvalid(w, "protocol", "Only vault apps have a password to copy.")
+		return
+	}
 	cfg := settingsFrom(ctx)
-	if !vaultOpen(*SessionFrom(ctx), time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
+	if !session.VaultOpen(*SessionFrom(ctx), time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
 		writeError(w, http.StatusForbidden, "stepup_required", "Confirm this with your passkey first.")
 		return
 	}

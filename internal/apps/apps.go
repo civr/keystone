@@ -59,8 +59,39 @@ type LDAP struct {
 
 // Gate configures an app behind keystone-gate.
 type Gate struct {
-	Host        string   `json:"host"`
-	BypassPaths []string `json:"bypass_paths"`
+	Host        string      `json:"host"`
+	BypassPaths []string    `json:"bypass_paths"`
+	SignIn      *GateSignIn `json:"sign_in,omitempty"`
+}
+
+// Gate sign-in modes: what keystone-gate does with the credentials stored
+// in the vault. basic and header add a request header to every request the
+// proxy passes on; form, json and jellyfin log the browser in at the app.
+const (
+	SignInBasic    = "basic"
+	SignInHeader   = "header"
+	SignInForm     = "form"
+	SignInJSON     = "json"
+	SignInJellyfin = "jellyfin"
+)
+
+// GateSignIn says how keystone-gate signs the person in to a gate app.
+type GateSignIn struct {
+	Mode string `json:"mode"`
+	// Upstream is the address keystone-gate itself calls (form, json,
+	// jellyfin), e.g. http://jellyfin:8096.
+	Upstream  string `json:"upstream,omitempty"`
+	LoginPath string `json:"login_path,omitempty"`
+	UserField string `json:"user_field,omitempty"`
+	PassField string `json:"pass_field,omitempty"`
+	// Header carries the stored password in header mode.
+	Header string `json:"header,omitempty"`
+}
+
+// Server reports whether the sign-in is a login keystone-gate performs at
+// the app, rather than a header added to proxied requests.
+func (g *GateSignIn) Server() bool {
+	return g != nil && (g.Mode == SignInForm || g.Mode == SignInJSON || g.Mode == SignInJellyfin)
 }
 
 // Vault sign-in modes: copy the password, or post the app's login form
@@ -128,6 +159,8 @@ func (a App) AllowedFor(acct Owner) bool { return a.Allowed(acct.ID, acct.Groups
 
 // Owner is a Keystone account: the owner or a user (package accounts).
 type Owner = accounts.Account
+
+var headerRe = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 
 var fieldRe = regexp.MustCompile(`^[A-Za-z0-9_.\[\]-]{1,64}$`)
 
@@ -245,11 +278,65 @@ func (c *Config) Validate(protocol string) (field, msg string) {
 				return "config.gate.bypass_paths", "Every exception is a path that starts with /."
 			}
 		}
+		if msg := gate.validateSignIn(); msg != nil {
+			return msg[0], msg[1]
+		}
 		c.Gate = gate
 	default:
 		return "protocol", "Onbekend protocol."
 	}
 	return "", ""
+}
+
+// validateSignIn checks and completes g.SignIn; it returns the offending
+// field and message, or nil.
+func (g *Gate) validateSignIn() []string {
+	si := g.SignIn
+	if si == nil || si.Mode == "" {
+		g.SignIn = nil
+		return nil
+	}
+	bad := func(f, m string) []string { return []string{"config.gate.sign_in." + f, m} }
+	keep := *si
+	switch si.Mode {
+	case SignInBasic:
+		keep = GateSignIn{Mode: si.Mode}
+	case SignInHeader:
+		h := strings.TrimSpace(si.Header)
+		l := strings.ToLower(h)
+		if !headerRe.MatchString(h) || l == "host" || l == "cookie" || l == "content-length" || l == "transfer-encoding" || l == "connection" ||
+			strings.HasPrefix(l, "x-forwarded-") || strings.HasPrefix(l, "x-keystone-") {
+			return bad("header", "Enter a header name such as X-Api-Key; it cannot be a header the proxy sets itself.")
+		}
+		keep = GateSignIn{Mode: si.Mode, Header: h}
+	case SignInForm, SignInJSON, SignInJellyfin:
+		u, err := url.Parse(si.Upstream)
+		if err != nil || len(si.Upstream) > 2048 || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil ||
+			u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+			return bad("upstream", "Enter the address Keystone uses to reach the app, such as http://jellyfin:8096.")
+		}
+		keep = GateSignIn{Mode: si.Mode, Upstream: strings.TrimRight(si.Upstream, "/")}
+		if si.Mode == SignInJellyfin {
+			break
+		}
+		if !strings.HasPrefix(si.LoginPath, "/") || strings.HasPrefix(si.LoginPath, "//") || len(si.LoginPath) > 256 || strings.ContainsAny(si.LoginPath, " #\\\x00\r\n") {
+			return bad("login_path", "Enter the path of the login, starting with /.")
+		}
+		if si.UserField == "" {
+			si.UserField = "username"
+		}
+		if si.PassField == "" {
+			si.PassField = "password"
+		}
+		if !fieldRe.MatchString(si.UserField) || !fieldRe.MatchString(si.PassField) {
+			return bad("user_field", "Field names use letters, digits and . _ - [ ] (at most 64).")
+		}
+		keep.LoginPath, keep.UserField, keep.PassField = si.LoginPath, si.UserField, si.PassField
+	default:
+		return bad("mode", "Choose how Keystone signs you in.")
+	}
+	g.SignIn = &keep
+	return nil
 }
 
 // Mapped returns the account to send, filling empty fields from the owner.

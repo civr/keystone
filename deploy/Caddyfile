@@ -35,3 +35,12 @@
 		reverse_proxy core:8080
 	}
 }
+
+# Apps behind keystone-gate that Keystone signs in to (README › Home Assistant
+# (gate) › Sign in to the app for you) need, in the operator's own proxy,
+# before the forward_auth check:
+#
+#	handle /.keystone/* { reverse_proxy keystone-gate:8081 }
+#
+# and copy_headers X-Keystone-User X-Keystone-Email X-Keystone-Name Authorization
+# (plus the custom header, in header mode) on forward_auth.

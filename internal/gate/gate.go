@@ -5,6 +5,7 @@
 //	GET /verify                 200 + X-Keystone-* headers, or 302 to Keystone
 //	GET /verify?mode=nginx      as above, but 401 instead of 302 (nginx auth_request)
 //	GET /login-redirect?rd=URL  the 302 for nginx's error_page 401
+//	GET /.keystone/signin?rd=/  sign the browser in to the app (apps.GateSignIn)
 package gate
 
 import (
@@ -17,9 +18,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/civr/keystone/internal/apps"
+	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/gatetoken"
 	"github.com/civr/keystone/internal/runtime"
 	"github.com/civr/keystone/internal/session"
@@ -36,12 +39,20 @@ type Server struct {
 	Valkey   *redis.Client
 	Sessions *session.Store
 	Limiter  *session.Limiter
+	// Pool, VaultKey and Audit serve sign-in: the stored credentials, and a
+	// record of their use. Audit may be nil.
+	Pool     *pgxpool.Pool
+	VaultKey []byte
+	Audit    *audit.Writer
+
+	cache credsCache
 }
 
 // Handler returns the gate's HTTP handler.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /verify", s.verify)
+	mux.HandleFunc("GET "+signinPath+"signin", s.signIn)
 	mux.HandleFunc("GET /login-redirect", s.loginRedirect)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	return mux
@@ -137,6 +148,20 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 			h.Set("X-Keystone-User", acct.Username)
 			h.Set("X-Keystone-Email", acct.Email)
 			h.Set("X-Keystone-Name", acct.DisplayName)
+			if err := s.addHeaders(ctx, h, app); err != nil {
+				slog.Error("gate: credentials", "err", err)
+				http.Error(w, "unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			if redirect, err := s.wantsSignIn(r, u, app); err != nil {
+				slog.Error("gate: credentials", "err", err)
+				http.Error(w, "unavailable", http.StatusServiceUnavailable)
+				return
+			} else if redirect {
+				h.Set("Cache-Control", "no-store")
+				http.Redirect(w, r, signInURL(u), http.StatusFound)
+				return
+			}
 			w.WriteHeader(http.StatusOK)
 			return
 		}

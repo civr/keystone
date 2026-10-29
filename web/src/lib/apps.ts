@@ -9,6 +9,8 @@ export interface App {
 	config: AppConfig;
 	/** OIDC client secret or LDAP bind password has been generated. */
 	has_secret?: boolean;
+	/** Gate apps that sign in for you: the address that signs in first, then opens the app. */
+	launch_url?: string;
 	/** Account ids that may use it; null is everyone. */
 	access?: string[] | null;
 	sort: number;
@@ -22,12 +24,24 @@ export interface AppConfig {
 	saml?: { entity_id: string; acs_url: string; idp_initiated: boolean };
 	oidc?: { client_id: string; redirect_uris: string[] };
 	ldap?: { slug: string };
-	gate?: { host: string; bypass_paths: string[] };
+	gate?: { host: string; bypass_paths: string[]; sign_in?: GateSignIn };
 	/** How a vault tile signs in: copy the password, or post the login form. */
 	vault?: { mode: VaultMode; login_url?: string; user_field?: string; pass_field?: string };
 	/** Only sessions signed in with a passkey or authenticator code. */
 	require_mfa?: boolean;
 }
+
+/** How keystone-gate signs in to a gate app with the vault's details. */
+export interface GateSignIn {
+	mode: GateSignInMode;
+	upstream?: string;
+	login_path?: string;
+	user_field?: string;
+	pass_field?: string;
+	header?: string;
+}
+
+export type GateSignInMode = 'basic' | 'header' | 'form' | 'json' | 'jellyfin';
 
 export type VaultMode = 'copy' | 'form' | 'json';
 
@@ -36,6 +50,7 @@ export type VaultMode = 'copy' | 'form' | 'json';
  * accepts unsolicited responses, otherwise the app's own (sign-in) address.
  */
 export function tileHref(app: App): string | null {
+	if (app.launch_url) return safeHref(app.launch_url);
 	if (app.protocol === 'saml' && app.config?.saml?.idp_initiated) return `/saml/idp/${encodeURIComponent(app.id)}`;
 	return safeHref(app.url);
 }

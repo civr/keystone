@@ -17,6 +17,7 @@ import (
 
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/crypto"
+	"github.com/civr/keystone/internal/session"
 )
 
 // Signing in to a vault app for you. A browser lets no page fill in another
@@ -45,11 +46,11 @@ func (s *server) vaultLaunch(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if v := a.Config.Vault; v == nil || (v.Mode != apps.VaultForm && v.Mode != apps.VaultJSON) {
+	if v := a.Config.Vault; a.Protocol != apps.Vault || v == nil || (v.Mode != apps.VaultForm && v.Mode != apps.VaultJSON) {
 		writeInvalid(w, "config.vault.mode", "This app copies the password instead.")
 		return
 	}
-	if !vaultOpen(*SessionFrom(ctx), time.Duration(settingsFrom(ctx).Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
+	if !session.VaultOpen(*SessionFrom(ctx), time.Duration(settingsFrom(ctx).Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
 		writeError(w, http.StatusForbidden, "stepup_required", "Confirm this with your passkey first.")
 		return
 	}
@@ -88,7 +89,7 @@ func (s *server) vaultLaunchPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a, err := apps.ByID(ctx, s.d.Pool, l.App)
-	open := vaultOpen(*SessionFrom(ctx), time.Duration(settingsFrom(ctx).Vault.ReconfirmMinutes)*time.Minute, time.Now())
+	open := session.VaultOpen(*SessionFrom(ctx), time.Duration(settingsFrom(ctx).Vault.ReconfirmMinutes)*time.Minute, time.Now())
 	if err != nil || a.Protocol != apps.Vault || a.Config.Vault == nil || !s.mayUse(ctx, a) || lacksMFA(ctx, a) || !open {
 		gone()
 		return

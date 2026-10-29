@@ -23,6 +23,14 @@
 	let making = $state(false);
 
 	const info = $derived(app && app.protocol === form.protocol ? connectionInfo(location.origin, app) : []);
+	const signInHelp: Record<string, string> = {
+		basic: 'The gate adds the stored username and password as Basic auth to every request it lets through.',
+		header: 'The gate adds the stored password in a header, for apps that take an API key.',
+		form: 'The gate posts the app’s login form for you and hands your browser the session cookie.',
+		json: 'The gate sends the details as JSON to the app’s login API and hands your browser the session cookie.',
+		jellyfin: 'The gate signs in to Jellyfin for you; the web app opens already signed in.'
+	};
+	const serverSignIn = $derived(['form', 'json', 'jellyfin'].includes(form.gate.sign_in));
 	const help = $derived(PROTOCOLS.find((p) => p.value === form.protocol)?.help ?? '');
 
 	function choose() {
@@ -117,6 +125,60 @@
 			</small>
 		{/if}
 	</label>
+	<label class="field">
+		<span>Sign in for me</span>
+		<select class="input" bind:value={form.gate.sign_in}>
+			<option value="">Off</option>
+			<option value="basic">Basic auth</option>
+			<option value="header">Header with API key</option>
+			<option value="form">Login form</option>
+			<option value="json">JSON login</option>
+			<option value="jellyfin">Jellyfin</option>
+		</select>
+		<small>{signInHelp[form.gate.sign_in] ?? 'Off: the app asks for its own login.'}</small>
+	</label>
+	{#if form.gate.sign_in}
+		{#if form.gate.sign_in === 'header'}
+			<label class="field">
+				<span>Header name</span>
+				<input id="config.gate.sign_in.header" class="input mono" spellcheck="false" autocapitalize="none" placeholder="X-Api-Key" aria-invalid={errors['config.gate.sign_in.header'] ? 'true' : undefined} bind:value={form.gate.header} />
+				{#if errors['config.gate.sign_in.header']}<small class="field-error" role="alert">{errors['config.gate.sign_in.header']}</small>{/if}
+			</label>
+		{/if}
+		{#if serverSignIn}
+			<label class="field">
+				<span>Address Keystone uses to reach the app</span>
+				<input id="config.gate.sign_in.upstream" class="input mono" type="url" spellcheck="false" autocapitalize="none" placeholder="http://jellyfin:8096" aria-invalid={errors['config.gate.sign_in.upstream'] ? 'true' : undefined} bind:value={form.gate.upstream} />
+				{#if errors['config.gate.sign_in.upstream']}<small class="field-error" role="alert">{errors['config.gate.sign_in.upstream']}</small>{:else}<small>keystone-gate calls this itself, so it must be reachable from the gate (for example a container name).</small>{/if}
+			</label>
+		{/if}
+		{#if form.gate.sign_in === 'form' || form.gate.sign_in === 'json'}
+			<label class="field">
+				<span>Login path</span>
+				<input id="config.gate.sign_in.login_path" class="input mono" spellcheck="false" autocapitalize="none" placeholder="/login" aria-invalid={errors['config.gate.sign_in.login_path'] ? 'true' : undefined} bind:value={form.gate.login_path} />
+				{#if errors['config.gate.sign_in.login_path']}<small class="field-error" role="alert">{errors['config.gate.sign_in.login_path']}</small>{/if}
+			</label>
+			<div class="pair">
+				<label class="field">
+					<span>Username field</span>
+					<input class="input mono" spellcheck="false" autocapitalize="none" bind:value={form.gate.user_field} />
+				</label>
+				<label class="field">
+					<span>Password field</span>
+					<input class="input mono" spellcheck="false" autocapitalize="none" bind:value={form.gate.pass_field} />
+				</label>
+			</div>
+		{/if}
+		<label class="field">
+			<span>Username in the app</span>
+			<input class="input" autocomplete="off" spellcheck="false" autocapitalize="none" bind:value={vault.username} />
+		</label>
+		<label class="field">
+			<span>Password</span>
+			<input class="input" type="password" autocomplete="new-password" placeholder={vault.hasPassword ? 'Saved' : ''} bind:value={vault.password} />
+			<small>{vault.hasPassword ? 'Leave empty to keep the stored password.' : 'Kept encrypted with the vault key, outside the database.'}</small>
+		</label>
+	{/if}
 {:else if form.protocol === 'vault'}
 	<label class="field">
 		<span>Username in the app</span>

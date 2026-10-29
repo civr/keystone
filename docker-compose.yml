@@ -126,7 +126,9 @@ services:
       retries: 5
 
   # Forward auth for apps behind your reverse proxy (Home Assistant). Only the
-  # proxy should reach it; see README › Poortwachter.
+  # proxy should reach it; see README › Poortwachter. An app that Keystone signs
+  # in to (README › Sign in to the app for you) must be reachable from here:
+  # put the gate on the app's docker network under `networks:`.
   gate:
     image: ghcr.io/civr/keystone-gate:latest
     restart: unless-stopped
