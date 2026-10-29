@@ -169,7 +169,9 @@ func vaultOpen(sess session.Session, d time.Duration, now time.Time) bool {
 		last = sess.LastFullAuthAt
 	}
 	if d <= 0 {
-		return sess.VaultLockedAt.IsZero() || last.After(sess.VaultLockedAt)
+		// Still needs a real sign-in or confirmation: a reverse-proxy
+		// session has none and must confirm once.
+		return !last.IsZero() && (sess.VaultLockedAt.IsZero() || last.After(sess.VaultLockedAt))
 	}
 	return confirmedWithin(sess, d, now) && last.After(sess.VaultLockedAt)
 }
