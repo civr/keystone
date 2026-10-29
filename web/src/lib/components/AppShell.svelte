@@ -31,7 +31,7 @@
 	} = $props();
 
 	const groups = $derived(
-		navFor(portal === 'admin' ? ADMIN_NAV : USER_NAV, { permissions: me?.permissions ?? [], owner: me?.role === 'owner' })
+		navFor(portal === 'admin' ? ADMIN_NAV : USER_NAV, { permissions: me?.permissions ?? [], owner: me?.role === 'owner', appAdmin: (me?.app_admin_of ?? []).length > 0 })
 	);
 
 	// Admin groups fold away; the one with the current page stays open.

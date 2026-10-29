@@ -88,7 +88,8 @@ func (s *server) vaultLaunchPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a, err := apps.ByID(ctx, s.d.Pool, l.App)
-	if err != nil || a.Protocol != apps.Vault || a.Config.Vault == nil || !s.mayUse(ctx, a) {
+	open := vaultOpen(*SessionFrom(ctx), time.Duration(settingsFrom(ctx).Vault.ReconfirmMinutes)*time.Minute, time.Now())
+	if err != nil || a.Protocol != apps.Vault || a.Config.Vault == nil || !s.mayUse(ctx, a) || lacksMFA(ctx, a) || !open {
 		gone()
 		return
 	}

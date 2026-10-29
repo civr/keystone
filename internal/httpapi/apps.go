@@ -15,11 +15,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/civr/keystone/internal/rbac"
 	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/appicon"
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/crypto"
+	"github.com/civr/keystone/internal/rbac"
 )
 
 const (
@@ -276,13 +276,18 @@ func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "load grants", err)
 		return
 	}
-	all := g.Has(rbac.AppsRead) && r.URL.Query().Get("mine") == ""
+	mine := r.URL.Query().Get("mine") != ""
+	all := g.Has(rbac.AppsRead) && !mine
+	managed := []string{}
+	if !mine {
+		managed = g.Apps() // an application admin sees the apps it manages
+	}
 	groups := make([]string, 0, len(acct.Groups))
 	for _, g := range acct.Groups {
 		groups = append(groups, "group:"+g)
 	}
 	rows, err := s.d.Pool.Query(ctx, `select `+appCols+` from apps where $1 or access is null or $2 = any(access) or access && $3::text[]
-		order by sort, created_at, id`, all, acct.ID, groups)
+		or id::text = any($4) order by sort, created_at, id`, all, acct.ID, groups, managed)
 	if err != nil {
 		errInternal(w, "list apps", err)
 		return
@@ -296,6 +301,9 @@ func (s *server) listApps(w http.ResponseWriter, r *http.Request) {
 		// Members get the tile, not how the app is set up or who else uses
 		// it; only whether a SAML tile signs in directly (tileHref).
 		for i := range list {
+			if g.HasFor(rbac.AppsWrite, list[i].ID) {
+				continue // its admin sees it whole
+			}
 			cfg := apps.Config{}
 			if sm := list[i].Config.SAML; sm != nil {
 				cfg.SAML = &apps.SAML{IdPInitiated: sm.IdPInitiated}

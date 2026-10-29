@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/netip"
 	"strings"
-	"time"
 
 	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/audit"
@@ -67,7 +66,9 @@ func (s *server) authProxy(w http.ResponseWriter, r *http.Request) {
 			acct = &list[i]
 		}
 	}
-	if acct == nil || acct.Disabled {
+	// The owner always signs in to Keystone itself: a proxy (or whoever
+	// controls its address) can never become the owner.
+	if acct == nil || acct.Disabled || acct.IsOwner() {
 		s.d.Audit.Log(ctx, audit.ActorAnonymous, "login.failure", ip, map[string]any{"method": "proxy", "username": who})
 		writeError(w, http.StatusForbidden, "not_allowed", "The proxy signed you in as someone Keystone does not know.")
 		return
@@ -78,7 +79,8 @@ func (s *server) authProxy(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "count passkeys", err)
 		return
 	}
-	if !s.createSession(w, r, cfg, session.Session{UserID: user, LastFullAuthAt: time.Now(), NoPasskey: passkeys == 0}) {
+	// Not a confirmation: sensitive actions and the vault still ask.
+	if !s.createSession(w, r, cfg, session.Session{UserID: user, NoPasskey: passkeys == 0}) {
 		return
 	}
 	s.d.Audit.Log(ctx, actorOf(user), "login.success", ip, map[string]any{"method": "proxy"})

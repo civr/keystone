@@ -24,8 +24,13 @@ What Keystone guarantees, what depends on your configuration, and what it cannot
   sealed with `data_key`). Apps can require that a second factor was used.
 - **Sensitive actions** ask you to confirm again (passkey, or password plus code while you have no passkey).
 - **Reverse-proxy sign-in** trusts the identity header only when the request reached Keystone directly from a
-  configured proxy address (the last `X-Forwarded-For` hop, which Keystone's own Caddy appends). Your proxy must strip
-  that header from client requests. Sign-in through the proxy skips Keystone's own passkey and code steps.
+  configured proxy address (the last `X-Forwarded-For` hop, which Keystone's own Caddy appends). **Your proxy must
+  strip that header from every client request, on every route**, and only it may reach Keystone; otherwise anyone can
+  claim any name. Only super admins can set this up. The owner never signs in through the proxy, and a proxy session
+  does not count as a recent confirmation, so sensitive actions and the vault still ask. Sign-in through the proxy
+  skips Keystone's own passkey and code steps.
+- **Recovery codes** (owner only) replace the second step when a phone or passkey is lost: password plus a recovery
+  code signs the owner in without the authenticator code.
 - Without https, passkeys do not work and cookies are not marked Secure. Run Keystone behind https.
 
 ## Vault

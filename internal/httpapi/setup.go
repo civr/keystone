@@ -19,8 +19,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/accounts"
+	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/session"

@@ -30,7 +30,9 @@ func setRoles(t *testing.T, c *client, id string, want int, roles ...map[string]
 func TestRBAC(t *testing.T) {
 	t.Parallel()
 	l, owner := adminClient(t, "192.168.1.20")
-	l.settings(t, func(s *settings.Settings) { s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100 })
+	l.settings(t, func(s *settings.Settings) {
+		s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100
+	})
 
 	member, _ := signedIn(t, l, owner, "mia", "192.168.1.30")
 	auditor, auditorID := signedIn(t, l, owner, "aud", "192.168.1.31")
@@ -80,7 +82,9 @@ func TestRBAC(t *testing.T) {
 func TestAppAdminAndGroupAccess(t *testing.T) {
 	t.Parallel()
 	l, owner := adminClient(t, "192.168.1.20")
-	l.settings(t, func(s *settings.Settings) { s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100 })
+	l.settings(t, func(s *settings.Settings) {
+		s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100
+	})
 	var a, b map[string]any
 	body(t, owner.must("POST", "/api/apps", map[string]any{"name": "A", "url": "https://a.home.lan", "color": "#007aff"}, 201).Body, &a)
 	body(t, owner.must("POST", "/api/apps", map[string]any{"name": "B", "url": "https://b.home.lan", "color": "#007aff"}, 201).Body, &b)
@@ -110,7 +114,9 @@ func TestAppAdminAndGroupAccess(t *testing.T) {
 func TestPortalEndpoints(t *testing.T) {
 	t.Parallel()
 	l, owner := adminClient(t, "192.168.1.20")
-	l.settings(t, func(s *settings.Settings) { s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100 })
+	l.settings(t, func(s *settings.Settings) {
+		s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100
+	})
 	member, mid := signedIn(t, l, owner, "pm", "192.168.1.50")
 	member.must("GET", "/api/admin/sessions/all", nil, 403)
 	var all struct{ Sessions []map[string]any }

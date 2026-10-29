@@ -9,6 +9,7 @@ import (
 
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/crypto"
+	"github.com/civr/keystone/internal/rbac"
 )
 
 // Vault (spec §5): credentials for apps without SAML/OIDC/LDAP. Passwords are
@@ -35,7 +36,11 @@ func (s *server) vaultApp(w http.ResponseWriter, r *http.Request) (apps.App, boo
 		writeInvalid(w, "protocol", "Only vault apps have stored credentials.")
 		return a, false
 	}
-	if !s.mayUse(r.Context(), a) || lacksMFA(r.Context(), a) {
+	manage := false
+	if g, err := s.grants(r.Context()); err == nil && g.HasFor(rbac.AppsWrite, a.ID) && r.Method == http.MethodPut {
+		manage = true // the app's admin sets its credentials without using them
+	}
+	if !manage && (!s.mayUse(r.Context(), a) || lacksMFA(r.Context(), a)) {
 		errNotFound(w, r)
 		return a, false
 	}

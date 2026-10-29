@@ -12,9 +12,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/civr/keystone/internal/rbac"
 	"github.com/civr/keystone/internal/ad"
 	"github.com/civr/keystone/internal/crypto"
+	"github.com/civr/keystone/internal/rbac"
 	"github.com/civr/keystone/internal/settings"
 )
 

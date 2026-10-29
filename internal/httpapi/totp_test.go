@@ -13,7 +13,9 @@ import (
 func TestTOTP(t *testing.T) {
 	t.Parallel()
 	l, owner := adminClient(t, "192.168.1.20")
-	l.settings(t, func(s *settings.Settings) { s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100 })
+	l.settings(t, func(s *settings.Settings) {
+		s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100
+	})
 	c, id := signedIn(t, l, owner, "tom", "192.168.1.70")
 
 	var begin struct{ Secret, URI string }

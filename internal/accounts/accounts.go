@@ -268,7 +268,8 @@ func Delete(ctx context.Context, q Querier, id string) error {
 	err := q.QueryRow(ctx, `with gone as (delete from users where id::text = $1 returning username),
 		kept as (insert into retired_usernames (username) select username from gone on conflict do nothing),
 		m as (delete from group_members where account_id = $1),
-		r as (delete from role_assignments where account_id = $1)
+		r as (delete from role_assignments where account_id = $1),
+		t as (delete from totp where account_id = $1)
 		select count(*) from gone`, id).Scan(&n)
 	if err == nil && n != 1 {
 		err = ErrNotFound

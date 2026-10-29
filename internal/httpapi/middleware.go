@@ -13,8 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/civr/keystone/internal/rbac"
 	"github.com/civr/keystone/internal/accounts"
+	"github.com/civr/keystone/internal/rbac"
 	"github.com/civr/keystone/internal/realip"
 	"github.com/civr/keystone/internal/session"
 	"github.com/civr/keystone/internal/settings"

@@ -118,6 +118,11 @@ func (s Settings) Validate(requesterIP netip.Addr) error {
 	if !headerRe.MatchString(s.ProxyAuth.Header) {
 		return bad("proxy_auth.header", "use a header name such as Remote-User")
 	}
+	for _, p := range proxies {
+		if p.Bits() < 16 {
+			return bad("proxy_auth.trusted", "name the proxy itself, not a whole network (at least /16)")
+		}
+	}
 	if s.ProxyAuth.Enabled && len(proxies) == 0 {
 		return bad("proxy_auth.trusted", "name the proxy addresses that may sign people in")
 	}

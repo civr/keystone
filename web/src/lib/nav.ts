@@ -112,6 +112,8 @@ export const ADMIN_NAV: NavGroup[] = [
 export interface Access {
 	permissions: string[];
 	owner: boolean;
+	/** Administers some apps (application admin). */
+	appAdmin?: boolean;
 }
 
 /** Whether access opens item. */
@@ -119,8 +121,8 @@ export function canSee(item: NavItem, a: Access): boolean {
 	if (item.owner) return a.owner;
 	if (!item.perms) return true;
 	if (a.permissions.includes('*')) return true;
-	if (item.perms.length === 0) return a.permissions.length > 0;
-	return item.perms.some((p) => a.permissions.includes(p));
+	if (item.perms.length === 0) return a.permissions.length > 0 || !!a.appAdmin;
+	return item.perms.some((p) => a.permissions.includes(p)) || (!!a.appAdmin && item.perms.includes('apps.write'));
 }
 
 /** The menu filtered for access; empty groups disappear. */

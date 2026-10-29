@@ -14,6 +14,7 @@
 	}
 
 	let providers = $state<Provider[] | null>(null);
+	let canProviders = $state(false);
 	let people = $state<{ id: string; label: string }[]>([]);
 	let open = $state(false);
 	let form = $state({ name: '1Password', url: 'http://op-connect:8080', token: '', access: [] as string[] });
@@ -24,6 +25,9 @@
 		providers = (await api.get<{ providers: Provider[] }>('/admin/vault/providers').catch(() => ({ providers: [] }))).providers;
 	}
 	onMount(async () => {
+		const me = await api.get<{ permissions: string[] }>('/me').catch(() => ({ permissions: [] as string[] }));
+		canProviders = me.permissions.includes('*') || me.permissions.includes('vault.write');
+		if (!canProviders) return;
 		load();
 		const [u, g] = await Promise.all([
 			api.get<{ users: { id: string; username: string; display_name: string }[] }>('/admin/users').catch(() => ({ users: [] })),
@@ -67,6 +71,7 @@
 <div class="pane-head"><h1 class="pane-title">Vault &amp; secrets</h1></div>
 <p class="pane-intro">How vault passwords may be used, and where secrets may come from.</p>
 
+{#if canProviders}
 <section class="group" aria-labelledby="g-prov">
 	<div class="group-head">
 		<h2 id="g-prov">Credential providers</h2>
@@ -91,6 +96,7 @@
 	{/if}
 	<p class="foot">The Connect token is sealed with the vault key. Its reach is what you gave it in 1Password: give it only the vaults Keystone needs.</p>
 </section>
+{/if}
 
 <SettingsEditor groups={securityGroups} visible={['vault']} />
 

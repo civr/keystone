@@ -13,7 +13,9 @@ import (
 func TestAccounts(t *testing.T) {
 	t.Parallel()
 	l, owner := adminClient(t, "192.168.1.20")
-	l.settings(t, func(s *settings.Settings) { s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100 })
+	l.settings(t, func(s *settings.Settings) {
+		s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100
+	})
 
 	owner.must("POST", "/api/admin/users", map[string]any{"username": "Thijs", "password": "long enough secret", "role": "member"}, 400) // the owner's name
 	owner.must("POST", "/api/admin/users", map[string]any{"username": "anna", "password": "short", "role": "member"}, 400)
@@ -113,7 +115,9 @@ func TestOwnerAppNameReserved(t *testing.T) {
 func TestAccountIsolation(t *testing.T) {
 	t.Parallel()
 	l, owner := adminClient(t, "192.168.1.20")
-	l.settings(t, func(s *settings.Settings) { s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100 })
+	l.settings(t, func(s *settings.Settings) {
+		s.Login.PasskeyRequired, s.BruteForce.LoginPerAccountPerMinute = false, 100
+	})
 	var vapp map[string]any
 	body(t, owner.must("POST", "/api/apps", map[string]any{"name": "Router", "url": "https://r.home.lan", "color": "#007aff", "protocol": "vault"}, 201).Body, &vapp)
 	if acc, _ := vapp["access"].([]any); len(acc) != 1 || acc[0] != "owner" {
