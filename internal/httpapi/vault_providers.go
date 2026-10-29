@@ -232,6 +232,11 @@ func (s *server) providerSecret(ctx context.Context, providerID, ref string) (on
 	if err != nil {
 		return onepassword.Secret{}, err
 	}
+	// Access is checked on every use: taking someone off a provider also
+	// stops the items they linked earlier.
+	if !s.mayLink(ctx, p) {
+		return onepassword.Secret{}, onepassword.ErrNotFound
+	}
 	c, err := s.client(p)
 	if err != nil {
 		return onepassword.Secret{}, err
