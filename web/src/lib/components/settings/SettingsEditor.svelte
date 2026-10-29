@@ -198,4 +198,8 @@
 	.cols > :global(.group) {
 		break-inside: avoid;
 	}
+	/* A single group uses the whole width instead of half. */
+	.cols > :global(.group:only-child) {
+		column-span: all;
+	}
 </style>

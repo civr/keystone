@@ -283,6 +283,9 @@
 	.cols > .group {
 		break-inside: avoid;
 	}
+	.cols > .group:only-child {
+		column-span: all;
+	}
 	.form-card {
 		display: flex;
 		flex-direction: column;

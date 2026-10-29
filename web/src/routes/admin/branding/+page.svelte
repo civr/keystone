@@ -261,6 +261,9 @@
 	.cols > .group {
 		break-inside: avoid;
 	}
+	.cols > .group:only-child {
+		column-span: all;
+	}
 	.logo {
 		flex: none;
 		width: 48px;
