@@ -94,9 +94,9 @@ func marker(appID string) string {
 
 // addHeaders sets the header the app reads its login from (basic, header).
 // A closed vault sends none, as for the other sign-in modes.
-func (s *Server) addHeaders(ctx context.Context, h http.Header, app *apps.App, sess session.Session, window time.Duration) error {
+func (s *Server) addHeaders(ctx context.Context, h http.Header, app *apps.App, sess session.Session, window time.Duration, proxy bool) error {
 	si := app.Config.Gate.SignIn
-	if si == nil || (si.Mode != apps.SignInBasic && si.Mode != apps.SignInHeader) || !session.VaultOpen(sess, window, time.Now()) {
+	if !proxy || si == nil || (si.Mode != apps.SignInBasic && si.Mode != apps.SignInHeader) || !session.VaultOpen(sess, window, time.Now()) {
 		return nil
 	}
 	user, pass, ok, err := s.credentials(ctx, app.ID)
@@ -116,8 +116,8 @@ func (s *Server) addHeaders(ctx context.Context, h http.Header, app *apps.App, s
 // in yet and there is a password to sign in with.
 // A closed vault lets the page through to the app's own login: sign-in
 // would only stop at "Confirm it is you", even when the app's session is live.
-func (s *Server) wantsSignIn(r *http.Request, u *url.URL, app *apps.App, sess session.Session, window time.Duration) (bool, error) {
-	if !app.Config.Gate.SignIn.Server() || r.URL.Query().Get("mode") == "nginx" || strings.HasPrefix(u.Path, signinPath) {
+func (s *Server) wantsSignIn(r *http.Request, u *url.URL, app *apps.App, sess session.Session, window time.Duration, proxy bool) (bool, error) {
+	if !proxy || !app.Config.Gate.SignIn.Server() || r.URL.Query().Get("mode") == "nginx" || strings.HasPrefix(u.Path, signinPath) {
 		return false, nil
 	}
 	if !session.VaultOpen(sess, window, time.Now()) {
@@ -200,6 +200,12 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unavailable", http.StatusServiceUnavailable)
 		return
 	}
+	trusted := trustedProxies(v.Settings.Network.TrustedProxies)
+	if !fromProxy(r, trusted) {
+		slog.Warn("gate: sign-in from a peer that is not a trusted proxy", "peer", r.RemoteAddr)
+		http.Error(w, "Keystone only signs in through your reverse proxy. Add its address under Network › Trusted proxies.", http.StatusForbidden)
+		return
+	}
 	host := forwardedHost(r)
 	var app *apps.App
 	for i, a := range v.Apps {
@@ -250,7 +256,7 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request) {
 			Text: "Open " + app.Name + " from Keystone to confirm it is you.", Link: v.Settings.PublicURL, LinkText: "Go to Keystone"})
 		return
 	}
-	if ok, err := s.Limiter.Allow(ctx, "gate-ip", clientIP(r), v.Settings.Gate.FailPerIPPerMinute); err == nil && !ok {
+	if ok, err := s.Limiter.Allow(ctx, "gate-ip", clientIP(r, trusted), v.Settings.Gate.FailPerIPPerMinute); err == nil && !ok {
 		http.Error(w, "too many requests", http.StatusTooManyRequests)
 		return
 	}
@@ -296,7 +302,7 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.Audit != nil {
-		ip, _ := netip.ParseAddr(clientIP(r))
+		ip, _ := netip.ParseAddr(clientIP(r, trusted))
 		s.Audit.Log(ctx, actorOf(sess.UserID), "vault.revealed", ip, map[string]any{"id": app.ID, "app": app.Name, "method": "gate"})
 	}
 	mark.MaxAge = int(signinTTL / time.Second)

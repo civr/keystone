@@ -463,7 +463,30 @@ func (s *server) updateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in, ok := s.readApp(w, r)
-	if !ok || !s.prepareConfig(ctx, w, id, &in) || !s.checkAccess(ctx, w, in.Access) || !s.overrideFree(ctx, w, in.Config.Account) {
+	if !ok {
+		return
+	}
+	g, err := s.grants(ctx)
+	if err != nil {
+		errInternal(w, "load grants", err)
+		return
+	}
+	if !g.Has(rbac.AppsWrite) {
+		// An application admin must not widen access or repoint where the
+		// vault password is sent, which would let them read it.
+		all, err := apps.Load(ctx, s.d.Pool)
+		if err != nil {
+			errInternal(w, "load apps", err)
+			return
+		}
+		for _, a := range all {
+			if a.ID == id {
+				in.Access, in.Protocol = a.Access, a.Protocol
+				in.Config.Vault, in.Config.Gate, in.Config.RequireMFA = a.Config.Vault, a.Config.Gate, a.Config.RequireMFA
+			}
+		}
+	}
+	if !s.prepareConfig(ctx, w, id, &in) || !s.checkAccess(ctx, w, in.Access) || !s.overrideFree(ctx, w, in.Config.Account) {
 		return
 	}
 	rows, err := s.d.Pool.Query(ctx, `update apps set name = $2, url = $3, color = $4, icon = nullif($5, ''), protocol = $6, config = $7,

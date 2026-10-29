@@ -11,10 +11,11 @@ package gate
 import (
 	"context"
 	"log/slog"
-	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/gatetoken"
+	"github.com/civr/keystone/internal/realip"
 	"github.com/civr/keystone/internal/runtime"
 	"github.com/civr/keystone/internal/session"
 )
@@ -92,15 +94,27 @@ func bypassed(p string, prefixes []string) bool {
 	return false
 }
 
-// clientIP is the proxy-reported client: the last X-Forwarded-For hop, which
-// the proxy itself appended, or the peer address.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[len(parts)-1])
+// trustedProxies parses network.trusted_proxies; invalid entries are skipped.
+func trustedProxies(cidrs []string) []netip.Prefix {
+	var out []netip.Prefix
+	for _, c := range cidrs {
+		if p, err := netip.ParsePrefix(c); err == nil {
+			out = append(out, p)
+		}
 	}
-	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return host
+	return out
+}
+
+// fromProxy reports whether the direct peer is a trusted reverse proxy; only
+// then are the forwarded headers, and so the app host, believable.
+func fromProxy(r *http.Request, trusted []netip.Prefix) bool {
+	ip := realip.ClientIP(r.RemoteAddr, "", nil)
+	return slices.ContainsFunc(trusted, func(p netip.Prefix) bool { return p.Contains(ip) })
+}
+
+// clientIP is the browser's address as the trusted proxies report it.
+func clientIP(r *http.Request, trusted []netip.Prefix) string {
+	return realip.ClientIP(r.RemoteAddr, r.Header.Get("X-Forwarded-For"), trusted).String()
 }
 
 func startURL(publicURL, rd string) string {
@@ -120,6 +134,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing forwarded headers", http.StatusBadRequest)
 		return
 	}
+	trusted := trustedProxies(v.Settings.Network.TrustedProxies)
 	host := strings.ToLower(u.Hostname())
 	var app *apps.App
 	for i, a := range v.Apps {
@@ -149,12 +164,16 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 			h.Set("X-Keystone-Email", acct.Email)
 			h.Set("X-Keystone-Name", acct.DisplayName)
 			window := time.Duration(v.Settings.Vault.ReconfirmMinutes) * time.Minute
-			if err := s.addHeaders(ctx, h, app, sess, window); err != nil {
+			proxy := fromProxy(r, trusted)
+			if !proxy {
+				slog.Warn("gate: peer is not a trusted proxy, no credentials sent", "peer", r.RemoteAddr)
+			}
+			if err := s.addHeaders(ctx, h, app, sess, window, proxy); err != nil {
 				slog.Error("gate: credentials", "err", err)
 				http.Error(w, "unavailable", http.StatusServiceUnavailable)
 				return
 			}
-			if redirect, err := s.wantsSignIn(r, u, app, sess, window); err != nil {
+			if redirect, err := s.wantsSignIn(r, u, app, sess, window, proxy); err != nil {
 				slog.Error("gate: credentials", "err", err)
 				http.Error(w, "unavailable", http.StatusServiceUnavailable)
 				return
@@ -172,7 +191,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if ok, err := s.Limiter.Allow(ctx, "gate-ip", clientIP(r), v.Settings.Gate.FailPerIPPerMinute); err == nil && !ok {
+	if ok, err := s.Limiter.Allow(ctx, "gate-ip", clientIP(r, trusted), v.Settings.Gate.FailPerIPPerMinute); err == nil && !ok {
 		http.Error(w, "too many requests", http.StatusTooManyRequests)
 		return
 	}

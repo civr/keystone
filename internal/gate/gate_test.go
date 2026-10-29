@@ -159,3 +159,27 @@ func TestVerify(t *testing.T) {
 		}
 	})
 }
+
+func TestSignInOnlyForTrustedProxy(t *testing.T) {
+	s, tok, _, _ := setup(t)
+	v := s.View.(*fixedView)
+	v.v.Apps[0].Config.Gate.SignIn = &apps.GateSignIn{Mode: apps.SignInBasic}
+	s.cache.m = map[string]creds{"1": {user: "u", pass: "p", ok: true, at: time.Now()}}
+	h := s.Handler()
+
+	if w := verify(h, "", "ha.home.lan", "/", tok); w.Code != 200 || w.Header().Get("Authorization") != "" {
+		t.Fatalf("untrusted peer: %d %v", w.Code, w.Header())
+	}
+	v.v.Settings.Network.TrustedProxies = []string{"172.18.0.0/16", "bogus"}
+	if w := verify(h, "", "ha.home.lan", "/", tok); w.Header().Get("Authorization") != "Basic dTpw" {
+		t.Fatalf("trusted peer: %d %v", w.Code, w.Header())
+	}
+}
+
+func TestSafeRD(t *testing.T) {
+	for rd, want := range map[string]bool{"//x": false, "/\\x": false, "/\t/x": false, "x": false, "": false, "/": true, "/web/?a=b": true} {
+		if safeRD(rd) != want {
+			t.Errorf("safeRD(%q) = %v", rd, !want)
+		}
+	}
+}

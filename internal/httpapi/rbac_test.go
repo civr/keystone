@@ -92,6 +92,22 @@ func TestAppAdminAndGroupAccess(t *testing.T) {
 	appadm, id := signedIn(t, l, owner, "apa", "192.168.1.40")
 	setRoles(t, owner, id, 200, map[string]string{"role": "app_admin", "app": a["id"].(string)})
 	appadm.must("PUT", "/api/apps/"+a["id"].(string), map[string]any{"name": "A2", "url": "https://a.home.lan", "color": "#007aff"}, 200)
+	// An app admin cannot change who has access or where the vault logs in.
+	owner.must("PUT", "/api/apps/"+a["id"].(string), map[string]any{"name": "A", "url": "https://a.home.lan", "color": "#007aff",
+		"protocol": "vault", "access": []string{"owner"}, "config": map[string]any{"vault": map[string]any{"mode": "form", "login_url": "https://good.example"}}}, 200)
+	var kept struct {
+		Access []string
+		Config struct {
+			Vault struct {
+				LoginURL string `json:"login_url"`
+			}
+		}
+	}
+	body(t, appadm.must("PUT", "/api/apps/"+a["id"].(string), map[string]any{"name": "A2", "url": "https://a.home.lan", "color": "#007aff",
+		"protocol": "vault", "config": map[string]any{"vault": map[string]any{"mode": "form", "login_url": "https://evil.example"}}}, 200).Body, &kept)
+	if len(kept.Access) != 1 || kept.Access[0] != "owner" || kept.Config.Vault.LoginURL != "https://good.example" {
+		t.Fatalf("app admin changed protected fields: %+v", kept)
+	}
 	appadm.must("PUT", "/api/apps/"+b["id"].(string), map[string]any{"name": "B2", "url": "https://b.home.lan", "color": "#007aff"}, 403)
 	appadm.must("POST", "/api/apps", map[string]any{"name": "C", "url": "https://c.home.lan", "color": "#007aff"}, 403)
 	appadm.must("DELETE", "/api/apps/"+a["id"].(string), nil, 403)

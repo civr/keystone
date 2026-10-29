@@ -186,6 +186,9 @@ app in Keystone logs you in:
   vault has to be open (you confirmed with your passkey within the vault window), otherwise the gate asks
   you to open the app from Keystone first.
 
+The gate only signs in for requests that come from your reverse proxy: list the proxy's address under
+**Admin › Network › Trusted proxies**, otherwise the gate does not sign in.
+
 Caddy (add `Authorization`, or your header, to `copy_headers`):
 
 ```
