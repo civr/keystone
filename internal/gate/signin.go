@@ -113,8 +113,13 @@ func (s *Server) addHeaders(ctx context.Context, h http.Header, app *apps.App) e
 // wantsSignIn reports whether a top-level page load should first pass
 // /.keystone/signin: the app logs in server side, the browser is not signed
 // in yet and there is a password to sign in with.
-func (s *Server) wantsSignIn(r *http.Request, u *url.URL, app *apps.App) (bool, error) {
+// A closed vault lets the page through to the app's own login: sign-in
+// would only stop at "Confirm it is you", even when the app's session is live.
+func (s *Server) wantsSignIn(r *http.Request, u *url.URL, app *apps.App, sess session.Session, window time.Duration) (bool, error) {
 	if !app.Config.Gate.SignIn.Server() || r.URL.Query().Get("mode") == "nginx" || strings.HasPrefix(u.Path, signinPath) {
+		return false, nil
+	}
+	if !session.VaultOpen(sess, window, time.Now()) {
 		return false, nil
 	}
 	method := r.Header.Get("X-Forwarded-Method")
@@ -149,9 +154,15 @@ func forwardedHost(r *http.Request) string {
 	return strings.ToLower(h)
 }
 
-// safeRD reports whether rd is a path on the app's own host.
+// safeRD reports whether rd is a path on the app's own host. Browsers drop
+// tabs and newlines and read a backslash as /, so "/\t/evil" would leave the host.
 func safeRD(rd string) bool {
-	return strings.HasPrefix(rd, "/") && !strings.HasPrefix(rd, "//") && !strings.HasPrefix(rd, "/\\") && !strings.ContainsAny(rd, "\r\n")
+	for i := 0; i < len(rd); i++ {
+		if rd[i] < 0x20 || rd[i] == 0x7f || rd[i] == '\\' {
+			return false
+		}
+	}
+	return strings.HasPrefix(rd, "/") && !strings.HasPrefix(rd, "//")
 }
 
 type noticePage struct {
@@ -276,7 +287,7 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request) {
 			err = errors.New("no token")
 		}
 	default:
-		status, cookies, err = s.formLogin(ctx, si, user, pass)
+		status, cookies, err = s.formLogin(ctx, si, user, pass, proto == "https")
 	}
 	if err != nil {
 		slog.Warn("gate: sign-in", "app", app.Name, "err", err)
@@ -313,7 +324,9 @@ var upstream = &http.Client{
 
 // formLogin posts the login form (or JSON body) to the app and returns the
 // cookies it sets, made host-only for the browser. The status is the app's.
-func (s *Server) formLogin(ctx context.Context, si *apps.GateSignIn, user, pass string) (int, []*http.Cookie, error) {
+// The app is reached over plain http inside, so on an https host the cookies
+// are made Secure here.
+func (s *Server) formLogin(ctx context.Context, si *apps.GateSignIn, user, pass string, secure bool) (int, []*http.Cookie, error) {
 	var body, ctype string
 	if si.Mode == apps.SignInJSON {
 		raw, _ := json.Marshal(map[string]string{si.UserField: user, si.PassField: pass})
@@ -339,7 +352,7 @@ func (s *Server) formLogin(ctx context.Context, si *apps.GateSignIn, user, pass 
 		}
 		out = append(out, &http.Cookie{
 			Name: c.Name, Value: c.Value, Path: path, Expires: c.Expires, MaxAge: c.MaxAge,
-			HttpOnly: c.HttpOnly, Secure: c.Secure, SameSite: c.SameSite,
+			HttpOnly: c.HttpOnly, Secure: c.Secure || secure, SameSite: c.SameSite, Quoted: c.Quoted,
 		})
 	}
 	return resp.StatusCode, out, nil

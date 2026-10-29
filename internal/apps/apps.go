@@ -305,6 +305,8 @@ func (g *Gate) validateSignIn() []string {
 		h := strings.TrimSpace(si.Header)
 		l := strings.ToLower(h)
 		if !headerRe.MatchString(h) || l == "host" || l == "cookie" || l == "content-length" || l == "transfer-encoding" || l == "connection" ||
+			l == "set-cookie" || l == "location" || l == "content-type" || l == "cache-control" || l == "upgrade" || l == "te" || l == "trailer" ||
+			l == "keep-alive" || strings.HasPrefix(l, "proxy-") ||
 			strings.HasPrefix(l, "x-forwarded-") || strings.HasPrefix(l, "x-keystone-") {
 			return bad("header", "Enter a header name such as X-Api-Key; it cannot be a header the proxy sets itself.")
 		}

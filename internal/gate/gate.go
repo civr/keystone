@@ -153,7 +153,8 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "unavailable", http.StatusServiceUnavailable)
 				return
 			}
-			if redirect, err := s.wantsSignIn(r, u, app); err != nil {
+			window := time.Duration(v.Settings.Vault.ReconfirmMinutes) * time.Minute
+			if redirect, err := s.wantsSignIn(r, u, app, sess, window); err != nil {
 				slog.Error("gate: credentials", "err", err)
 				http.Error(w, "unavailable", http.StatusServiceUnavailable)
 				return

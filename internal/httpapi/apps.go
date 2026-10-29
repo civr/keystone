@@ -481,8 +481,9 @@ func (s *server) updateApp(w http.ResponseWriter, r *http.Request) {
 		errInternal(w, "update app", err)
 		return
 	}
-	if a.Protocol != apps.Vault {
-		// A stored password must not outlive the app's use of the vault.
+	if a.Protocol != apps.Vault && !(a.Protocol == apps.GateP && a.Config.Gate != nil && a.Config.Gate.SignIn != nil) {
+		// A stored password must not outlive the app's use of the vault (a
+		// gate app that signs in for you uses it too).
 		if _, err := s.d.Pool.Exec(ctx, `delete from vault_entries where app_id = $1`, a.ID); err != nil {
 			errInternal(w, "clear vault", err)
 			return
