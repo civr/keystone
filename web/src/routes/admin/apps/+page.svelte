@@ -9,6 +9,7 @@
 	import { toast } from '$lib/toast.svelte';
 	import { latestQueue } from '$lib/serial';
 	import Sheet from '$lib/components/Sheet.svelte';
+	import { TEMPLATES, type AppTemplate } from '$lib/appTemplates';
 	import AppProtocol from '$lib/components/settings/AppProtocol.svelte';
 	import { protocolError, protocolForm, protocolPayload, type ProtocolForm } from '$lib/protocols';
 
@@ -158,7 +159,25 @@
 		}
 	}
 
+	// A template fills in the protocol and addresses from the app's address.
+	let template = $state<AppTemplate | null>(null);
+	let base = $state('');
+	function useTemplate(t: AppTemplate) {
+		template = t;
+		form.name = form.name || t.name;
+		form.color = t.color;
+	}
+	$effect(() => {
+		if (!template) return;
+		const b = base.trim().replace(/\/+$/, '');
+		if (!/^https?:\/\/[^/]+/.test(b)) return;
+		template.apply(b, proto);
+		form.url = template.tile ? template.tile(b) : b;
+	});
+
 	function openEditor(app: App | null) {
+		template = null;
+		base = '';
 		editing = app;
 		proto = protocolForm(app);
 		protoErrors = {};
@@ -381,6 +400,25 @@
 
 <Sheet bind:open={sheetOpen} title={editing ? 'Edit app' : 'New app'}>
 	<form class="form" onsubmit={saveApp} novalidate>
+		{#if !editing}
+			<div class="field">
+				<span class="field-label">Start from</span>
+				<div class="templates">
+					{#each TEMPLATES as t (t.id)}
+						<button type="button" class="tpl" class:on={template?.id === t.id} onclick={() => useTemplate(t)}>
+							<span class="dot" style:background={t.color}></span>{t.name}
+						</button>
+					{/each}
+				</div>
+				{#if template}
+					<label class="field tpl-base">
+						<span>{template.name} address</span>
+						<input class="input" type="url" bind:value={base} placeholder="https://{template.id}.home.lan" />
+						<small>{template.hint}</small>
+					</label>
+				{/if}
+			</div>
+		{/if}
 		<div class="preview">
 			{@render tile(form.name || '?', form.color, form.icon, 48)}
 			<span class="preview-name">{form.name.trim() || 'Name'}</span>
@@ -778,6 +816,38 @@
 	}
 	.swatch.custom:not([style*='transparent'])::after {
 		content: none;
+	}
+	.templates {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-top: 6px;
+	}
+	.tpl {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		height: 30px;
+		padding: 0 12px;
+		border: 1px solid var(--c-border);
+		border-radius: var(--radius-pill);
+		background: var(--c-bg-card);
+		color: var(--color-text);
+		font: inherit;
+		font-size: 0.875rem;
+		cursor: pointer;
+	}
+	.tpl.on {
+		border-color: var(--primary);
+		background: var(--c-selected-mid);
+	}
+	.tpl .dot {
+		width: 10px;
+		height: 10px;
+		border-radius: 3px;
+	}
+	.tpl-base {
+		margin-top: 12px;
 	}
 	.people {
 		display: grid;
