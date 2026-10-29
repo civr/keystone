@@ -6,7 +6,25 @@ export interface VaultItem {
 	username: string;
 	has_password: boolean;
 	has_note: boolean;
+	kind: VaultKind;
+	/** Provider id when the secret lives in 1Password. */
+	provider?: string;
 	updated_at: string;
+}
+
+export type VaultKind = 'login' | 'api_key' | 'token' | 'client_secret' | 'note';
+
+/** Kinds of secret, with how their fields are named. */
+export const KINDS: { id: VaultKind; label: string; user: string | null; secret: string }[] = [
+	{ id: 'login', label: 'Login', user: 'Username', secret: 'Password' },
+	{ id: 'api_key', label: 'API key', user: null, secret: 'Key' },
+	{ id: 'token', label: 'Token', user: null, secret: 'Token' },
+	{ id: 'client_secret', label: 'Client secret', user: 'Client ID', secret: 'Client secret' },
+	{ id: 'note', label: 'Secure note', user: null, secret: '' }
+];
+
+export function kindOf(id: string | undefined) {
+	return KINDS.find((k) => k.id === id) ?? KINDS[0];
 }
 
 /** Items whose title, username or address contains query (case-insensitive). */

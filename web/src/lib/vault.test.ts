@@ -8,6 +8,7 @@ const item = (title: string, username = '', url = ''): VaultItem => ({
 	username,
 	has_password: true,
 	has_note: false,
+	kind: 'login',
 	updated_at: ''
 });
 

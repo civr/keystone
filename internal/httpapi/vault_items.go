@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/civr/keystone/internal/accounts"
 	"github.com/civr/keystone/internal/crypto"
+	"github.com/civr/keystone/internal/onepassword"
 )
 
 // The vault's own items (Kluis): sign-in details for anything, not tied to an
@@ -35,6 +37,10 @@ func (s *server) vaultRoutes(r chi.Router) {
 	w.Put("/{id}", s.updateVaultItem)
 	w.Delete("/{id}", s.deleteVaultItem)
 	g.Post("/{id}/reveal", s.revealVaultItem)
+	g.Get("/status", s.vaultStatus)
+	g.Post("/lock", s.vaultLock)
+	g.Get("/providers", s.myProviders)
+	g.Get("/providers/{id}/items", s.providerItems)
 }
 
 type vaultItem struct {
@@ -44,6 +50,8 @@ type vaultItem struct {
 	Username    string    `json:"username"`
 	HasPassword bool      `json:"has_password"`
 	HasNote     bool      `json:"has_note"`
+	Kind        string    `json:"kind"`
+	Provider    string    `json:"provider,omitempty"` // provider id when linked
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
@@ -53,7 +61,13 @@ type vaultItemInput struct {
 	Username string  `json:"username"`
 	Password *string `json:"password"` // omitted: keep; "": clear
 	Note     *string `json:"note"`     // omitted: keep; "": clear
+	Kind     string  `json:"kind"`
+	// Provider and Ref link a 1Password item instead of storing a secret.
+	Provider string `json:"provider"`
+	Ref      string `json:"ref"`
 }
+
+var vaultKinds = []string{"login", "api_key", "token", "client_secret", "note"}
 
 // readVaultItem decodes and checks an item; false when an answer was written.
 func readVaultItem(w http.ResponseWriter, r *http.Request) (vaultItemInput, bool) {
@@ -75,6 +89,8 @@ func readVaultItem(w http.ResponseWriter, r *http.Request) (vaultItemInput, bool
 		writeInvalid(w, "password", "At most 1024 characters.")
 	case in.Note != nil && len(*in.Note) > maxVaultNote:
 		writeInvalid(w, "note", "The note may be at most 4096 characters.")
+	case in.Kind != "" && !slices.Contains(vaultKinds, in.Kind):
+		writeInvalid(w, "kind", "Choose what kind of secret this is.")
 	default:
 		return in, true
 	}
@@ -99,8 +115,8 @@ func (s *server) seal(v string) (*string, error) {
 func vaultOwner(r *http.Request) *string { return accounts.Ref(SessionFrom(r.Context()).UserID) }
 
 func (s *server) listVaultItems(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.d.Pool.Query(r.Context(), `select id, title, url, username, password_sealed is not null,
-		note_sealed is not null, updated_at from vault_items where user_id is not distinct from $1
+	rows, err := s.d.Pool.Query(r.Context(), `select id, title, url, username, password_sealed is not null or provider_id is not null,
+		note_sealed is not null, kind, coalesce(provider_id::text, ''), updated_at from vault_items where user_id is not distinct from $1
 		order by lower(title), id`, vaultOwner(r))
 	if err != nil {
 		errInternal(w, "vault list", err)
@@ -108,7 +124,7 @@ func (s *server) listVaultItems(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (vaultItem, error) {
 		var it vaultItem
-		err := row.Scan(&it.ID, &it.Title, &it.URL, &it.Username, &it.HasPassword, &it.HasNote, &it.UpdatedAt)
+		err := row.Scan(&it.ID, &it.Title, &it.URL, &it.Username, &it.HasPassword, &it.HasNote, &it.Kind, &it.Provider, &it.UpdatedAt)
 		return it, err
 	})
 	if err != nil {
@@ -135,9 +151,26 @@ func (s *server) createVaultItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var it vaultItem
-	err = s.d.Pool.QueryRow(ctx, `insert into vault_items (title, url, username, password_sealed, note_sealed, user_id)
-		values ($1, $2, $3, $4, $5, $6) returning id, title, url, username, password_sealed is not null, note_sealed is not null, updated_at`,
-		in.Title, in.URL, in.Username, pw, note, vaultOwner(r)).Scan(&it.ID, &it.Title, &it.URL, &it.Username, &it.HasPassword, &it.HasNote, &it.UpdatedAt)
+	if in.Kind == "" {
+		in.Kind = "login"
+	}
+	var prov *string
+	if in.Provider != "" {
+		p, err := s.providerByID(ctx, in.Provider)
+		if err != nil || !s.mayLink(ctx, p) {
+			writeInvalid(w, "provider", "You cannot link items from this provider.")
+			return
+		}
+		if _, _, ok := onepassword.SplitRef(in.Ref); !ok {
+			writeInvalid(w, "ref", "Choose an item.")
+			return
+		}
+		prov, pw, note = &p.ID, nil, nil // nothing secret is stored for a linked item
+	}
+	err = s.d.Pool.QueryRow(ctx, `insert into vault_items (title, url, username, password_sealed, note_sealed, user_id, kind, provider_id, provider_ref)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id, title, url, username, password_sealed is not null or provider_id is not null,
+		note_sealed is not null, kind, coalesce(provider_id::text, ''), updated_at`,
+		in.Title, in.URL, in.Username, pw, note, vaultOwner(r), in.Kind, prov, in.Ref).Scan(&it.ID, &it.Title, &it.URL, &it.Username, &it.HasPassword, &it.HasNote, &it.Kind, &it.Provider, &it.UpdatedAt)
 	if err != nil {
 		errInternal(w, "vault create", err)
 		return
@@ -171,11 +204,13 @@ func (s *server) updateVaultItem(w http.ResponseWriter, r *http.Request) {
 	err = s.d.Pool.QueryRow(ctx, `update vault_items set title = $2, url = $3, username = $4,
 		password_sealed = case when $5 then $6 else password_sealed end,
 		note_sealed = case when $7 then $8 else note_sealed end,
+		kind = coalesce(nullif($10, ''), kind),
 		updated_at = now()
-		where id = $1 and user_id is not distinct from $9
-		returning id, title, url, username, password_sealed is not null, note_sealed is not null, updated_at`,
-		id, in.Title, in.URL, in.Username, in.Password != nil, pw, in.Note != nil, note, vaultOwner(r)).
-		Scan(&it.ID, &it.Title, &it.URL, &it.Username, &it.HasPassword, &it.HasNote, &it.UpdatedAt)
+		where id = $1 and user_id is not distinct from $9 and (provider_id is null or not ($5 or $7))
+		returning id, title, url, username, password_sealed is not null or provider_id is not null, note_sealed is not null, kind,
+		coalesce(provider_id::text, ''), updated_at`,
+		id, in.Title, in.URL, in.Username, in.Password != nil, pw, in.Note != nil, note, vaultOwner(r), in.Kind).
+		Scan(&it.ID, &it.Title, &it.URL, &it.Username, &it.HasPassword, &it.HasNote, &it.Kind, &it.Provider, &it.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		errNotFound(w, r)
 		return
@@ -218,14 +253,14 @@ func (s *server) revealVaultItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := settingsFrom(ctx)
-	if !confirmedWithin(*SessionFrom(ctx), time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
+	if !vaultOpen(*SessionFrom(ctx), time.Duration(cfg.Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
 		writeError(w, http.StatusForbidden, "stepup_required", "Confirm this with your passkey first.")
 		return
 	}
-	var title string
+	var title, provID, ref string
 	var pw, note *string
-	err := s.d.Pool.QueryRow(ctx, `select title, password_sealed, note_sealed from vault_items
-		where id = $1 and user_id is not distinct from $2`, id, vaultOwner(r)).Scan(&title, &pw, &note)
+	err := s.d.Pool.QueryRow(ctx, `select title, password_sealed, note_sealed, coalesce(provider_id::text, ''), provider_ref from vault_items
+		where id = $1 and user_id is not distinct from $2`, id, vaultOwner(r)).Scan(&title, &pw, &note, &provID, &ref)
 	if errors.Is(err, pgx.ErrNoRows) {
 		errNotFound(w, r)
 		return
@@ -235,6 +270,15 @@ func (s *server) revealVaultItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]string{"password": "", "note": ""}
+	if provID != "" {
+		sec, err := s.providerSecret(ctx, provID, ref)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "provider", "The item could not be read from 1Password: "+err.Error())
+			return
+		}
+		out = map[string]string{"password": sec.Password, "note": sec.Note, "username": sec.Username}
+		pw, note = nil, nil
+	}
 	for k, v := range map[string]*string{"password": pw, "note": note} {
 		if v == nil {
 			continue

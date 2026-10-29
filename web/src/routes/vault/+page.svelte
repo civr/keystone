@@ -6,7 +6,7 @@
 	import { pageTitle } from '$lib/brand.svelte';
 	import { copyText } from '$lib/copy';
 	import { safeHref } from '$lib/apps';
-	import { filterItems, strongPassword, type VaultItem } from '$lib/vault';
+	import { filterItems, kindOf, KINDS, strongPassword, type VaultItem, type VaultKind } from '$lib/vault';
 	import { toast } from '$lib/toast.svelte';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
@@ -29,6 +29,8 @@
 	onMount(() => {
 		api.get<Me>('/me').then((m) => (me = m), () => {});
 		load();
+		refreshStatus();
+		api.get<{ providers: { id: string; name: string }[] }>('/vault/providers').then((r) => (providers = r.providers), () => {});
 	});
 
 	// ── Detail ──
@@ -52,6 +54,7 @@
 		revealing = true;
 		try {
 			secret = await api.send<{ password: string; note: string }>('POST', `/vault/${current.id}/reveal`);
+			refreshStatus();
 			return secret;
 		} catch (e) {
 			toast(e instanceof ApiError ? e.message : 'The password could not be loaded.', 'error');
@@ -76,17 +79,50 @@
 	}
 
 	// ── Edit ──
-	type Form = { title: string; url: string; username: string; password: string; note: string };
+	type Form = { title: string; url: string; username: string; password: string; note: string; kind: VaultKind };
 	let editOpen = $state(false);
 	let editing = $state<VaultItem | null>(null);
-	let form = $state<Form>({ title: '', url: '', username: '', password: '', note: '' });
+	let form = $state<Form>({ title: '', url: '', username: '', password: '', note: '', kind: 'login' });
+	const fk = $derived(kindOf(form.kind));
+
+	// Linking from a credential provider (1Password Connect) instead of storing.
+	let providers = $state<{ id: string; name: string }[]>([]);
+	let source = $state<'keystone' | string>('keystone');
+	let pItems = $state<{ Ref: string; Title: string; Vault: string }[] | null>(null);
+	let pQuery = $state('');
+	let pRef = $state('');
+	async function loadProviderItems(id: string) {
+		pItems = null;
+		pRef = '';
+		try {
+			pItems = (await api.get<{ items: { Ref: string; Title: string; Vault: string }[] }>(`/vault/providers/${id}/items`)).items;
+		} catch (e) {
+			toast(e instanceof ApiError ? e.message : '1Password could not be reached.', 'error');
+			source = 'keystone';
+		}
+	}
+
+	// Lock state, shown in the list header.
+	let status = $state<{ open: boolean; seconds_left: number } | null>(null);
+	async function refreshStatus() {
+		status = await api.get<{ open: boolean; seconds_left: number }>('/vault/status').catch(() => null);
+	}
+	async function lockNow() {
+		await api.send('POST', '/vault/lock').catch(() => {});
+		secret = null;
+		await refreshStatus();
+		toast('Vault locked');
+	}
 	let errors = $state<Partial<Record<keyof Form, string>>>({});
 	let saving = $state(false);
 	let confirmDelete = $state(false);
 
 	function startAdd() {
 		editing = null;
-		form = { title: '', url: '', username: '', password: strongPassword(), note: '' };
+		form = { title: '', url: '', username: '', password: strongPassword(), note: '', kind: 'login' };
+		source = 'keystone';
+		pItems = null;
+		pRef = '';
 		errors = {};
 		confirmDelete = false;
 		editOpen = true;
@@ -96,7 +132,8 @@
 		if (!current) return;
 		editing = current;
 		// The password is not filled in: empty keeps the stored one.
-		form = { title: current.title, url: current.url, username: current.username, password: '', note: secret?.note ?? '' };
+		form = { title: current.title, url: current.url, username: current.username, password: '', note: secret?.note ?? '', kind: current.kind };
+		source = current.provider ? current.provider : 'keystone';
 		errors = {};
 		confirmDelete = false;
 		detailOpen = false;
@@ -110,8 +147,15 @@
 		if (!form.title.trim()) return void (errors.title = 'Give the item a name.');
 		saving = true;
 		try {
-			const body: Record<string, string> = { title: form.title, url: form.url, username: form.username, note: form.note };
-			if (!editing || form.password) body.password = form.password;
+			const body: Record<string, string> = { title: form.title, url: form.url, username: form.username, kind: form.kind };
+			if (source !== 'keystone' && !editing) {
+				if (!pRef) throw new ApiError('invalid', 'Choose an item from 1Password.', 400, { field: 'title' });
+				body.provider = source;
+				body.ref = pRef;
+			} else if (source === 'keystone') {
+				body.note = form.note;
+				if (!editing || form.password) body.password = form.password;
+			}
 			const saved = editing
 				? await api.send<VaultItem>('PUT', `/vault/${editing.id}`, body)
 				: await api.send<VaultItem>('POST', '/vault', body);
@@ -170,6 +214,13 @@
 		<section class="list-pane" aria-label="Passwords">
 			<div class="list-head">
 				<span class="count">{items ? `${shown.length} ${shown.length === 1 ? 'item' : 'items'}` : ''}</span>
+				{#if status?.open}
+					<button type="button" class="btn btn-flat btn-sm lock" onclick={lockNow} title="Unlocked for {Math.ceil(status.seconds_left / 60)} more minutes">
+						<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V7a4 4 0 0 1 8 0v2M5 9h10v7H5z" /></svg>Lock
+					</button>
+				{:else if status}
+					<span class="locked"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V7a4 4 0 0 1 8 0v2M5 9h10v7H5z" /></svg>Locked</span>
+				{/if}
 				<button type="button" class="btn btn-secondary btn-sm add" onclick={startAdd} aria-label="Add a password">
 					<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11" /></svg>
 				</button>
@@ -224,14 +275,14 @@
 		</header>
 		<div class="fields">
 			<div class="fld">
-				<span class="k">username</span>
+				<span class="k">{(kindOf(it.kind).user ?? 'username').toLowerCase()}</span>
 				<div class="v-row">
 					<span class="v">{it.username || '—'}</span>
 					{#if it.username}<button type="button" class="btn btn-flat btn-sm" onclick={() => copy(it.username, 'Username')}>Copy</button>{/if}
 				</div>
 			</div>
 			<div class="fld">
-				<span class="k">password</span>
+				<span class="k">{(kindOf(it.kind).secret || 'secret').toLowerCase()}{#if it.provider} · from 1Password{/if}</span>
 				<div class="v-row">
 					<span class="v dots">{it.has_password ? '••••••••••••' : '—'}</span>
 					{#if it.has_password}
@@ -268,8 +319,45 @@
 	{#if current}{@render detail(current)}{/if}
 </Sheet>
 
-<Sheet bind:open={editOpen} title={editing ? 'Edit' : 'New password'}>
+<Sheet bind:open={editOpen} title={editing ? 'Edit' : 'New item'}>
 	<form class="form" onsubmit={save} novalidate>
+		{#if !editing && providers.length}
+			<fieldset class="field">
+				<legend class="field-label">Where the secret lives</legend>
+				<div class="segmented">
+					<label><input type="radio" bind:group={source} value="keystone" /><span>In Keystone</span></label>
+					{#each providers as p (p.id)}
+						<label><input type="radio" bind:group={source} value={p.id} onchange={() => loadProviderItems(p.id)} /><span>{p.name}</span></label>
+					{/each}
+				</div>
+			</fieldset>
+			{#if source !== 'keystone'}
+				<div class="field">
+					<span class="field-label">Item</span>
+					{#if pItems === null}
+						<p class="help">Loading items…</p>
+					{:else}
+						<input class="input" type="search" placeholder="Search 1Password" bind:value={pQuery} />
+						<ul class="pick">
+							{#each pItems.filter((i) => !pQuery.trim() || i.Title.toLowerCase().includes(pQuery.trim().toLowerCase())).slice(0, 50) as i (i.Ref)}
+								<li>
+									<button type="button" class:on={pRef === i.Ref} onclick={() => ((pRef = i.Ref), (form.title = form.title || i.Title))}>
+										{i.Title}<small>{i.Vault}</small>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+					<small>Keystone keeps only a link; the secret is read from 1Password each time it is used.</small>
+				</div>
+			{/if}
+		{/if}
+		<fieldset class="field">
+			<legend class="field-label">Kind</legend>
+			<select class="input" bind:value={form.kind}>
+				{#each KINDS as k (k.id)}<option value={k.id}>{k.label}</option>{/each}
+			</select>
+		</fieldset>
 		<label class="field">
 			<span>Name</span>
 			<input class="input" bind:value={form.title} placeholder="Router" aria-invalid={errors.title ? 'true' : undefined} />
@@ -280,13 +368,16 @@
 			<input class="input" type="url" bind:value={form.url} placeholder="https://" aria-invalid={errors.url ? 'true' : undefined} />
 			{#if errors.url}<small class="field-error" role="alert">{errors.url}</small>{/if}
 		</label>
+		{#if fk.user && source === 'keystone'}
 		<label class="field">
-			<span>Username</span>
+			<span>{fk.user}</span>
 			<input class="input" bind:value={form.username} autocomplete="off" autocapitalize="none" spellcheck="false" />
 			{#if errors.username}<small class="field-error" role="alert">{errors.username}</small>{/if}
 		</label>
+		{/if}
+		{#if fk.secret && source === 'keystone'}
 		<div class="field">
-			<label class="field-label" for="vault-password">Password</label>
+			<label class="field-label" for="vault-password">{fk.secret}</label>
 			<div class="pw-row">
 				<input
 					id="vault-password"
@@ -301,11 +392,14 @@
 			{#if form.password && !errors.password}<small>{form.password === '' ? '' : 'Saved encrypted. It is never shown, only copied.'}</small>{/if}
 			{#if errors.password}<small class="field-error" role="alert">{errors.password}</small>{/if}
 		</div>
+		{/if}
+		{#if source === 'keystone'}
 		<label class="field">
 			<span>Note</span>
 			<textarea class="input note-input" bind:value={form.note} rows="3"></textarea>
 			{#if errors.note}<small class="field-error" role="alert">{errors.note}</small>{/if}
 		</label>
+		{/if}
 		<div class="sheet-actions">
 			{#if editing}
 				<button type="button" class="btn {confirmDelete ? 'btn-danger' : 'btn-secondary danger-ink'}" onclick={remove} disabled={saving}>
@@ -495,6 +589,61 @@
 	}
 	.link-v {
 		color: var(--primary);
+	}
+	.lock,
+	.locked {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		margin-left: auto;
+		margin-right: 8px;
+		font-size: 0.875rem;
+	}
+	.locked {
+		color: var(--color-text-muted);
+	}
+	.lock svg,
+	.locked svg {
+		width: 14px;
+		height: 14px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+	}
+	.pick {
+		max-height: 220px;
+		overflow-y: auto;
+		margin: 6px 0 0;
+		padding: 0;
+		list-style: none;
+		border: 1px solid var(--c-border);
+		border-radius: var(--radius-control);
+	}
+	.pick button {
+		display: flex;
+		justify-content: space-between;
+		width: 100%;
+		padding: 8px 12px;
+		border: 0;
+		background: none;
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.pick button:hover {
+		background: var(--c-hover);
+	}
+	.pick button.on {
+		background: var(--c-selected-mid);
+	}
+	.pick small {
+		color: var(--color-text-muted);
+	}
+	fieldset.field {
+		margin: 0;
+		padding: 0;
+		border: 0;
 	}
 	.pw-row {
 		display: flex;

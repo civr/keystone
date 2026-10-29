@@ -73,6 +73,8 @@ const ACTIONS: Record<string, string> = {
 	'user.updated': 'User changed',
 	'user.deleted': 'User deleted',
 	'account.password_changed': 'Password changed',
+	'vault.provider_added': 'Credential provider added',
+	'vault.provider_removed': 'Credential provider removed',
 	'totp.enabled': 'Authenticator added',
 	'totp.disabled': 'Authenticator removed',
 	'totp.reset': 'Authenticator reset by an admin',

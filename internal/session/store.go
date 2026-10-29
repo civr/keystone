@@ -48,11 +48,14 @@ return 1`)
 type Session struct {
 	ID string
 	// UserID is the signed-in account (package accounts); "" is the owner.
-	UserID              string
-	CreatedAt           time.Time
-	LastSeenAt          time.Time
-	LastFullAuthAt      time.Time
-	LastPasskeyAt       time.Time
+	UserID         string
+	CreatedAt      time.Time
+	LastSeenAt     time.Time
+	LastFullAuthAt time.Time
+	LastPasskeyAt  time.Time
+	// VaultLockedAt: the vault was locked by hand; confirmations before it
+	// no longer open the vault.
+	VaultLockedAt       time.Time
 	IP                  string
 	UserAgent           string
 	MustRegisterPasskey bool

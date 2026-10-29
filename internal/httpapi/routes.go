@@ -65,6 +65,10 @@ func (s *server) adminRoutes(r chi.Router) {
 	own.Get("/emergency", s.getEmergency)
 	ownW.Put("/emergency", s.putEmergency)
 
+	can(rbac.VaultWrite).Get("/vault/providers", s.adminListProviders)
+	canW(rbac.VaultWrite).Post("/vault/providers", s.createProvider)
+	canW(rbac.VaultWrite).Delete("/vault/providers/{id}", s.deleteProvider)
+
 	can(rbac.SecurityWrite).Get("/keys", s.listKeys)
 	canW(rbac.SecurityWrite).Post("/keys/{use}/rotate", s.rotateKey)
 

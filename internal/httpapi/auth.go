@@ -150,6 +150,16 @@ func (s *server) mayUse(ctx context.Context, a apps.App) bool {
 	return err == nil && a.AllowedFor(acct)
 }
 
+// vaultOpen reports whether the vault is unlocked in sess: confirmed within
+// the vault's window, and after any manual lock.
+func vaultOpen(sess session.Session, d time.Duration, now time.Time) bool {
+	last := sess.LastPasskeyAt
+	if sess.NoPasskey && sess.LastFullAuthAt.After(last) {
+		last = sess.LastFullAuthAt
+	}
+	return confirmedWithin(sess, d, now) && last.After(sess.VaultLockedAt)
+}
+
 // accountKey turns a session's UserID into an account id ("" → owner).
 func accountKey(user string) string {
 	if user == "" {

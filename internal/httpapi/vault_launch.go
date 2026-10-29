@@ -49,7 +49,7 @@ func (s *server) vaultLaunch(w http.ResponseWriter, r *http.Request) {
 		writeInvalid(w, "config.vault.mode", "This app copies the password instead.")
 		return
 	}
-	if !confirmedWithin(*SessionFrom(ctx), time.Duration(settingsFrom(ctx).Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
+	if !vaultOpen(*SessionFrom(ctx), time.Duration(settingsFrom(ctx).Vault.ReconfirmMinutes)*time.Minute, time.Now()) {
 		writeError(w, http.StatusForbidden, "stepup_required", "Confirm this with your passkey first.")
 		return
 	}
