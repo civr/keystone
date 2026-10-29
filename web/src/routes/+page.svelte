@@ -8,7 +8,6 @@
 
 	let me = $state<Me | null>(null);
 	let apps = $state<App[] | null>(null);
-	let recentIds = $state<string[]>([]);
 	let loadError = $state<string | null>(null);
 	let query = $state('');
 
@@ -18,12 +17,7 @@
 		loadError = null;
 		try {
 			// Both requests in parallel: one round-trip of latency for the whole page.
-			const [m, a, r] = await Promise.all([
-				api.get<Me>('/me'),
-				api.get<{ apps: App[] }>('/apps?mine=1'),
-				api.get<{ ids: string[] }>('/apps/recent').catch(() => ({ ids: [] }))
-			]);
-			recentIds = r.ids;
+			const [m, a] = await Promise.all([api.get<Me>('/me'), api.get<{ apps: App[] }>('/apps?mine=1')]);
 			me = m;
 			apps = a.apps;
 		} catch (e) {
@@ -105,12 +99,6 @@
 			{/if}
 		</div>
 	{:else}
-		{@const recent = query.trim() ? [] : recentIds.map((id) => apps!.find((a) => a.id === id)).filter((a): a is App => !!a)}
-		{#if recent.length}
-			<h2 class="section">Recently used</h2>
-			<AppGrid apps={recent} />
-			<h2 class="section">All apps</h2>
-		{/if}
 		<AppGrid apps={matches} highlightFirst={query.trim() !== '' && matches.length > 0} />
 		{#if matches.length === 0}
 			<div class="surface state">
@@ -124,15 +112,6 @@
 	.head h1 {
 		margin: 4px 0 18px;
 		font-size: 1.75rem;
-	}
-	.section {
-		margin: 22px 0 12px;
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--color-text-muted);
-	}
-	.section:first-of-type {
-		margin-top: 0;
 	}
 	.banner {
 		display: flex;
