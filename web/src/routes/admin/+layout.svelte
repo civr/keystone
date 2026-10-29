@@ -43,8 +43,8 @@
 </AppShell>
 
 <style>
+	/* The admin portal uses the whole window. */
 	.pane {
-		max-width: 1080px;
-		margin: 0 auto;
+		max-width: none;
 	}
 </style>
