@@ -60,7 +60,7 @@
 		height: 148px;
 		padding: 18px 12px 14px;
 		border: 1px solid var(--c-border);
-		border-radius: 14px;
+		border-radius: var(--radius-card);
 		background: var(--c-bg-card);
 		color: var(--color-text);
 		text-decoration: none;

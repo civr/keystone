@@ -172,7 +172,7 @@
 		gap: 2px;
 		padding: 18px 20px;
 		border: 1px solid var(--c-border);
-		border-radius: 12px;
+		border-radius: var(--radius-card);
 		background: var(--c-bg-card);
 		color: var(--color-text);
 		text-decoration: none;
@@ -195,7 +195,7 @@
 		padding: 18px 20px;
 		margin-bottom: 20px;
 		border: 1px solid var(--c-border);
-		border-radius: 12px;
+		border-radius: var(--radius-card);
 		background: var(--c-bg-card);
 	}
 	.grid > .box {

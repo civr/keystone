@@ -310,25 +310,6 @@
 		display: none;
 	}
 
-	/* The user portal has a light menu (Okta-like launcher); the admin
-	   portal keeps the dark one. */
-	.shell.user {
-		--nav-bg: var(--c-bg-card);
-		--nav-ink: var(--color-text);
-		--nav-ink-2: var(--color-text-muted);
-		--nav-hover: var(--c-hover);
-		--nav-active: var(--c-selected-mid);
-		--nav-active-ink: var(--primary-dark);
-		--nav-rule: var(--c-border);
-	}
-	.shell.user .rail {
-		border-right: 1px solid var(--c-border);
-	}
-	.shell.user .nav-link.active,
-	.shell.user .nav-link.active:hover {
-		box-shadow: none;
-		font-weight: 600;
-	}
 	/* The admin menu is longer: denser rows so it fits the window. */
 	.shell.admin .nav-link {
 		height: 34px;
@@ -338,7 +319,6 @@
 	.shell.admin .glyph {
 		width: 22px;
 		height: 22px;
-		border-radius: 6px;
 	}
 	.shell.admin .nav-link .glyph svg {
 		width: 14px;
@@ -385,6 +365,7 @@
 	/* ── Sidebar ── */
 	.rail {
 		background: var(--nav-bg);
+		border-right: 1px solid var(--topbar-stroke);
 		color: var(--nav-ink);
 	}
 	.rail-inner {
@@ -450,15 +431,16 @@
 		margin: 12px 18px;
 		background: var(--nav-rule);
 	}
-	/* Rows inset 10px; the selected row is tinted with the accent. */
+	/* Rows inset 10px; the selected row is shaded and marked by an accent bar. */
 	.nav-link {
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 9px;
 		margin: 2px 12px;
 		padding: 0 10px;
 		height: 40px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		color: var(--nav-ink);
 		font-size: 1.0625rem;
 		font-weight: 400;
@@ -473,16 +455,14 @@
 	.nav-link:active {
 		background: var(--press);
 	}
-	/* Each item has a small coloured tile with a white symbol, as in System Settings. */
+	/* Icons are monochrome; the selected one takes the accent. */
 	.glyph {
 		display: grid;
 		place-items: center;
 		flex: none;
 		width: 26px;
 		height: 26px;
-		border-radius: 7px;
-		background: var(--tint);
-		color: #fff;
+		color: var(--nav-ink-2);
 	}
 	.nav-link .glyph svg {
 		width: 16px;
@@ -492,8 +472,22 @@
 	.nav-link.active,
 	.nav-link.active:hover {
 		background: var(--nav-active);
-		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 		color: var(--nav-active-ink);
+		font-weight: 600;
+	}
+	.nav-link.active::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 50%;
+		width: 3px;
+		height: 16px;
+		margin-top: -8px;
+		border-radius: var(--radius-full);
+		background: var(--primary);
+	}
+	.nav-link.active .glyph {
+		color: var(--primary-dark);
 	}
 	.nav-link.icon-only {
 		justify-content: center;

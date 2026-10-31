@@ -551,7 +551,7 @@
 		gap: 16px;
 		padding: 20px 22px;
 		border: 1px solid var(--c-border);
-		border-radius: 12px;
+		border-radius: var(--radius-card);
 		margin-bottom: 20px;
 	}
 	.fld {
@@ -588,7 +588,7 @@
 		white-space: pre-wrap;
 	}
 	.link-v {
-		color: var(--primary);
+		color: var(--primary-dark);
 	}
 	.lock,
 	.locked {

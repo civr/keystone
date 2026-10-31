@@ -58,7 +58,7 @@
 		padding: 8px;
 		border-radius: 10px;
 		border: 1px solid var(--c-border);
-		background: #f5f5f7;
+		background: #f5f5f5;
 	}
 	.swatch span {
 		width: 60%;
@@ -68,13 +68,13 @@
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
 	}
 	.swatch.dark {
-		background: #1c1c1e;
+		background: #141414;
 	}
 	.swatch.dark span {
 		background: #3a3a3c;
 	}
 	.swatch.system {
-		background: linear-gradient(135deg, #f5f5f7 50%, #1c1c1e 50%);
+		background: linear-gradient(135deg, #f5f5f5 50%, #141414 50%);
 	}
 	.look.on .swatch {
 		box-shadow:

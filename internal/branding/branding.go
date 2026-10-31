@@ -38,7 +38,7 @@ const MaxName = 40
 
 // Defaults is Keystone's own look.
 func Defaults() Branding {
-	return Branding{Name: "Keystone", Accent: "#007aff", Background: "#f5f5f7"}
+	return Branding{Name: "Keystone", Accent: "#0f6cbd", Background: "#f5f5f5"}
 }
 
 var hexRe = regexp.MustCompile(`^#[0-9a-f]{6}$`)

@@ -1,9 +1,9 @@
 /*
- * Keystone design tokens — flat and light.
+ * Keystone design tokens — Fluent 2.
  *
- * The system font, a grey canvas with white boxes edged by a 1px hairline,
- * solid chrome, small corner radii, no shadows and no blur. Everything that
- * is coloured derives from two tokens the huisstijl sets (Instellingen ›
+ * Segoe type, layered neutral backgrounds (canvas, chrome, cards), 1px
+ * strokes, 4px corners and Fluent's two-part shadows. Everything that is
+ * coloured derives from two tokens the huisstijl sets (Instellingen ›
  * Huisstijl; keystone-core writes them into the page): --primary, the accent,
  * and --color-bg, the canvas.
  */
@@ -11,107 +11,107 @@
 :root {
 	color-scheme: light;
 
-	/* ── Type: the platform's own face first ── */
-	--font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro', 'Segoe UI Variable Text', 'Segoe UI', system-ui,
-		Roboto, 'Helvetica Neue', Arial, sans-serif;
-	--font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro', 'Segoe UI Variable Display', 'Segoe UI',
-		system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif;
-	--font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, 'Cascadia Code', Consolas, 'Liberation Mono', monospace;
+	/* ── Type: Segoe first, the platform's own face where it is missing ── */
+	--font: 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue',
+		Arial, sans-serif;
+	--font-display: 'Segoe UI Variable Display', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, Roboto,
+		'Helvetica Neue', Arial, sans-serif;
+	--font-mono: 'Cascadia Code', 'Cascadia Mono', Consolas, ui-monospace, 'SF Mono', Menlo, 'Liberation Mono', monospace;
 
 	/* ── Accent (huisstijl) and its shades ── */
-	--primary: #007aff;
+	--primary: #0f6cbd;
 	--primary-dark: color-mix(in srgb, var(--primary) 86%, #000);
 	--primary-light: color-mix(in srgb, var(--primary) 75%, #fff);
 	--primary-pressed: color-mix(in srgb, var(--primary) 74%, #000);
-	--focus-ring: color-mix(in srgb, var(--primary) 45%, transparent);
+	--focus-ring: #000000;
 
-	/* ── Labels, fills and separators (iOS light) ── */
-	--color-bg: #f5f5f7; /* canvas (huisstijl) */
+	/* ── Neutrals (Fluent light): canvas bg3, chrome bg2, cards bg1 ── */
+	--color-bg: #f5f5f5; /* canvas (huisstijl) */
 	--color-surface: #ffffff;
-	--color-border: #d1d1d6; /* systemGray4: field strokes */
-	--color-text: #1d1d1f; /* label */
-	--color-text-muted: #6e6e73; /* secondaryLabel, 4.6:1 on white */
-	--color-text-faint: #6e6e73; /* small text stays readable: same as secondary */
-	--c-700: #3a3a3c;
-	--c-400: #aeaeb2; /* systemGray2: disabled ink */
-	--c-border: #e5e5ea; /* systemGray5 */
-	--c-border2: #ececf0; /* separators inside cards */
-	--c-border3: #f5f5f7;
+	--color-border: #d1d1d1; /* stroke1: field strokes */
+	--color-text: #242424; /* foreground1 */
+	--color-text-muted: #616161; /* foreground3, 6.2:1 on white */
+	--color-text-faint: #616161; /* small text stays readable: same as secondary */
+	--c-700: #424242;
+	--c-400: #bdbdbd; /* disabled ink */
+	--c-border: #e0e0e0; /* stroke2 */
+	--c-border2: #ebebeb; /* separators inside cards */
+	--c-border3: #f5f5f5;
 	--c-bg-card: #ffffff;
 	--c-elevated: #ffffff; /* sheets, menus, toasts */
 	--c-field: #ffffff; /* inputs */
-	--c-bg-section: #f9f9fb;
-	--c-bg-sunken: rgba(118, 118, 128, 0.12); /* tertiarySystemFill: search fields, segmented tracks */
+	--c-bg-section: #fafafa;
+	--c-bg-sunken: #f0f0f0; /* search fields, segmented tracks */
 	--c-hover: rgba(0, 0, 0, 0.04);
 	--c-bg-page: var(--color-bg);
 
-	/* ── Status: system colours, with darker ink for text ── */
-	--color-success: #34c759;
-	--color-success-text: #248a3d;
-	--color-success-tint: #eaf8ee;
-	--color-warning: #ff9500;
-	--color-warning-text: #b35900;
-	--color-warning-tint: #fff4e5;
-	--color-danger: #ff3b30;
-	--color-danger-text: #d70015;
-	--color-danger-tint: #ffeceb;
-	--color-info-tint: #eaf3ff;
+/* ── Status: system colours, with darker ink for text ── */
+	--color-success: #107c10;
+	--color-success-text: #0e700e;
+	--color-success-tint: #f1faf1;
+	--color-warning: #f7630c;
+	--color-warning-text: #bc4b09;
+	--color-warning-tint: #fff9f5;
+	--color-danger: #c50f1f;
+	--color-danger-text: #b10e1c;
+	--color-danger-tint: #fdf3f4;
+	--color-info-tint: #ebf3fc;
 
 	/* ── Selection tints from the accent ── */
 	--c-selected: color-mix(in srgb, var(--primary) 18%, #fff);
 	--c-selected-mid: color-mix(in srgb, var(--primary) 11%, #fff);
 	--c-selected-light: color-mix(in srgb, var(--primary) 6%, #fff);
 
-	--t-slate: #3a3a3c;
-	--t-slate-bg: rgba(118, 118, 128, 0.12);
+	--t-slate: #424242;
+	--t-slate-bg: #f0f0f0;
 
-	/* ── Chrome: a slate sidebar and a light toolbar, as 1Password for Mac ── */
-	--material-bar: #f2f2f4;
-	--material-side: #3b4555;
+	/* ── Chrome: light top bar and navigation pane, as Outlook and Teams ── */
+	--material-bar: #fafafa;
+	--material-side: #fafafa;
 	--material-blur: none;
 	--topbar-bg: var(--material-bar);
-	--topbar-ink: #1d1d1f;
-	--topbar-ink-2: #6e6e73;
-	--topbar-hover: rgba(0, 0, 0, 0.05);
-	--topbar-stroke: #d4d4d8;
+	--topbar-ink: #242424;
+	--topbar-ink-2: #616161;
+	--topbar-hover: rgba(0, 0, 0, 0.04);
+	--topbar-stroke: #e0e0e0;
 	--topbar-field: #ffffff;
-	--topbar-field-stroke: #cfcfd4;
+	--topbar-field-stroke: #d1d1d1;
 	--nav-bg: var(--material-side);
-	--nav-ink: #ffffff;
-	--nav-ink-2: rgba(255, 255, 255, 0.62);
-	--nav-hover: rgba(255, 255, 255, 0.07);
-	--nav-active: rgba(255, 255, 255, 0.13);
-	--nav-active-ink: #ffffff;
-	--nav-rule: rgba(255, 255, 255, 0.14);
+	--nav-ink: #242424;
+	--nav-ink-2: #616161;
+	--nav-hover: rgba(0, 0, 0, 0.04);
+	--nav-active: rgba(0, 0, 0, 0.06);
+	--nav-active-ink: #242424;
+	--nav-rule: #e0e0e0;
 	--nav-active-shadow: none;
 	--nav-w: 248px;
 	--nav-w-icons: 64px;
 
-	/* ── Radii: small and few ── */
-	--radius-xs: 4px;
-	--radius-sm: 6px;
-	--radius-control: 6px; /* inputs, buttons */
-	--radius-md: 8px; /* menus, notes */
-	--radius-lg: 8px;
-	--radius-card: 10px; /* boxes */
-	--radius-sheet: 10px;
+	/* ── Radii: Fluent's small (2), medium (4), large (6) and x-large (8) ── */
+	--radius-xs: 2px;
+	--radius-sm: 4px;
+	--radius-control: 4px; /* inputs, buttons */
+	--radius-md: 4px; /* menus, notes */
+	--radius-lg: 6px;
+	--radius-card: 4px; /* boxes */
+	--radius-sheet: 8px;
 	--radius-icon: 18%; /* app tiles */
 	--radius-full: 9999px;
 	--radius-pill: 9999px;
 
-	/* ── Depth: none; anything raised is edged by a hairline ── */
-	--shadow-sm: none;
-	--shadow-hover: 0 0 0 1px var(--c-border);
-	--shadow-md: 0 0 0 1px var(--c-border);
-	--shadow-lg: 0 0 0 1px var(--c-border);
+	/* ── Depth: Fluent shadow2/8/16/28, an ambient blur plus a key offset ── */
+	--shadow-sm: 0 0 2px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.14);
+	--shadow-hover: 0 0 2px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.14);
+	--shadow-md: 0 0 2px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.14);
+	--shadow-lg: 0 0 8px rgba(0, 0, 0, 0.12), 0 14px 28px rgba(0, 0, 0, 0.14);
 
-	/* ── Motion: Apple's ease, and the iOS sheet curve for arrivals ── */
-	--ease: cubic-bezier(0.25, 0.1, 0.25, 1);
-	--ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+	/* ── Motion: Fluent's easy-ease, and decelerate-max for arrivals ── */
+	--ease: cubic-bezier(0.33, 0, 0.67, 1);
+	--ease-out: cubic-bezier(0.1, 0.9, 0.2, 1);
 	--dur-1: 100ms;
-	--dur-2: 180ms;
-	--dur-3: 240ms;
-	--dur-4: 320ms;
+	--dur-2: 150ms;
+	--dur-3: 200ms;
+	--dur-4: 300ms;
 
 	/* ── Z-index ── */
 	--z-sticky: 10;
@@ -150,90 +150,112 @@
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
 		color-scheme: dark;
-		--color-bg: #000000;
-		--color-surface: #1c1c1e;
-		--color-border: #48484a;
-		--color-text: #f5f5f7;
-		--color-text-muted: #a1a1a6;
-		--color-text-faint: #a1a1a6;
-		--c-700: #d1d1d6;
-		--c-400: #636366;
-		--c-border: #38383a;
-		--c-border2: #2c2c2e;
-		--c-border3: #1c1c1e;
-		--c-bg-card: #1c1c1e;
-		--c-elevated: #2c2c2e;
-		--c-field: #1c1c1e;
-		--c-bg-section: #232325;
-		--c-bg-sunken: rgba(118, 118, 128, 0.24);
+		--color-bg: #141414;
+		--color-surface: #292929;
+		--color-border: #666666;
+		--color-text: #ffffff;
+		--color-text-muted: #adadad;
+		--color-text-faint: #adadad;
+		--c-700: #d6d6d6;
+		--c-400: #5c5c5c;
+		--c-border: #3d3d3d;
+		--c-border2: #333333;
+		--c-border3: #292929;
+		--c-bg-card: #292929;
+		--c-elevated: #2e2e2e;
+		--c-field: #292929;
+		--c-bg-section: #242424;
+		--c-bg-sunken: #1f1f1f;
 		--c-hover: rgba(255, 255, 255, 0.06);
 		--press: rgba(255, 255, 255, 0.1);
-		--c-selected: color-mix(in srgb, var(--primary) 34%, #1c1c1e);
-		--c-selected-mid: color-mix(in srgb, var(--primary) 24%, #1c1c1e);
-		--c-selected-light: color-mix(in srgb, var(--primary) 14%, #1c1c1e);
-		--primary-dark: color-mix(in srgb, var(--primary) 80%, #fff);
-		--color-success-tint: rgba(48, 209, 88, 0.16);
-		--color-success-text: #30d158;
-		--color-warning-tint: rgba(255, 159, 10, 0.16);
-		--color-warning-text: #ffb340;
-		--color-danger-tint: rgba(255, 69, 58, 0.16);
-		--color-danger-text: #ff6961;
-		--color-info-tint: rgba(10, 132, 255, 0.16);
-		--material-bar: #1c1c1e;
-		--topbar-ink: #f5f5f7;
-		--topbar-ink-2: #a1a1a6;
-		--topbar-hover: rgba(255, 255, 255, 0.08);
-		--topbar-stroke: #38383a;
-		--topbar-field: #2c2c2e;
-		--topbar-field-stroke: #3a3a3c;
-		--material-side: #161618;
-		--t-slate: #d1d1d6;
-		--t-slate-bg: rgba(118, 118, 128, 0.24);
+		--c-selected: color-mix(in srgb, var(--primary) 34%, #292929);
+		--c-selected-mid: color-mix(in srgb, var(--primary) 24%, #292929);
+		--c-selected-light: color-mix(in srgb, var(--primary) 14%, #292929);
+		--primary-dark: color-mix(in srgb, var(--primary) 60%, #fff);
+		--focus-ring: #ffffff;
+		--color-success-tint: rgba(84, 176, 84, 0.16);
+		--color-success-text: #54b054;
+		--color-warning-tint: rgba(250, 160, 107, 0.16);
+		--color-warning-text: #faa06b;
+		--color-danger-tint: rgba(220, 98, 109, 0.16);
+		--color-danger-text: #dc626d;
+		--color-info-tint: rgba(71, 158, 245, 0.16);
+		--material-bar: #1f1f1f;
+		--topbar-ink: #ffffff;
+		--topbar-ink-2: #adadad;
+		--topbar-hover: rgba(255, 255, 255, 0.06);
+		--topbar-stroke: #333333;
+		--topbar-field: #292929;
+		--topbar-field-stroke: #666666;
+		--material-side: #1f1f1f;
+		--nav-ink: #ffffff;
+		--nav-ink-2: #adadad;
+		--nav-hover: rgba(255, 255, 255, 0.06);
+		--nav-active: rgba(255, 255, 255, 0.08);
+		--nav-active-ink: #ffffff;
+		--nav-rule: #333333;
+		--t-slate: #d6d6d6;
+		--t-slate-bg: #333333;
+		--shadow-sm: 0 0 2px rgba(0, 0, 0, 0.24), 0 1px 2px rgba(0, 0, 0, 0.28);
+		--shadow-hover: 0 0 2px rgba(0, 0, 0, 0.24), 0 4px 8px rgba(0, 0, 0, 0.28);
+		--shadow-md: 0 0 2px rgba(0, 0, 0, 0.24), 0 8px 16px rgba(0, 0, 0, 0.28);
+		--shadow-lg: 0 0 8px rgba(0, 0, 0, 0.24), 0 14px 28px rgba(0, 0, 0, 0.28);
 		--scrim: rgba(0, 0, 0, 0.5);
 	}
 }
 
 :root[data-theme='dark'] {
 	color-scheme: dark;
-	--color-bg: #000000;
-	--color-surface: #1c1c1e;
-	--color-border: #48484a;
-	--color-text: #f5f5f7;
-	--color-text-muted: #a1a1a6;
-	--color-text-faint: #a1a1a6;
-	--c-700: #d1d1d6;
-	--c-400: #636366;
-	--c-border: #38383a;
-	--c-border2: #2c2c2e;
-	--c-border3: #1c1c1e;
-	--c-bg-card: #1c1c1e;
-	--c-elevated: #2c2c2e;
-	--c-field: #1c1c1e;
-	--c-bg-section: #232325;
-	--c-bg-sunken: rgba(118, 118, 128, 0.24);
+	--color-bg: #141414;
+	--color-surface: #292929;
+	--color-border: #666666;
+	--color-text: #ffffff;
+	--color-text-muted: #adadad;
+	--color-text-faint: #adadad;
+	--c-700: #d6d6d6;
+	--c-400: #5c5c5c;
+	--c-border: #3d3d3d;
+	--c-border2: #333333;
+	--c-border3: #292929;
+	--c-bg-card: #292929;
+	--c-elevated: #2e2e2e;
+	--c-field: #292929;
+	--c-bg-section: #242424;
+	--c-bg-sunken: #1f1f1f;
 	--c-hover: rgba(255, 255, 255, 0.06);
 	--press: rgba(255, 255, 255, 0.1);
-	--c-selected: color-mix(in srgb, var(--primary) 34%, #1c1c1e);
-	--c-selected-mid: color-mix(in srgb, var(--primary) 24%, #1c1c1e);
-	--c-selected-light: color-mix(in srgb, var(--primary) 14%, #1c1c1e);
-	--primary-dark: color-mix(in srgb, var(--primary) 80%, #fff);
-	--color-success-tint: rgba(48, 209, 88, 0.16);
-	--color-success-text: #30d158;
-	--color-warning-tint: rgba(255, 159, 10, 0.16);
-	--color-warning-text: #ffb340;
-	--color-danger-tint: rgba(255, 69, 58, 0.16);
-	--color-danger-text: #ff6961;
-	--color-info-tint: rgba(10, 132, 255, 0.16);
-	--material-bar: #1c1c1e;
-	--topbar-ink: #f5f5f7;
-	--topbar-ink-2: #a1a1a6;
-	--topbar-hover: rgba(255, 255, 255, 0.08);
-	--topbar-stroke: #38383a;
-	--topbar-field: #2c2c2e;
-	--topbar-field-stroke: #3a3a3c;
-	--material-side: #161618;
-	--t-slate: #d1d1d6;
-	--t-slate-bg: rgba(118, 118, 128, 0.24);
+	--c-selected: color-mix(in srgb, var(--primary) 34%, #292929);
+	--c-selected-mid: color-mix(in srgb, var(--primary) 24%, #292929);
+	--c-selected-light: color-mix(in srgb, var(--primary) 14%, #292929);
+	--primary-dark: color-mix(in srgb, var(--primary) 60%, #fff);
+	--focus-ring: #ffffff;
+	--color-success-tint: rgba(84, 176, 84, 0.16);
+	--color-success-text: #54b054;
+	--color-warning-tint: rgba(250, 160, 107, 0.16);
+	--color-warning-text: #faa06b;
+	--color-danger-tint: rgba(220, 98, 109, 0.16);
+	--color-danger-text: #dc626d;
+	--color-info-tint: rgba(71, 158, 245, 0.16);
+	--material-bar: #1f1f1f;
+	--topbar-ink: #ffffff;
+	--topbar-ink-2: #adadad;
+	--topbar-hover: rgba(255, 255, 255, 0.06);
+	--topbar-stroke: #333333;
+	--topbar-field: #292929;
+	--topbar-field-stroke: #666666;
+	--material-side: #1f1f1f;
+	--nav-ink: #ffffff;
+	--nav-ink-2: #adadad;
+	--nav-hover: rgba(255, 255, 255, 0.06);
+	--nav-active: rgba(255, 255, 255, 0.08);
+	--nav-active-ink: #ffffff;
+	--nav-rule: #333333;
+	--t-slate: #d6d6d6;
+	--t-slate-bg: #333333;
+	--shadow-sm: 0 0 2px rgba(0, 0, 0, 0.24), 0 1px 2px rgba(0, 0, 0, 0.28);
+	--shadow-hover: 0 0 2px rgba(0, 0, 0, 0.24), 0 4px 8px rgba(0, 0, 0, 0.28);
+	--shadow-md: 0 0 2px rgba(0, 0, 0, 0.24), 0 8px 16px rgba(0, 0, 0, 0.28);
+	--shadow-lg: 0 0 8px rgba(0, 0, 0, 0.24), 0 14px 28px rgba(0, 0, 0, 0.28);
 	--scrim: rgba(0, 0, 0, 0.5);
 }
 
@@ -288,7 +310,7 @@ h1 {
 }
 
 a {
-	color: var(--primary);
+	color: var(--primary-dark);
 	text-decoration: none;
 }
 a:hover {
@@ -421,12 +443,12 @@ pre,
 
 .btn-flat {
 	background: transparent;
-	color: var(--primary);
+	color: var(--primary-dark);
 	padding: 0 10px;
 }
 .btn-flat:hover:not(:disabled) {
 	background: var(--c-hover);
-	color: var(--primary);
+	color: var(--primary-dark);
 }
 .btn-flat:active:not(:disabled) {
 	background: var(--press);
@@ -457,7 +479,7 @@ pre,
 	border: 0;
 	border-radius: var(--radius-xs);
 	background: none;
-	color: var(--primary);
+	color: var(--primary-dark);
 	font-size: inherit;
 	font-weight: 400;
 	cursor: pointer;

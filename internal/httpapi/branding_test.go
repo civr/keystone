@@ -13,7 +13,7 @@ func TestBranding(t *testing.T) {
 
 	var b map[string]string
 	body(t, c.must("GET", "/api/admin/branding", nil, 200).Body, &b)
-	if b["name"] != "Keystone" || b["accent"] != "#007aff" || b["logo"] != "" {
+	if b["name"] != "Keystone" || b["accent"] != "#0f6cbd" || b["logo"] != "" {
 		t.Fatalf("defaults = %v", b)
 	}
 

@@ -17,8 +17,8 @@ export interface Branding {
 export const DEFAULT_BRAND: Branding = {
 	name: 'Keystone',
 	logo: '',
-	accent: '#007aff',
-	background: '#f5f5f7',
+	accent: '#0f6cbd',
+	background: '#f5f5f5',
 	login_image: ''
 };
 export const DEFAULT_LOGO = '/favicon.svg';

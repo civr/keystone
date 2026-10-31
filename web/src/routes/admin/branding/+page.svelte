@@ -5,8 +5,8 @@
 	import { applyBrand, brandError, DEFAULT_BRAND, logoSrc, type Branding } from '$lib/brand.svelte';
 	import { toast } from '$lib/toast.svelte';
 
-	const ACCENTS = ['#007aff', '#0a7a3f', '#5e5ce6', '#bf3989', '#d70015', '#c2410c', '#0e7490', '#1d1d1f'];
-	const BACKGROUNDS = ['#f5f5f7', '#ffffff', '#f7f6f2', '#f2f6f3', '#f1f4f9', '#f7f3f6'];
+	const ACCENTS = ['#0f6cbd', '#0a7a3f', '#5e5ce6', '#bf3989', '#d70015', '#c2410c', '#0e7490', '#1d1d1f'];
+	const BACKGROUNDS = ['#f5f5f5', '#ffffff', '#f7f6f2', '#f2f6f3', '#f1f4f9', '#f7f3f6'];
 
 	let saved = $state<Branding | null>(null);
 	let form = $state<Branding>({ ...DEFAULT_BRAND });
@@ -231,7 +231,7 @@
 		background:
 			radial-gradient(120% 90% at 15% 10%, color-mix(in srgb, var(--primary) 55%, #fff) 0%, transparent 60%),
 			radial-gradient(110% 90% at 90% 100%, color-mix(in srgb, var(--primary) 70%, #1d1d1f) 0%, transparent 65%),
-			color-mix(in srgb, var(--primary) 35%, #f5f5f7);
+			color-mix(in srgb, var(--primary) 35%, #f5f5f5);
 	}
 	.mini-card {
 		display: inline-flex;
