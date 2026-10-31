@@ -25,7 +25,7 @@ describe('protocol form', () => {
 		expect(f.gate.bypass).toBe('/api/\n/auth/token');
 		expect(protocolPayload(f)).toEqual({
 			protocol: 'gate',
-			config: { account: { username: 'thijs_ha', email: '', display_name: '' }, gate: { host: 'ha.home.lan', bypass_paths: ['/api/', '/auth/token'] } }
+			config: { account: { username: 'thijs_ha', email: '', display_name: '' }, gate: { host: 'ha.home.lan', bypass_paths: ['/api/', '/auth/token'] }, require_mfa: false }
 		});
 	});
 
