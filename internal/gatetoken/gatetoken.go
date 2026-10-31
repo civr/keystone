@@ -59,7 +59,7 @@ func Resolve(ctx context.Context, rdb *redis.Client, sessions *session.Store, cf
 	if err != nil {
 		return session.Session{}, err
 	}
-	sess, err := sessions.Get(ctx, sid, cfg, now)
+	sess, err := sessions.Peek(ctx, sid, cfg, now)
 	if errors.Is(err, session.ErrNotFound) {
 		_ = rdb.Del(ctx, key(tok)).Err()
 		return session.Session{}, ErrNotFound

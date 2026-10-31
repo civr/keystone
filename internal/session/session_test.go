@@ -1,9 +1,9 @@
 package session
 
 import (
-	"slices"
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -232,7 +232,7 @@ func TestAMR(t *testing.T) {
 		want []string
 	}{
 		{"password only", Session{CreatedAt: now, LastFullAuthAt: now}, []string{"pwd"}},
-		{"password and passkey", Session{CreatedAt: now, LastFullAuthAt: now, LastPasskeyAt: now}, []string{"pwd", "hwk"}},
+		{"password and passkey", Session{CreatedAt: now, LastFullAuthAt: now, LastPasskeyAt: now}, []string{"pwd", "hwk", "mfa"}},
 		{"trusted device, passkey only", Session{CreatedAt: now, LastFullAuthAt: now.Add(-48 * time.Hour), LastPasskeyAt: now}, []string{"hwk"}},
 		{"recovery code", Session{CreatedAt: now, LastFullAuthAt: now, MustRegisterPasskey: true}, []string{"pwd"}},
 	}

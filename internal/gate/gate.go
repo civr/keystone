@@ -2,8 +2,8 @@
 // reverse proxy (Traefik, Caddy, nginx) asks before passing a request to an
 // app configured with protocol gate.
 //
-//	GET /verify                 200 + X-Keystone-* headers, or 302 to Keystone
-//	GET /verify?mode=nginx      as above, but 401 instead of 302 (nginx auth_request)
+//	    /verify                 200 + X-Keystone-* headers, or 302 to Keystone
+//	    /verify?mode=nginx      as above, but 401 instead of 302 (nginx auth_request)
 //	GET /login-redirect?rd=URL  the 302 for nginx's error_page 401
 //	GET /.keystone/signin?rd=/  sign the browser in to the app (apps.GateSignIn)
 package gate

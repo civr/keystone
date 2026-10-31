@@ -46,6 +46,20 @@ func TestIssueResolveRevoke(t *testing.T) {
 		}
 	})
 
+	t.Run("ResolveDoesNotSlide", func(t *testing.T) {
+		idle := cfg
+		idle.Session.IdleTimeoutMinutes = 30
+		s3, _ := st.Create(ctx, session.Session{LastFullAuthAt: now}, idle)
+		t3, _ := Issue(ctx, rdb, s3.ID, time.Hour)
+		if _, err := Resolve(ctx, rdb, st, idle, t3, now.Add(20*time.Minute)); err != nil {
+			t.Fatalf("within idle = %v", err)
+		}
+		// An app polling through the gate must not keep the session alive.
+		if _, err := Resolve(ctx, rdb, st, idle, t3, now.Add(40*time.Minute)); err != ErrNotFound {
+			t.Fatalf("after idle = %v", err)
+		}
+	})
+
 	t.Run("RevokeSessionDeletesTokens", func(t *testing.T) {
 		s2, _ := st.Create(ctx, session.Session{LastFullAuthAt: now}, cfg)
 		t2, _ := Issue(ctx, rdb, s2.ID, time.Hour)

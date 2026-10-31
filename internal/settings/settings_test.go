@@ -115,7 +115,7 @@ func TestDefaultsNewSections(t *testing.T) {
 	if d.Gate.FailPerIPPerMinute != 60 {
 		t.Fatalf("gate = %+v", d.Gate)
 	}
-	if d.Vault != (VaultSettings{ReconfirmMinutes: 15, ClipboardClearSeconds: 30, AllowReveal: true}) {
+	if d.Vault != (VaultSettings{ReconfirmMinutes: 0, ClipboardClearSeconds: 30, AllowReveal: true}) {
 		t.Fatalf("vault = %+v", d.Vault)
 	}
 }
