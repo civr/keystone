@@ -90,7 +90,9 @@ func (s *Store) Active(ctx context.Context, use string) (Key, error) {
 }
 
 // Rotate retires the active key of use and returns a fresh one.
-func (s *Store) Rotate(ctx context.Context, use string) (Key, error) { return s.replace(ctx, use, true) }
+func (s *Store) Rotate(ctx context.Context, use string) (Key, error) {
+	return s.replace(ctx, use, true)
+}
 
 // replace creates a new active key under an advisory lock. Without force it
 // returns an existing active key that a concurrent caller created first.
