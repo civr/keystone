@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api, ApiError } from '$lib/api';
 	import type { App } from '$lib/apps';
-	import { BYPASS_PRESETS, PROTOCOLS, connectionInfo, slugify, type ProtocolForm } from '$lib/protocols';
+	import { BYPASS_PRESETS, PROTOCOLS, connectionInfo, slugify, type DetectedLogin, type ProtocolForm } from '$lib/protocols';
 	import { copyText } from '$lib/copy';
 	import { proxyConfig, type ProxyKind } from '$lib/proxyConfig';
 	import { toast } from '$lib/toast.svelte';
@@ -11,6 +11,7 @@
 		vault = $bindable(),
 		app,
 		name,
+		appUrl = '',
 		errors
 	}: {
 		form: ProtocolForm;
@@ -18,6 +19,8 @@
 		vault: { username: string; password: string; hasPassword: boolean };
 		app: App | null;
 		name: string;
+		/** The tile's address, where the login form is looked for first. */
+		appUrl?: string;
 		errors: Record<string, string>;
 	} = $props();
 
@@ -51,6 +54,58 @@
 				/* no host to suggest */
 			}
 		}
+	}
+
+	let detecting = $state(false);
+	let found = $state<{ text: string; notes: string[]; error: boolean } | null>(null);
+
+	function fieldsText(d: DetectedLogin): string {
+		const who = d.user_field ? `${d.user_field} and ${d.pass_field}` : `only ${d.pass_field}`;
+		const more = d.extra.length ? `, plus ${d.extra.length === 1 ? 'one other field' : `${d.extra.length} other fields`} Keystone sends along` : '';
+		return `Found the login form: ${who}${more}.`;
+	}
+
+	/** Looks for the login form and fills in the address and field names. */
+	async function detect(target: 'vault' | 'gate', quiet = false) {
+		if (detecting) return;
+		let url = '';
+		if (target === 'vault') url = (form.vault.login_page || appUrl).trim();
+		else if (form.gate.upstream.trim()) url = form.gate.upstream.trim().replace(/\/+$/, '') + (form.gate.login_path.trim() || '/');
+		if (!url) {
+			if (!quiet) toast(target === 'vault' ? 'Enter the app’s address or login page first.' : 'Enter the address Keystone uses to reach the app first.', 'error');
+			return;
+		}
+		detecting = true;
+		try {
+			const d = await api.send<DetectedLogin>('POST', '/apps/login-form', { url });
+			if (target === 'vault') {
+				form.vault.login_url = d.login_url;
+				form.vault.login_page = d.page_url;
+			} else {
+				const a = new URL(d.login_url);
+				form.gate.login_path = a.pathname + a.search;
+			}
+			const f = target === 'vault' ? form.vault : form.gate;
+			f.user_field = d.user_field || 'username';
+			f.pass_field = d.pass_field;
+			found = { text: fieldsText(d), notes: d.notes ?? [], error: false };
+		} catch (e) {
+			const msg = e instanceof ApiError ? e.message : 'Keystone could not look for the login form.';
+			found = { text: msg, notes: [], error: true };
+			if (!quiet) toast(msg, 'error');
+		} finally {
+			detecting = false;
+		}
+	}
+
+	function vaultMode() {
+		found = null;
+		if (form.vault.mode === 'form' && !form.vault.login_url) void detect('vault', true);
+	}
+
+	function gateMode() {
+		found = null;
+		if (form.gate.sign_in === 'form' && form.gate.upstream && !form.gate.login_path) void detect('gate', true);
 	}
 
 	async function copy(v: string) {
@@ -136,7 +191,7 @@
 	</label>
 	<label class="field">
 		<span>Sign in for me</span>
-		<select class="input" bind:value={form.gate.sign_in}>
+		<select class="input" bind:value={form.gate.sign_in} onchange={gateMode}>
 			<option value="">Off</option>
 			<option value="basic">Basic auth</option>
 			<option value="header">Header with API key</option>
@@ -162,11 +217,26 @@
 			</label>
 		{/if}
 		{#if form.gate.sign_in === 'form' || form.gate.sign_in === 'json'}
-			<label class="field">
-				<span>Login path</span>
-				<input id="config.gate.sign_in.login_path" class="input mono" spellcheck="false" autocapitalize="none" placeholder="/login" aria-invalid={errors['config.gate.sign_in.login_path'] ? 'true' : undefined} bind:value={form.gate.login_path} />
-				{#if errors['config.gate.sign_in.login_path']}<small class="field-error" role="alert">{errors['config.gate.sign_in.login_path']}</small>{/if}
-			</label>
+			<div class="field">
+				<label class="field-label" for="config.gate.sign_in.login_path">Login path</label>
+				<div class="row">
+					<input id="config.gate.sign_in.login_path" class="input mono" spellcheck="false" autocapitalize="none" placeholder="/login" aria-invalid={errors['config.gate.sign_in.login_path'] ? 'true' : undefined} bind:value={form.gate.login_path} />
+					{#if form.gate.sign_in === 'form'}
+						<button type="button" class="btn btn-secondary btn-sm" disabled={detecting} onclick={() => detect('gate')}>{detecting ? 'Looking…' : 'Find automatically'}</button>
+					{/if}
+				</div>
+				{#if errors['config.gate.sign_in.login_path']}
+					<small class="field-error" role="alert">{errors['config.gate.sign_in.login_path']}</small>
+				{:else if form.gate.sign_in === 'form'}
+					<small>The page with the login form. The gate opens it first and also sends its hidden fields and security token.</small>
+				{/if}
+			</div>
+			{#if form.gate.sign_in === 'form' && found}
+				<div class="found" class:error={found.error} role="status">
+					<p>{found.text}</p>
+					{#each found.notes as n}<p class="muted">{n}</p>{/each}
+				</div>
+			{/if}
 			<div class="pair">
 				<label class="field">
 					<span>Username field</span>
@@ -219,9 +289,9 @@
 	<fieldset class="field">
 		<legend class="field-label">When the tile is opened</legend>
 		<div class="segmented">
-			<label><input type="radio" bind:group={form.vault.mode} value="copy" /><span>Copy the password</span></label>
-			<label><input type="radio" bind:group={form.vault.mode} value="form" /><span>Sign in for me</span></label>
-			<label><input type="radio" bind:group={form.vault.mode} value="json" /><span>Sign in (JSON)</span></label>
+			<label><input type="radio" bind:group={form.vault.mode} value="copy" onchange={vaultMode} /><span>Copy the password</span></label>
+			<label><input type="radio" bind:group={form.vault.mode} value="form" onchange={vaultMode} /><span>Sign in for me</span></label>
+			<label><input type="radio" bind:group={form.vault.mode} value="json" onchange={vaultMode} /><span>Sign in (JSON)</span></label>
 		</div>
 		<small>
 			{#if form.vault.mode === 'copy'}
@@ -233,6 +303,30 @@
 			{/if}
 		</small>
 	</fieldset>
+	{#if form.vault.mode === 'form'}
+		<div class="field">
+			<label class="field-label" for="config.vault.login_page">Login page</label>
+			<div class="row">
+				<input
+					id="config.vault.login_page"
+					class="input mono"
+					type="url"
+					spellcheck="false"
+					autocapitalize="none"
+					placeholder={appUrl || 'http://192.168.1.1/'}
+					bind:value={form.vault.login_page}
+				/>
+				<button type="button" class="btn btn-secondary btn-sm" disabled={detecting} onclick={() => detect('vault')}>{detecting ? 'Looking…' : 'Find automatically'}</button>
+			</div>
+			<small>Keystone opens this page, finds the login form and fills in the fields below. At each sign-in it also sends the form’s hidden fields. Empty: the tile’s address.</small>
+		</div>
+		{#if found}
+			<div class="found" class:error={found.error} role="status">
+				<p>{found.text}</p>
+				{#each found.notes as n}<p class="muted">{n}</p>{/each}
+			</div>
+		{/if}
+	{/if}
 	{#if form.vault.mode !== 'copy'}
 		<label class="field">
 			<span>Login form address</span>
@@ -305,6 +399,34 @@
 {/if}
 
 <style>
+	.row {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+	}
+	.row .input {
+		flex: 1;
+		min-width: 0;
+	}
+	.row .btn {
+		flex: none;
+	}
+	.found {
+		font-size: 0.8125rem;
+		padding: 8px 12px;
+		border-radius: 8px;
+		background: var(--color-surface-muted, rgba(0, 0, 0, 0.04));
+	}
+	.found.error {
+		color: var(--color-danger-text);
+		background: var(--color-danger-tint);
+	}
+	.found p {
+		margin: 0;
+	}
+	.found p + p {
+		margin-top: 4px;
+	}
 	.pair {
 		display: grid;
 		grid-template-columns: 1fr 1fr;

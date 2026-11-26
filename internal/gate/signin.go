@@ -26,6 +26,7 @@ import (
 	"github.com/civr/keystone/internal/audit"
 	"github.com/civr/keystone/internal/crypto"
 	"github.com/civr/keystone/internal/gatetoken"
+	"github.com/civr/keystone/internal/loginform"
 	"github.com/civr/keystone/internal/session"
 )
 
@@ -333,22 +334,69 @@ var upstream = &http.Client{
 // cookies it sets, made host-only for the browser. The status is the app's.
 // The app is reached over plain http inside, so on an https host the cookies
 // are made Secure here.
+//
+// In form mode the login page is read first, as a browser would: the app's
+// cookies from that visit go along, and so do the form's other fields
+// (anti-forgery tokens, hidden fields, a named submit button). A login page
+// that comes back with its form again means the details were refused.
 func (s *Server) formLogin(ctx context.Context, si *apps.GateSignIn, user, pass string, secure bool) (int, []*http.Cookie, error) {
+	target := si.Upstream + si.LoginPath
 	var body, ctype string
+	var pre []*http.Cookie
+	var jar http.CookieJar
 	if si.Mode == apps.SignInJSON {
 		raw, _ := json.Marshal(map[string]string{si.UserField: user, si.PassField: pass})
 		body, ctype = string(raw), "application/json"
 	} else {
-		body, ctype = url.Values{si.UserField: {user}, si.PassField: {pass}}.Encode(), "application/x-www-form-urlencoded"
+		fields := url.Values{}
+		c := loginform.NewClient(5 * time.Second)
+		if p, err := loginform.Fetch(ctx, c, target); err == nil {
+			jar, pre = c.Jar, loginform.Recorded(c)
+			if p.Form != nil && p.Form.Method == http.MethodPost {
+				if t, ok := onUpstream(si.Upstream, p.Form.Action); ok {
+					target = t
+				}
+				for _, e := range p.Form.Extra {
+					if e.Name != si.UserField && e.Name != si.PassField {
+						fields.Add(e.Name, e.Value)
+					}
+				}
+			}
+		}
+		fields.Set(si.UserField, user)
+		fields.Set(si.PassField, pass)
+		body, ctype = fields.Encode(), "application/x-www-form-urlencoded"
 	}
-	resp, err := post(ctx, si.Upstream+si.LoginPath, ctype, body, nil)
+	hdr := map[string]string{}
+	if jar != nil {
+		if u, err := url.Parse(target); err == nil {
+			var parts []string
+			for _, c := range jar.Cookies(u) {
+				parts = append(parts, c.Name+"="+c.Value)
+			}
+			if len(parts) > 0 {
+				hdr["Cookie"] = strings.Join(parts, "; ")
+			}
+		}
+		if u, err := url.Parse(si.Upstream); err == nil {
+			hdr["Origin"] = u.Scheme + "://" + u.Host
+			hdr["Referer"] = si.Upstream + si.LoginPath
+		}
+	}
+	resp, err := post(ctx, target, ctype, body, hdr)
 	if err != nil {
 		return 0, nil, err
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxLoginBody))
-	set := resp.Cookies()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 || len(set) == 0 {
+	page, _ := io.ReadAll(io.LimitReader(resp.Body, maxLoginBody))
+	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		return resp.StatusCode, nil, errors.New("login refused")
+	}
+	if si.Mode == apps.SignInForm && refused(resp, page) {
+		return resp.StatusCode, nil, errors.New("login refused: the app showed its login form again")
+	}
+	set := merge(pre, resp.Cookies())
+	if len(set) == 0 {
 		return resp.StatusCode, nil, errors.New("login refused")
 	}
 	out := make([]*http.Cookie, 0, len(set))
@@ -363,6 +411,50 @@ func (s *Server) formLogin(ctx context.Context, si *apps.GateSignIn, user, pass 
 		})
 	}
 	return resp.StatusCode, out, nil
+}
+
+// onUpstream moves a form action onto the upstream address: an app often
+// writes its public address in the form, which the gate does not call.
+func onUpstream(upstream, action string) (string, bool) {
+	a, err := url.Parse(action)
+	if err != nil || (a.Scheme != "http" && a.Scheme != "https") {
+		return "", false
+	}
+	return strings.TrimRight(upstream, "/") + a.RequestURI(), true
+}
+
+// refused reports a login answer that shows the login form again, or sends
+// the browser back to it with an error.
+func refused(resp *http.Response, page []byte) bool {
+	if loc := resp.Header.Get("Location"); loc != "" {
+		l := strings.ToLower(loc)
+		return strings.Contains(l, "error") || strings.Contains(l, "fail") || strings.Contains(l, "invalid")
+	}
+	if resp.StatusCode != http.StatusOK || strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "json") {
+		return false
+	}
+	f, err := loginform.Find(page, resp.Request.URL)
+	return err == nil && f != nil
+}
+
+// merge lists the cookies of the login page visit and the login answer;
+// for the same name and path the later one counts.
+func merge(lists ...[]*http.Cookie) []*http.Cookie {
+	type key struct{ name, path string }
+	at := map[key]int{}
+	var out []*http.Cookie
+	for _, l := range lists {
+		for _, c := range l {
+			k := key{c.Name, c.Path}
+			if i, ok := at[k]; ok {
+				out[i] = c
+				continue
+			}
+			at[k] = len(out)
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func post(ctx context.Context, target, ctype, body string, hdr map[string]string) (*http.Response, error) {

@@ -522,7 +522,7 @@
 			</fieldset>
 		{/if}
 
-		<AppProtocol bind:form={proto} bind:vault app={editing} name={form.name} errors={protoErrors} />
+		<AppProtocol bind:form={proto} bind:vault app={editing} name={form.name} appUrl={form.url} errors={protoErrors} />
 
 		{#if formError}<p class="error" role="alert">{formError}</p>{/if}
 

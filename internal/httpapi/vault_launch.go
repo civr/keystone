@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/civr/keystone/internal/apps"
 	"github.com/civr/keystone/internal/crypto"
+	"github.com/civr/keystone/internal/loginform"
 	"github.com/civr/keystone/internal/session"
 )
 
@@ -119,7 +121,7 @@ func (s *server) vaultLaunchPage(w http.ResponseWriter, r *http.Request) {
 		page.Plain = true
 		page.Fields = []launchField{{Name: strings.TrimSuffix(string(body), "}") + `,"_":"`, Value: `"}`}}
 	} else {
-		page.Fields = []launchField{{Name: v.UserField, Value: user}, {Name: v.PassField, Value: string(pw)}}
+		page.Fields = append(launchExtras(ctx, v), launchField{Name: v.UserField, Value: user}, launchField{Name: v.PassField, Value: string(pw)})
 	}
 	s.d.Audit.Log(ctx, actor(ctx), "vault.revealed", clientIP(ctx), map[string]any{"id": a.ID, "app": a.Name, "method": "launch"})
 	u, _ := url.Parse(v.LoginURL)
@@ -133,6 +135,34 @@ func (s *server) vaultLaunchPage(w http.ResponseWriter, r *http.Request) {
 }
 
 type launchField struct{ Name, Value string }
+
+// launchExtras reads the app's login page now and returns the other fields
+// its form holds (hidden fields, a named submit button), which many apps
+// need back. Only a form that posts to the stored address counts; when the
+// page can't be read the sign-in goes ahead without them.
+func launchExtras(ctx context.Context, v *apps.VaultLogin) []launchField {
+	if v.LoginPage == "" {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	p, err := loginform.Fetch(ctx, loginform.NewClient(3*time.Second), v.LoginPage)
+	if err != nil || p.Form == nil {
+		return nil
+	}
+	want, err1 := url.Parse(v.LoginURL)
+	got, err2 := url.Parse(p.Form.Action)
+	if err1 != nil || err2 != nil || want.Scheme != got.Scheme || want.Host != got.Host || want.Path != got.Path {
+		return nil
+	}
+	var out []launchField
+	for _, e := range p.Form.Extra {
+		if e.Name != v.UserField && e.Name != v.PassField {
+			out = append(out, launchField{Name: e.Name, Value: e.Value})
+		}
+	}
+	return out
+}
 
 type launchPage struct {
 	URL, Name string

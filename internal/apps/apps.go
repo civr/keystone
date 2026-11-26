@@ -108,6 +108,10 @@ type VaultLogin struct {
 	LoginURL  string `json:"login_url,omitempty"`
 	UserField string `json:"user_field,omitempty"`
 	PassField string `json:"pass_field,omitempty"`
+	// LoginPage is the page that shows the login form. When set, Keystone
+	// reads it at each sign-in and also sends the other fields the form
+	// holds right then (hidden fields, a named submit button).
+	LoginPage string `json:"login_page,omitempty"`
 }
 
 // Config is the protocol-specific part of an app (apps.config).
@@ -162,7 +166,7 @@ type Owner = accounts.Account
 
 var headerRe = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 
-var fieldRe = regexp.MustCompile(`^[A-Za-z0-9_.\[\]-]{1,64}$`)
+var fieldRe = regexp.MustCompile(`^[A-Za-z0-9_.\[\]$:@-]{1,128}$`)
 
 var (
 	slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
@@ -230,7 +234,11 @@ func (c *Config) Validate(protocol string) (field, msg string) {
 			vault.PassField = "password"
 		}
 		if !fieldRe.MatchString(vault.UserField) || !fieldRe.MatchString(vault.PassField) {
-			return "config.vault.user_field", "Field names use letters, digits and . _ - [ ] (at most 64)."
+			return "config.vault.user_field", "Field names use letters, digits and . _ - [ ] $ : @ (at most 128)."
+		}
+		vault.LoginPage = strings.TrimSpace(vault.LoginPage)
+		if vault.LoginPage != "" && (vault.Mode != VaultForm || !appURL(vault.LoginPage)) {
+			vault.LoginPage = ""
 		}
 		c.Vault = vault
 	case SAMLP:
@@ -331,7 +339,7 @@ func (g *Gate) validateSignIn() []string {
 			si.PassField = "password"
 		}
 		if !fieldRe.MatchString(si.UserField) || !fieldRe.MatchString(si.PassField) {
-			return bad("user_field", "Field names use letters, digits and . _ - [ ] (at most 64).")
+			return bad("user_field", "Field names use letters, digits and . _ - [ ] $ : @ (at most 128).")
 		}
 		keep.LoginPath, keep.UserField, keep.PassField = si.LoginPath, si.UserField, si.PassField
 	default:

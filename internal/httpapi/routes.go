@@ -103,6 +103,7 @@ func (s *server) appRoutes(r chi.Router) {
 	all.Post("/", s.createApp)
 	all.Put("/order", s.reorderApps)
 	all.Post("/icon", s.fetchAppIcon)
+	all.Post("/login-form", s.detectLoginForm)
 	meW.Put("/{id}", s.appAdmin(s.updateApp))
 	all.Delete("/{id}", s.deleteApp)
 	meW.Post("/{id}/secret", s.appAdmin(s.appSecret))

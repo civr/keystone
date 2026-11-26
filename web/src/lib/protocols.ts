@@ -34,7 +34,7 @@ export interface ProtocolForm {
 		pass_field: string;
 		header: string;
 	};
-	vault: { mode: VaultMode; login_url: string; user_field: string; pass_field: string };
+	vault: { mode: VaultMode; login_url: string; user_field: string; pass_field: string; login_page: string };
 	requireMFA: boolean;
 }
 
@@ -60,7 +60,8 @@ export function protocolForm(app: App | null): ProtocolForm {
 			mode: c.vault?.mode ?? 'copy',
 			login_url: c.vault?.login_url ?? '',
 			user_field: c.vault?.user_field ?? 'username',
-			pass_field: c.vault?.pass_field ?? 'password'
+			pass_field: c.vault?.pass_field ?? 'password',
+			login_page: c.vault?.login_page ?? ''
 		},
 		requireMFA: c.require_mfa ?? false
 	};
@@ -111,7 +112,8 @@ export function protocolPayload(f: ProtocolForm): { protocol: Protocol; config: 
 							mode: f.vault.mode,
 							login_url: f.vault.login_url.trim(),
 							user_field: f.vault.user_field.trim(),
-							pass_field: f.vault.pass_field.trim()
+							pass_field: f.vault.pass_field.trim(),
+							...(f.vault.mode === 'form' && f.vault.login_page.trim() ? { login_page: f.vault.login_page.trim() } : {})
 						};
 			break;
 	}
@@ -217,4 +219,16 @@ export function connectionInfo(origin: string, app: App): { label: string; value
 			];
 	}
 	return [];
+}
+
+/** A login form Keystone found on an app's page (POST /apps/login-form). */
+export interface DetectedLogin {
+	page_url: string;
+	login_url: string;
+	method: string;
+	user_field: string;
+	pass_field: string;
+	extra: string[];
+	token: boolean;
+	notes: string[] | null;
 }

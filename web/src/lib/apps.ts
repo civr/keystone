@@ -26,7 +26,7 @@ export interface AppConfig {
 	ldap?: { slug: string };
 	gate?: { host: string; bypass_paths: string[]; sign_in?: GateSignIn };
 	/** How a vault tile signs in: copy the password, or post the login form. */
-	vault?: { mode: VaultMode; login_url?: string; user_field?: string; pass_field?: string };
+	vault?: { mode: VaultMode; login_url?: string; user_field?: string; pass_field?: string; login_page?: string };
 	/** Only sessions signed in with a passkey or authenticator code. */
 	require_mfa?: boolean;
 }
