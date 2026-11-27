@@ -80,3 +80,33 @@ func TestFormLoginWithoutPage(t *testing.T) {
 		t.Fatalf("cookies %v, err %v", c, err)
 	}
 }
+
+func TestOnLAN(t *testing.T) {
+	t.Parallel()
+	for host, want := range map[string]bool{
+		"192.168.1.1": true, "10.0.0.5": true, "unifi": true, "nas.home.lan": true, "fd00::1": true,
+		"8.8.8.8": false, "example.com": false, "unifi.ui.com": false,
+	} {
+		if onLAN(host) != want {
+			t.Errorf("onLAN(%q) = %v", host, !want)
+		}
+	}
+}
+
+// A UniFi-style JSON login on https with a self-signed certificate.
+func TestJSONLoginSelfSigned(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/auth/login" || r.Header.Get("Content-Type") != "application/json" {
+			http.Error(w, "no", http.StatusBadRequest)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{Name: "TOKEN", Value: "jwt", Path: "/", HttpOnly: true})
+		_, _ = w.Write([]byte(`{"username":"admin"}`))
+	}))
+	defer srv.Close()
+	si := &apps.GateSignIn{Mode: apps.SignInJSON, Upstream: srv.URL, LoginPath: "/api/auth/login", UserField: "username", PassField: "password"}
+	if _, c, err := (&Server{}).formLogin(context.Background(), si, "admin", "pw", true); err != nil || len(c) != 1 || c[0].Name != "TOKEN" {
+		t.Fatalf("cookies %v, err %v", c, err)
+	}
+}

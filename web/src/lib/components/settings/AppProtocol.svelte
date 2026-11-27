@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api, ApiError } from '$lib/api';
 	import type { App } from '$lib/apps';
-	import { BYPASS_PRESETS, PROTOCOLS, connectionInfo, slugify, type DetectedLogin, type ProtocolForm } from '$lib/protocols';
+	import { BYPASS_PRESETS, PROTOCOLS, connectionInfo, slugify, type DetectedLogin, type KnownApp, type ProtocolForm } from '$lib/protocols';
 	import { copyText } from '$lib/copy';
 	import { proxyConfig, type ProxyKind } from '$lib/proxyConfig';
 	import { toast } from '$lib/toast.svelte';
@@ -57,46 +57,119 @@
 	}
 
 	let detecting = $state(false);
-	let found = $state<{ text: string; notes: string[]; error: boolean } | null>(null);
+	type Found = { text: string; notes: string[]; error: boolean; app: KnownApp | null; base: string; target: 'vault' | 'gate' };
+	let found = $state<Found | null>(null);
 
 	function fieldsText(d: DetectedLogin): string {
 		const who = d.user_field ? `${d.user_field} and ${d.pass_field}` : `only ${d.pass_field}`;
-		const more = d.extra.length ? `, plus ${d.extra.length === 1 ? 'one other field' : `${d.extra.length} other fields`} Keystone sends along` : '';
+		const n = d.extra?.length ?? 0;
+		const more = n ? `, plus ${n === 1 ? 'one other field' : `${n} other fields`} Keystone sends along` : '';
 		return `Found the login form: ${who}${more}.`;
 	}
 
-	/** Looks for the login form and fills in the address and field names. */
+	function origin(u: string): string {
+		try {
+			return new URL(u).origin;
+		} catch {
+			return '';
+		}
+	}
+
+	const gateModes = ['basic', 'header', 'form', 'json', 'jellyfin'];
+
+	/** Fills in the sign-in a recognised app needs, for the protocol now chosen. */
+	function applyApp(a: KnownApp, base: string) {
+		if (form.protocol === 'gate') {
+			if (gateModes.includes(a.mode)) form.gate.sign_in = a.mode as ProtocolForm['gate']['sign_in'];
+			if (!form.gate.upstream) form.gate.upstream = origin(base);
+			if (a.login_path) form.gate.login_path = a.login_path;
+			if (a.user_field) form.gate.user_field = a.user_field;
+			if (a.pass_field) form.gate.pass_field = a.pass_field;
+		} else if (form.protocol === 'vault') {
+			form.vault.mode = a.mode as ProtocolForm['vault']['mode'];
+			if (a.login_path) form.vault.login_url = origin(base) + a.login_path;
+			if (a.user_field) form.vault.user_field = a.user_field;
+			if (a.pass_field) form.vault.pass_field = a.pass_field;
+		}
+	}
+
+	/** Whether the app's sign-in fits the protocol now chosen. */
+	function fits(a: KnownApp): boolean {
+		return a.protocol === form.protocol || (a.protocol === 'oidc' && form.protocol === 'vault' && a.mode === 'copy' && form.vault.mode === 'copy');
+	}
+
+	/** Switches to the protocol the recognised app needs. */
+	function useApp(a: KnownApp, base: string) {
+		const host = (() => {
+			try {
+				return new URL(appUrl || base).hostname;
+			} catch {
+				return '';
+			}
+		})();
+		if (a.protocol === 'oidc') {
+			form.protocol = 'oidc';
+		} else {
+			form.protocol = a.protocol;
+			if (a.protocol === 'gate' && !form.gate.host) form.gate.host = host;
+			applyApp(a, base);
+		}
+		if (found) found = { ...found, text: `Recognised ${a.name}. Settings filled in.`, app: null, target: a.protocol === 'gate' ? 'gate' : 'vault' };
+	}
+
+	/** Looks for the login form, or recognises the app, and fills in the sign-in. */
 	async function detect(target: 'vault' | 'gate', quiet = false) {
 		if (detecting) return;
 		let url = '';
 		if (target === 'vault') url = (form.vault.login_page || appUrl).trim();
-		else if (form.gate.upstream.trim()) url = form.gate.upstream.trim().replace(/\/+$/, '') + (form.gate.login_path.trim() || '/');
+		else {
+			const base = form.gate.upstream.trim().replace(/\/+$/, '') || origin(appUrl);
+			if (base) url = base + (form.gate.sign_in === 'form' && form.gate.login_path.trim() ? form.gate.login_path.trim() : '/');
+		}
 		if (!url) {
-			if (!quiet) toast(target === 'vault' ? 'Enter the app’s address or login page first.' : 'Enter the address Keystone uses to reach the app first.', 'error');
+			if (!quiet) toast(target === 'vault' ? 'Enter the app’s address or login page first.' : 'Enter the app’s address first.', 'error');
 			return;
 		}
 		detecting = true;
 		try {
 			const d = await api.send<DetectedLogin>('POST', '/apps/login-form', { url });
-			if (target === 'vault') {
-				form.vault.login_url = d.login_url;
-				form.vault.login_page = d.page_url;
-			} else {
-				const a = new URL(d.login_url);
-				form.gate.login_path = a.pathname + a.search;
+			const a = d.app;
+			const notes = [...(a?.note ? [a.note] : []), ...(d.notes ?? [])];
+			// A form found on the page beats the catalog: it has the app's exact fields.
+			const useForm = !!d.login_url && (target === 'gate' ? form.gate.sign_in === 'form' || !form.gate.sign_in : form.vault.mode !== 'json');
+			if (useForm && d.login_url) {
+				if (target === 'vault') {
+					if (form.vault.mode === 'copy') form.vault.mode = 'form';
+					form.vault.login_url = d.login_url;
+					form.vault.login_page = d.page_url;
+					form.vault.user_field = d.user_field || 'username';
+					form.vault.pass_field = d.pass_field || 'password';
+				} else {
+					const u = new URL(d.login_url);
+					form.gate.sign_in = 'form';
+					if (!form.gate.upstream) form.gate.upstream = origin(d.page_url);
+					form.gate.login_path = u.pathname + u.search;
+					form.gate.user_field = d.user_field || 'username';
+					form.gate.pass_field = d.pass_field || 'password';
+				}
+			} else if (a && fits(a)) {
+				applyApp(a, d.page_url);
 			}
-			const f = target === 'vault' ? form.vault : form.gate;
-			f.user_field = d.user_field || 'username';
-			f.pass_field = d.pass_field;
-			found = { text: fieldsText(d), notes: d.notes ?? [], error: false };
+			let text = a ? `Recognised ${a.name}.` : '';
+			if (useForm) text = (text ? text + ' ' : '') + fieldsText(d);
+			else if (a && fits(a)) text += ' Settings filled in.';
+			found = { text, notes, error: false, app: a && !useForm && !fits(a) ? a : null, base: d.page_url, target };
 		} catch (e) {
 			const msg = e instanceof ApiError ? e.message : 'Keystone could not look for the login form.';
-			found = { text: msg, notes: [], error: true };
+			found = { text: msg, notes: [], error: true, app: null, base: '', target };
 			if (!quiet) toast(msg, 'error');
 		} finally {
 			detecting = false;
 		}
 	}
+
+	const useLabel = (a: KnownApp) =>
+		a.protocol === 'gate' ? 'Use the gate' : a.protocol === 'oidc' ? 'Use OIDC' : a.mode === 'copy' ? 'Copy the password instead' : 'Use these settings';
 
 	function vaultMode() {
 		found = null;
@@ -129,6 +202,19 @@
 		}
 	}
 </script>
+
+{#snippet foundBox()}
+	{#if found}
+		<div class="found" class:error={found.error} role="status">
+			{#if found.text}<p>{found.text}</p>{/if}
+			{#each found.notes as n}<p class="muted">{n}</p>{/each}
+			{#if found.app}
+				{@const a = found.app}
+				<p><button type="button" class="btn btn-secondary btn-sm" onclick={() => useApp(a, found!.base)}>{useLabel(a)}</button></p>
+			{/if}
+		</div>
+	{/if}
+{/snippet}
 
 <label class="field">
 	<span>Sign-in</span>
@@ -201,6 +287,11 @@
 		</select>
 		<small>{signInHelp[form.gate.sign_in] ?? 'Off: the app asks for its own login.'}</small>
 	</label>
+	<div class="field">
+		<div><button type="button" class="btn btn-secondary btn-sm" disabled={detecting} onclick={() => detect('gate')}>{detecting ? 'Looking…' : 'Find sign-in automatically'}</button></div>
+		<small>Keystone opens the app, recognises it or finds its login form, and fills in how the gate signs in.</small>
+	</div>
+	{#if found?.target === 'gate'}{@render foundBox()}{/if}
 	{#if form.gate.sign_in}
 		{#if form.gate.sign_in === 'header'}
 			<label class="field">
@@ -221,9 +312,6 @@
 				<label class="field-label" for="config.gate.sign_in.login_path">Login path</label>
 				<div class="row">
 					<input id="config.gate.sign_in.login_path" class="input mono" spellcheck="false" autocapitalize="none" placeholder="/login" aria-invalid={errors['config.gate.sign_in.login_path'] ? 'true' : undefined} bind:value={form.gate.login_path} />
-					{#if form.gate.sign_in === 'form'}
-						<button type="button" class="btn btn-secondary btn-sm" disabled={detecting} onclick={() => detect('gate')}>{detecting ? 'Looking…' : 'Find automatically'}</button>
-					{/if}
 				</div>
 				{#if errors['config.gate.sign_in.login_path']}
 					<small class="field-error" role="alert">{errors['config.gate.sign_in.login_path']}</small>
@@ -231,12 +319,6 @@
 					<small>The page with the login form. The gate opens it first and also sends its hidden fields and security token.</small>
 				{/if}
 			</div>
-			{#if form.gate.sign_in === 'form' && found}
-				<div class="found" class:error={found.error} role="status">
-					<p>{found.text}</p>
-					{#each found.notes as n}<p class="muted">{n}</p>{/each}
-				</div>
-			{/if}
 			<div class="pair">
 				<label class="field">
 					<span>Username field</span>
@@ -320,13 +402,13 @@
 			</div>
 			<small>Keystone opens this page, finds the login form and fills in the fields below. At each sign-in it also sends the form’s hidden fields. Empty: the tile’s address.</small>
 		</div>
-		{#if found}
-			<div class="found" class:error={found.error} role="status">
-				<p>{found.text}</p>
-				{#each found.notes as n}<p class="muted">{n}</p>{/each}
-			</div>
-		{/if}
 	{/if}
+	{#if form.vault.mode === 'json'}
+		<div class="field">
+			<div><button type="button" class="btn btn-secondary btn-sm" disabled={detecting} onclick={() => detect('vault')}>{detecting ? 'Looking…' : 'Find sign-in automatically'}</button></div>
+		</div>
+	{/if}
+	{#if found?.target === 'vault'}{@render foundBox()}{/if}
 	{#if form.vault.mode !== 'copy'}
 		<label class="field">
 			<span>Login form address</span>

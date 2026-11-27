@@ -63,6 +63,10 @@ type Page struct {
 	// Cookies are the cookies the app set while serving the page, when the
 	// client came from NewClient.
 	Cookies []*http.Cookie
+	// App is the app Keystone recognised, with how it signs in, or nil.
+	App *Known
+
+	body []byte
 }
 
 var tokenRe = regexp.MustCompile(`(?i)csrf|xsrf|token|nonce|authenticity|verification|__viewstate|__eventvalidation|_wpnonce`)
@@ -411,11 +415,25 @@ func Fetch(ctx context.Context, c *http.Client, rawURL string) (*Page, error) {
 	if err != nil {
 		return nil, err
 	}
+	first := p
 	if p.Form == nil && !p.Script && len(links) > 0 {
 		if q, _, err := fetch(ctx, c, links[0]); err == nil && q.Form != nil {
 			p = q
 		}
 	}
+	base, _ := url.Parse(first.URL)
+	app, fp := identify(ctx, c, first.body, base, first.Script)
+	if app == nil && p != first {
+		app, fp = identify(ctx, c, p.body, base, false)
+	}
+	if app != nil && p.Form == nil && fp.loginPage != "" {
+		u := *base
+		u.Path, u.RawQuery, u.Fragment = fp.loginPage, "", ""
+		if q, _, err := fetch(ctx, c, u.String()); err == nil && q.Form != nil {
+			p = q
+		}
+	}
+	p.App = app
 	p.Cookies = Recorded(c)
 	return p, nil
 }
@@ -443,7 +461,7 @@ func fetch(ctx context.Context, c *http.Client, rawURL string) (*Page, []string,
 		return nil, nil, err
 	}
 	final := resp.Request.URL
-	p := &Page{URL: final.String()}
+	p := &Page{URL: final.String(), body: body}
 	if resp.StatusCode >= 500 {
 		return nil, nil, fmt.Errorf("loginform: the app answered %d", resp.StatusCode)
 	}

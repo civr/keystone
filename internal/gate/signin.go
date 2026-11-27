@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -330,6 +331,43 @@ var upstream = &http.Client{
 	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 }
 
+// upstreamLAN is for apps on the home network, which mostly have self-signed
+// certificates (UniFi OS, Proxmox, NAS pages). Only private addresses,
+// container names and home-network names get it.
+var upstreamLAN = &http.Client{
+	Timeout:       10 * time.Second,
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	Transport: &http.Transport{
+		Proxy:           http.ProxyFromEnvironment,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // home-network apps only, see onLAN
+	},
+}
+
+// onLAN reports a host on the home network: a private or loopback address,
+// a container name without dots, or a home-network name.
+func onLAN(host string) bool {
+	if ip, err := netip.ParseAddr(host); err == nil {
+		return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()
+	}
+	h := strings.ToLower(strings.TrimSuffix(host, "."))
+	if !strings.Contains(h, ".") {
+		return true
+	}
+	for _, s := range []string{".lan", ".local", ".home.arpa", ".internal", ".localhost"} {
+		if strings.HasSuffix(h, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func clientFor(target string) *http.Client {
+	if u, err := url.Parse(target); err == nil && u.Scheme == "https" && onLAN(u.Hostname()) {
+		return upstreamLAN
+	}
+	return upstream
+}
+
 // formLogin posts the login form (or JSON body) to the app and returns the
 // cookies it sets, made host-only for the browser. The status is the app's.
 // The app is reached over plain http inside, so on an https host the cookies
@@ -466,7 +504,7 @@ func post(ctx context.Context, target, ctype, body string, hdr map[string]string
 	for k, v := range hdr {
 		req.Header.Set(k, v)
 	}
-	return upstream.Do(req)
+	return clientFor(target).Do(req)
 }
 
 type jellyfinAuth struct {

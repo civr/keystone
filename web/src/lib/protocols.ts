@@ -221,14 +221,27 @@ export function connectionInfo(origin: string, app: App): { label: string; value
 	return [];
 }
 
-/** A login form Keystone found on an app's page (POST /apps/login-form). */
+/** An app Keystone recognised, with the sign-in that works for it. */
+export interface KnownApp {
+	name: string;
+	protocol: 'gate' | 'vault' | 'oidc';
+	mode: string;
+	login_path?: string;
+	user_field?: string;
+	pass_field?: string;
+	note?: string;
+}
+
+/** What Keystone found on an app's page (POST /apps/login-form). */
 export interface DetectedLogin {
 	page_url: string;
-	login_url: string;
-	method: string;
-	user_field: string;
-	pass_field: string;
-	extra: string[];
-	token: boolean;
+	/** The login form; absent when only the app was recognised. */
+	login_url?: string;
+	method?: string;
+	user_field?: string;
+	pass_field?: string;
+	extra?: string[];
+	token?: boolean;
+	app: KnownApp | null;
 	notes: string[] | null;
 }
